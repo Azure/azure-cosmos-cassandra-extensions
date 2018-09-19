@@ -222,7 +222,7 @@ public class CosmosRetryPolicyTest {
             long duration = System.nanoTime() - startTime;
 
             assertThat(retryDecision.getType()).isEqualTo(expectedRetryDecisionType);
-            assertThat(duration).isGreaterThan(expectedDuration);
+            assertThat((double)duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
         }
     }
 
