@@ -25,7 +25,10 @@ import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.WriteType;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
+import com.datastax.driver.core.exceptions.WriteFailureException;
 import com.datastax.driver.core.policies.RetryPolicy;
+
+import java.util.Random;
 
 /**
  * Implements a Cassandra {@link RetryPolicy} with back-offs for {@link OverloadedException} failures
@@ -83,7 +86,7 @@ public class CosmosRetryPolicy implements RetryPolicy {
         RetryDecision retryDecision;
 
         try {
-            if (driverException instanceof OverloadedException) {
+            if (driverException instanceof OverloadedException || driverException instanceof WriteFailureException) {
                 retryDecision = retryManyTimesWithBackOffOrThrow(retryNumber);
             } else {
                 retryDecision = RetryDecision.rethrow();
@@ -117,7 +120,9 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
         return retryManyTimesOrThrow(retryNumber);
     }
-
+    
+    private final static Random random = new Random();
+    private final int growingBackOffSaltMs = 2000;
     private final int fixedBackOffTimeMs;
     private final int growingBackOffTimeMs;
     private final int maxRetryCount;
@@ -148,7 +153,7 @@ public class CosmosRetryPolicy implements RetryPolicy {
             retryDecision = RetryDecision.retry(null);
         } else {
             if (retryNumber < this.maxRetryCount) {
-                Thread.sleep(this.growingBackOffTimeMs * retryNumber);
+                Thread.sleep(this.growingBackOffTimeMs * retryNumber + random.nextInt(growingBackOffSaltMs));
                 retryDecision = RetryDecision.retry(null);
             } else {
                 retryDecision = RetryDecision.rethrow();
