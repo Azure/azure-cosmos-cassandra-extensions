@@ -34,9 +34,9 @@ import java.util.Random;
  * Implements a Cassandra {@link RetryPolicy} with back-offs for {@link OverloadedException} failures
  * <p>
  * Growing/fixed back-offs are performed based on the value of {@link #maxRetryCount}. A value of -1 specifies that
- * an indefinite number of retries should be attempted every {@link #fixedBackOffTimeMs} milliseconds (default:
- * 5000 ms). A value greater than zero specifies that {@link #maxRetryCount} retries should be attempted following a
- * growing back-off scheme. In this case the time between retries is increased by {@link #growingBackOffTimeMs}
+ * an indefinite number of retries should be attempted every {@link #fixedBackOffTimeMillis} milliseconds (default:
+ * 5000 Millis). A value greater than zero specifies that {@link #maxRetryCount} retries should be attempted following a
+ * growing back-off scheme. In this case the time between retries is increased by {@link #growingBackOffTimeMillis}
  * milliseconds (default: 1000 ms) on each retry.
  * </p>
  */
@@ -46,10 +46,10 @@ public class CosmosRetryPolicy implements RetryPolicy {
         this(maxRetryCount, 5000, 1000);
     }
 
-    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMs, int growingBackOffTimeMs) {
+    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMillis, int growingBackOffTimeMillis) {
         this.maxRetryCount = maxRetryCount;
-        this.fixedBackOffTimeMs = fixedBackOffTimeMs;
-        this.growingBackOffTimeMs = growingBackOffTimeMs;
+        this.fixedBackOffTimeMillis = fixedBackOffTimeMillis;
+        this.growingBackOffTimeMillis = growingBackOffTimeMillis;
     }
 
     public int getMaxRetryCount() {
@@ -122,9 +122,9 @@ public class CosmosRetryPolicy implements RetryPolicy {
     }
     
     private final static Random random = new Random();
-    private final int growingBackOffSaltMs = 2000;
-    private final int fixedBackOffTimeMs;
-    private final int growingBackOffTimeMs;
+    private final int growingBackOffSaltMillis = 2000;
+    private final int fixedBackOffTimeMillis;
+    private final int growingBackOffTimeMillis;
     private final int maxRetryCount;
 
     private RetryDecision retryManyTimesOrThrow(int retryNumber) {
@@ -149,11 +149,11 @@ public class CosmosRetryPolicy implements RetryPolicy {
         RetryDecision retryDecision = null;
 
         if (this.maxRetryCount == -1) {
-            Thread.sleep(this.fixedBackOffTimeMs);
+            Thread.sleep(this.fixedBackOffTimeMillis);
             retryDecision = RetryDecision.retry(null);
         } else {
             if (retryNumber < this.maxRetryCount) {
-                Thread.sleep(this.growingBackOffTimeMs * retryNumber + random.nextInt(growingBackOffSaltMs));
+                Thread.sleep(this.growingBackOffTimeMillis * retryNumber + random.nextInt(growingBackOffSaltMillis));
                 retryDecision = RetryDecision.retry(null);
             } else {
                 retryDecision = RetryDecision.rethrow();
