@@ -35,12 +35,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * CosmosDB failover aware Round-robin load balancing policy.
- * This allows the user to seamlessly failover the default write region.
+ * This policy allows the user to seamlessly failover the default write region.
  * This is very similar to DCAwareRoundRobinPolicy, with a difference that
  * it considers the nodes in the default write region at distance LOCAL.
  * All other nodes are considered at distance REMOTE.
  * The nodes in the default write region are retrieved from the global endpoint
- * of the account.
+ * of the account, based on the dns refresh interval of 60 seconds by default.
  */
 public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
 {
@@ -51,17 +51,27 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
     private Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> hosts;
     private InetAddress[] localAddresses = null;
 
+    /**
+     * Creates a new CosmosDB failover aware round robin policy given the global endpoint.
+     * @param globalContactPoint is the contact point of the account (e.g, *.cassandra.cosmos.azure.com)
+     */
     public CosmosFailoverAwareRRPolicy(String globalContactPoint)
     {
         this(globalContactPoint, 60);
     }
 
+    /**
+     * Creates a new CosmosDB failover aware round robin policy given the global endpoint.
+     * @param globalContactPoint is the contact point of the account (e.g, *.cassandra.cosmos.azure.com)
+     * @param dnsExpirationInSeconds specifies the dns refresh interval, which is 60 seconds by default.
+     */
     public CosmosFailoverAwareRRPolicy(String globalContactPoint, int dnsExpirationInSeconds)
     {
         this.globalContactPoint = globalContactPoint;
         this.dnsExpirationInSeconds = dnsExpirationInSeconds;
     }
 
+    @Override
     public void init(Cluster cluster, Collection<Host> hosts) {
         CopyOnWriteArrayList<Host> localDcAddresses = new CopyOnWriteArrayList<Host>();
         CopyOnWriteArrayList<Host> remoteDcAddresses = new CopyOnWriteArrayList<Host>();
@@ -88,6 +98,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
      * @param host the host of which to return the distance of.
      * @return the HostDistance to {@code host}.
      */
+    @Override
     public HostDistance distance(Host host) {
         if (Arrays.asList(getLocalAddresses()).contains(host.getAddress()))
         {
@@ -101,7 +112,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
      * Returns the hosts to use for a new query.
      *
      * <p>The returned plan will always try each known host in the default write region first, and then,
-     * if none of the host is reachable, it will try the remote datacenter.
+     * if none of the host is reachable, it will try all other regions.
      * The order of the local node in the returned query plan will follow a
      * Round-robin algorithm.
      *
@@ -110,36 +121,35 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
      * @return a new query plan, i.e. an iterator indicating which host to try first for querying,
      *     which one to use as failover, etc...
      */
+    @Override
     public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement)
     {
         Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
-        final List<Host> localHosts = cloneList(allHosts.getKey());
-        final List<Host> remoteHosts = cloneList(allHosts.getValue());
+        final Host[] localHosts = (Host[]) allHosts.getKey().toArray();
+        final Host[] remoteHosts = (Host[]) allHosts.getValue().toArray();
         final int startIdx = index.getAndIncrement();
+
+        // Overflow protection; not theoretically thread safe but should be good enough
+        if (startIdx > Integer.MAX_VALUE - 10000)
+        {
+            index.set(0);
+        }
 
         return new AbstractIterator<Host>() {
             private int idx = startIdx;
-            private int remainingLocal = localHosts.size();
-            private int remainingRemote = remoteHosts.size();
+            private int remainingLocal = localHosts.length;
+            private int remainingRemote = remoteHosts.length;
 
             protected Host computeNext() {
                 while (true) {
                     if (remainingLocal > 0) {
                         remainingLocal--;
-                        int c = idx++ % localHosts.size();
-                        if (c < 0) {
-                            c += localHosts.size();
-                        }
-                        return localHosts.get(c);
+                        return localHosts[idx ++ % localHosts.length];
                     }
 
                     if (remainingRemote > 0) {
                         remainingRemote--;
-                        int c = idx++ % remoteHosts.size();
-                        if (c < 0) {
-                            c += remoteHosts.size();
-                        }
-                        return remoteHosts.get(c);
+                        return remoteHosts[idx ++ % remoteHosts.length];
                     }
 
                     return endOfData();
@@ -148,6 +158,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
         };
     }
 
+    @Override
     public void onUp(Host host) {
         if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress()))
         {
@@ -158,6 +169,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
         hosts.getValue().addIfAbsent(host);
     }
 
+    @Override
     public void onDown(Host host) {
         if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress()))
         {
@@ -168,10 +180,12 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
         hosts.getValue().remove(host);
     }
 
+    @Override
     public void onAdd(Host host) {
         onUp(host);
     }
 
+    @Override
     public void onRemove(Host host) {
         onDown(host);
     }

@@ -19,7 +19,9 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.Session;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import org.testng.annotations.Test;
 
@@ -31,9 +33,9 @@ import static org.assertj.core.api.Assertions.fail;
  * <p>Preconditions:
  *
  * <ul>
- * <li>An Apache Cassandra cluster is running and accessible through the contacts points
- * identified by #CONTACT_POINTS and #PORT.
- * </ul>
+ * <li> CosmosDB Cassandra account must be created.
+ * <li> TestCommon.CONTACT_POINTS is the the global endpoint (e.g *.cassandra.cosmos.azure.com).
+ * <li> TestCommon.PORT is 10350.
  * <p>
  * Side effects:
  *
@@ -101,7 +103,6 @@ public class CosmosFailoverAwareRRPolicyTest {
      * @param port          the port to use.
      */
     private void connect(String[] contactPoints, int port, LoadBalancingPolicy loadBalancingPolicy) {
-
         cluster = Cluster.builder().addContactPoints(contactPoints).withPort(port).withLoadBalancingPolicy(loadBalancingPolicy).build();
         System.out.println("Connected to cluster: " + cluster.getClusterName());
         session = cluster.connect();
