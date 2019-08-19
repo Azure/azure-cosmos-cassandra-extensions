@@ -122,7 +122,7 @@ public class CosmosRetryPolicyTest {
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
 
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
-        retry(retryPolicy,MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
+        retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
     }
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = QUORUM;
@@ -148,12 +148,12 @@ public class CosmosRetryPolicyTest {
             long expectedDuration = 1000000 * (retryPolicy.getMaxRetryCount() == -1 ? FIXED_BACK_OFF_TIME : retryNumber * GROWING_BACK_OFF_TIME);
             long startTime = System.nanoTime();
 
-            RetryPolicy.RetryDecision retryDecision = retryPolicy.onRequestError(statement, consistencyLevel, driverException, retryNumber);
+            RetryDecision retryDecision = retryPolicy.onRequestError(statement, consistencyLevel, driverException, retryNumber);
 
             long duration = System.nanoTime() - startTime;
 
             assertThat(retryDecision.getType()).isEqualTo(expectedRetryDecisionType);
-            assertThat((double)duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
+            assertThat((double) duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
         }
     }
 
