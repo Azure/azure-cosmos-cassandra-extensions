@@ -125,8 +125,8 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
     public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement)
     {
         Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
-        final Host[] localHosts = (Host[]) allHosts.getKey().toArray();
-        final Host[] remoteHosts = (Host[]) allHosts.getValue().toArray();
+        final List<Host> localHosts = cloneList(allHosts.getKey());
+        final List<Host> remoteHosts = cloneList(allHosts.getValue());
         final int startIdx = index.getAndIncrement();
 
         // Overflow protection; not theoretically thread safe but should be good enough
@@ -137,19 +137,19 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
 
         return new AbstractIterator<Host>() {
             private int idx = startIdx;
-            private int remainingLocal = localHosts.length;
-            private int remainingRemote = remoteHosts.length;
+            private int remainingLocal = localHosts.size();
+            private int remainingRemote = remoteHosts.size();
 
             protected Host computeNext() {
                 while (true) {
                     if (remainingLocal > 0) {
                         remainingLocal--;
-                        return localHosts[idx ++ % localHosts.length];
+                        return localHosts.get(idx ++ % localHosts.size());
                     }
 
                     if (remainingRemote > 0) {
                         remainingRemote--;
-                        return remoteHosts[idx ++ % remoteHosts.length];
+                        return remoteHosts.get(idx ++ % remoteHosts.size());
                     }
 
                     return endOfData();
