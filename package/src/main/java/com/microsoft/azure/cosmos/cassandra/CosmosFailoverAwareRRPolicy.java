@@ -191,15 +191,14 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     }
 
     private InetAddress[] getLocalAddresses() {
-        if (this.localAddresses == null || dnsExpired()){
-            try{
+        if (this.localAddresses == null || dnsExpired()) {
+            try {
                 this.localAddresses = InetAddress.getAllByName(globalContactPoint);
                 this.lastDnsLookupTime = System.currentTimeMillis()/1000;
             }
-            catch (UnknownHostException ex){
-
+            catch (UnknownHostException ex) {
                 // dns entry may be temporarily unavailable
-                if (this.localAddresses == null){
+                if (this.localAddresses == null) {
                     throw new IllegalArgumentException("The dns could not resolve the globalContactPoint the first time.");
                 }
             }
@@ -209,7 +208,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     }
 
     private Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> getHosts() {
-        if (hosts != null && !dnsExpired()){
+        if (hosts != null && !dnsExpired()) {
             return hosts;
         }
 
@@ -220,18 +219,18 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         CopyOnWriteArrayList<Host> localDcHosts = new CopyOnWriteArrayList<Host>();
         CopyOnWriteArrayList<Host> remoteDcHosts = new CopyOnWriteArrayList<Host>();
 
-        for (Host host: oldLocalDcHosts){
-            if (localAddresses.contains(host.getAddress())){
+        for (Host host: oldLocalDcHosts) {
+            if (localAddresses.contains(host.getAddress())) {
                 localDcHosts.addIfAbsent(host);
-            }else{
+            } else {
                 remoteDcHosts.addIfAbsent(host);
             }
         }
 
-        for (Host host: newLocalDcHosts){
-            if (localAddresses.contains(host.getAddress())){
+        for (Host host: newLocalDcHosts) {
+            if (localAddresses.contains(host.getAddress())) {
                 localDcHosts.addIfAbsent(host);
-            }else{
+            } else {
                 remoteDcHosts.addIfAbsent(host);
             }
         }
@@ -239,7 +238,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         return hosts = new Pair(localDcHosts, remoteDcHosts);
     }
 
-    private boolean dnsExpired(){
+    private boolean dnsExpired() {
         return System.currentTimeMillis()/1000 > lastDnsLookupTime + dnsExpirationInSeconds;
     }
 }
