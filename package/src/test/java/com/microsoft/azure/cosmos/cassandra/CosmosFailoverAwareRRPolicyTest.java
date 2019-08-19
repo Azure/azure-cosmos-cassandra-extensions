@@ -60,7 +60,6 @@ public class CosmosFailoverAwareRRPolicyTest {
 
         try {
             this.connect(TestCommon.CONTACT_POINTS, TestCommon.PORT, loadBalancingPolicy);
-
         } catch (Exception error) {
             fail(String.format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
         }
@@ -68,7 +67,6 @@ public class CosmosFailoverAwareRRPolicyTest {
         try {
             try {
                 TestCommon.createSchema(session);
-
             } catch (Exception error) {
                 fail(String.format("createSchema failed: %s", error));
             }

@@ -25,8 +25,8 @@ import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.google.common.collect.AbstractIterator;
-import javafx.util.Pair;
 
+import javafx.util.Pair;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -42,8 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The nodes in the default write region are retrieved from the global endpoint
  * of the account, based on the dns refresh interval of 60 seconds by default.
  */
-public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
-{
+public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     private final AtomicInteger index = new AtomicInteger();
     private long lastDnsLookupTime = Long.MIN_VALUE;
     private String globalContactPoint;
@@ -53,10 +52,10 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
 
     /**
      * Creates a new CosmosDB failover aware round robin policy given the global endpoint.
+     * Optionally specify dnsExpirationInSeconds, which defaults to 60 seconds.
      * @param globalContactPoint is the contact point of the account (e.g, *.cassandra.cosmos.azure.com)
      */
-    public CosmosFailoverAwareRRPolicy(String globalContactPoint)
-    {
+    public CosmosFailoverAwareRRPolicy(String globalContactPoint) {
         this(globalContactPoint, 60);
     }
 
@@ -65,8 +64,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
      * @param globalContactPoint is the contact point of the account (e.g, *.cassandra.cosmos.azure.com)
      * @param dnsExpirationInSeconds specifies the dns refresh interval, which is 60 seconds by default.
      */
-    public CosmosFailoverAwareRRPolicy(String globalContactPoint, int dnsExpirationInSeconds)
-    {
+    public CosmosFailoverAwareRRPolicy(String globalContactPoint, int dnsExpirationInSeconds) {
         this.globalContactPoint = globalContactPoint;
         this.dnsExpirationInSeconds = dnsExpirationInSeconds;
     }
@@ -77,11 +75,9 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
         CopyOnWriteArrayList<Host> remoteDcAddresses = new CopyOnWriteArrayList<Host>();
         List<InetAddress> localAddressesFromLookup = Arrays.asList(getLocalAddresses());
         for (Host host : hosts) {
-            if (localAddressesFromLookup.contains(host.getAddress()))
-            {
+            if (localAddressesFromLookup.contains(host.getAddress())) {
                 localDcAddresses.add(host);
-            }
-            else{
+            } else {
                 remoteDcAddresses.add(host);
             }
         }
@@ -100,8 +96,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
      */
     @Override
     public HostDistance distance(Host host) {
-        if (Arrays.asList(getLocalAddresses()).contains(host.getAddress()))
-        {
+        if (Arrays.asList(getLocalAddresses()).contains(host.getAddress())) {
             return HostDistance.LOCAL;
         }
 
@@ -122,16 +117,14 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
      *     which one to use as failover, etc...
      */
     @Override
-    public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement)
-    {
+    public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
         Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
         final List<Host> localHosts = cloneList(allHosts.getKey());
         final List<Host> remoteHosts = cloneList(allHosts.getValue());
         final int startIdx = index.getAndIncrement();
 
         // Overflow protection; not theoretically thread safe but should be good enough
-        if (startIdx > Integer.MAX_VALUE - 10000)
-        {
+        if (startIdx > Integer.MAX_VALUE - 10000) {
             index.set(0);
         }
 
@@ -160,8 +153,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
 
     @Override
     public void onUp(Host host) {
-        if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress()))
-        {
+        if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
             hosts.getKey().addIfAbsent(host);
             return;
         }
@@ -171,8 +163,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
 
     @Override
     public void onDown(Host host) {
-        if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress()))
-        {
+        if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
             hosts.getKey().remove(host);
             return;
         }
@@ -199,8 +190,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy
         return (CopyOnWriteArrayList<Host>) list.clone();
     }
 
-    private InetAddress[] getLocalAddresses()
-    {
+    private InetAddress[] getLocalAddresses() {
         if (this.localAddresses == null || dnsExpired()){
             try{
                 this.localAddresses = InetAddress.getAllByName(globalContactPoint);

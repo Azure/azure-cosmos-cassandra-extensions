@@ -36,7 +36,7 @@ public class TestCommon {
         }
 
         PORT = Short.parseShort(value);
-    };
+    }
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
