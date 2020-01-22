@@ -33,6 +33,8 @@ import java.util.Random;
 /**
  * Implements a Cassandra {@link RetryPolicy} with back-offs for {@link OverloadedException} failures
  * <p>
+ * When {@link #useRetryMillisIfAvailable} is enabled, we try to parse the exception message and use RetryAfterMs
+ * field for the back-off duration. If RetryAfterMs is not available, we default to exponential backoff.
  * Growing/fixed back-offs are performed based on the value of {@link #maxRetryCount}. A value of -1 specifies that
  * an indefinite number of retries should be attempted every {@link #fixedBackOffTimeMillis} milliseconds (default:
  * 5000 Millis). A value greater than zero specifies that {@link #maxRetryCount} retries should be attempted following a
@@ -43,13 +45,14 @@ import java.util.Random;
 public class CosmosRetryPolicy implements RetryPolicy {
 
     public CosmosRetryPolicy(int maxRetryCount) {
-        this(maxRetryCount, 5000, 1000);
+        this(maxRetryCount, 5000, 1000, true);
     }
 
-    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMillis, int growingBackOffTimeMillis) {
+    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMillis, int growingBackOffTimeMillis, boolean useRetryMillisIfAvailable) {
         this.maxRetryCount = maxRetryCount;
         this.fixedBackOffTimeMillis = fixedBackOffTimeMillis;
         this.growingBackOffTimeMillis = growingBackOffTimeMillis;
+        this.useRetryMillisIfAvailable = useRetryMillisIfAvailable;
     }
 
     public int getMaxRetryCount() {
@@ -87,7 +90,9 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
         try {
             if (driverException instanceof OverloadedException || driverException instanceof WriteFailureException) {
-                retryDecision = retryManyTimesWithBackOffOrThrow(retryNumber);
+                retryDecision = this.useRetryMillisIfAvailable ?
+                        retryManyTimesWithMsInfoOrThrow(retryNumber, driverException.toString()):
+                        retryManyTimesWithBackOffOrThrow(retryNumber);
             } else {
                 retryDecision = RetryDecision.rethrow();
             }
@@ -120,12 +125,13 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
         return retryManyTimesOrThrow(retryNumber);
     }
-    
+
     private final static Random random = new Random();
     private final int growingBackOffSaltMillis = 2000;
     private final int fixedBackOffTimeMillis;
     private final int growingBackOffTimeMillis;
     private final int maxRetryCount;
+    private boolean useRetryMillisIfAvailable;
 
     private RetryDecision retryManyTimesOrThrow(int retryNumber) {
 
@@ -161,5 +167,43 @@ public class CosmosRetryPolicy implements RetryPolicy {
         }
 
         return retryDecision;
+    }
+
+    private RetryDecision retryManyTimesWithMsInfoOrThrow(int retryNumber, String exception) throws InterruptedException {
+
+        RetryDecision retryDecision = null;
+
+        int retryWaitTime = getRetryAfterMs(exception);
+
+        if (this.maxRetryCount == -1) {
+            Thread.sleep(retryWaitTime);
+            retryDecision = RetryDecision.retry(null);
+        } else {
+            System.out.println("retrying after "+retryWaitTime+" millseconds");
+            System.out.println("retryNumber "+retryNumber+" of "+this.maxRetryCount);
+            if (retryNumber < this.maxRetryCount) {
+                Thread.sleep(retryWaitTime);
+                retryDecision = RetryDecision.retry(null);
+            } else {
+                retryDecision = RetryDecision.rethrow();
+            }
+        }
+
+        return retryDecision;
+    }
+
+    public int getRetryAfterMs(String exceptionString){
+        // TODO: What if the exceptionString is not as we expected?
+        //parse the exception test to get retry milliseconds
+        int millseconds = 0;
+        String[] exceptions = exceptionString.toString().split(",");
+        String[] retryProperty = exceptions[1].toString().split("=");
+        exceptionString = retryProperty[0].toString().trim();
+        if (exceptionString.equals("RetryAfterMs")){
+            String value = retryProperty[1];
+            millseconds = Integer.parseInt(value);
+        }
+
+        return millseconds;
     }
 }
