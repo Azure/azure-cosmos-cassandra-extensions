@@ -171,24 +171,18 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
         RetryDecision retryDecision = null;
 
-        // If any exception occurs, default to exponential.
-        int retryWaitTime = -1;
-        try {
-            retryWaitTime = getRetryAfterMs(exception);
-        }
-        catch (Exception e) {
-            return retryManyTimesWithBackOffOrThrow(retryNumber);
-        }
-
         if (this.maxRetryCount == -1) {
             Thread.sleep(retryWaitTime);
             retryDecision = RetryDecision.retry(null);
+        } else if (retryNumber >= this.maxRetryCount) {
+            retryDecision = RetryDecision.rethrow();
         } else {
-            if (retryNumber < this.maxRetryCount && retryWaitTime > 0) {
+            retryWaitTime = getRetryAfterMs(exception);
+            if (retryWaitTime > 0) {
                 Thread.sleep(retryWaitTime);
                 retryDecision = RetryDecision.retry(null);
-            } else {
-                retryDecision = RetryDecision.rethrow();
+            }else{
+                return retryManyTimesWithBackOffOrThrow(retryNumber);
             }
         }
 
@@ -196,16 +190,19 @@ public class CosmosRetryPolicy implements RetryPolicy {
     }
 
     public int getRetryAfterMs(String exceptionString){
-        //parse the exception test to get retry milliseconds
-        int millseconds = 0;
         String[] exceptions = exceptionString.toString().split(",");
+
+        if (exceptions.length < 2) return -1;
         String[] retryProperty = exceptions[1].toString().split("=");
+
+        if (retryProperty.length < 2) return -1;
         exceptionString = retryProperty[0].toString().trim();
+
         if (exceptionString.equals("RetryAfterMs")){
             String value = retryProperty[1];
-            millseconds = Integer.parseInt(value);
+            return Integer.parseInt(value);
         }
 
-        return millseconds;
+        return -1;
     }
 }
