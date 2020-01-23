@@ -48,7 +48,16 @@ public class CosmosRetryPolicy implements RetryPolicy {
         this(maxRetryCount, 5000, 1000, true);
     }
 
-    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMillis, int growingBackOffTimeMillis, boolean useRetryMillisIfAvailable) {
+    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMillis, int growingBackOffTimeMillis) {
+        this(maxRetryCount, fixedBackOffTimeMillis, growingBackOffTimeMillis, true);
+    }
+
+    public CosmosRetryPolicy(
+            int maxRetryCount,
+            int fixedBackOffTimeMillis,
+            int growingBackOffTimeMillis,
+            boolean useRetryMillisIfAvailable) {
+
         this.maxRetryCount = maxRetryCount;
         this.fixedBackOffTimeMillis = fixedBackOffTimeMillis;
         this.growingBackOffTimeMillis = growingBackOffTimeMillis;
@@ -135,19 +144,8 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
     private RetryDecision retryManyTimesOrThrow(int retryNumber) {
 
-        RetryDecision retryDecision;
-
-        if (this.maxRetryCount == -1) {
-            retryDecision = RetryDecision.retry(null);
-        } else {
-            if (retryNumber < this.maxRetryCount) {
-                retryDecision = RetryDecision.retry(null);
-            } else {
-                retryDecision = RetryDecision.rethrow();
-            }
-        }
-
-        return retryDecision;
+        return (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) ?
+                RetryDecision.retry(null) : RetryDecision.rethrow();
     }
 
     private RetryDecision retryManyTimesWithBackOffOrThrow(int retryNumber) throws InterruptedException {
@@ -173,15 +171,20 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
         RetryDecision retryDecision = null;
 
-        int retryWaitTime = getRetryAfterMs(exception);
+        // If any exception occurs, default to exponential.
+        int retryWaitTime = -1;
+        try {
+            retryWaitTime = getRetryAfterMs(exception);
+        }
+        catch (Exception e) {
+            return retryManyTimesWithBackOffOrThrow(retryNumber);
+        }
 
         if (this.maxRetryCount == -1) {
             Thread.sleep(retryWaitTime);
             retryDecision = RetryDecision.retry(null);
         } else {
-            System.out.println("retrying after "+retryWaitTime+" millseconds");
-            System.out.println("retryNumber "+retryNumber+" of "+this.maxRetryCount);
-            if (retryNumber < this.maxRetryCount) {
+            if (retryNumber < this.maxRetryCount && retryWaitTime > 0) {
                 Thread.sleep(retryWaitTime);
                 retryDecision = RetryDecision.retry(null);
             } else {
@@ -193,7 +196,6 @@ public class CosmosRetryPolicy implements RetryPolicy {
     }
 
     public int getRetryAfterMs(String exceptionString){
-        // TODO: What if the exceptionString is not as we expected?
         //parse the exception test to get retry milliseconds
         int millseconds = 0;
         String[] exceptions = exceptionString.toString().split(",");
