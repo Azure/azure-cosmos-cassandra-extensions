@@ -84,7 +84,6 @@ public class CosmosRetryPolicy implements RetryPolicy {
             int receivedResponses,
             boolean dataRetrieved,
             int retryNumber) {
-
         return retryManyTimesOrThrow(retryNumber);
     }
 
@@ -94,14 +93,25 @@ public class CosmosRetryPolicy implements RetryPolicy {
             ConsistencyLevel consistencyLevel,
             DriverException driverException,
             int retryNumber) {
-
         RetryDecision retryDecision;
 
         try {
             if (driverException instanceof OverloadedException || driverException instanceof WriteFailureException) {
-                retryDecision = this.useRetryMillisIfAvailable ?
-                        retryManyTimesWithMsInfoOrThrow(retryNumber, driverException.toString()):
-                        retryManyTimesWithBackOffOrThrow(retryNumber);
+                if (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount){
+                    int retryMillis = -1;
+                    if (this.useRetryMillisIfAvailable) {
+                        retryWaitTime = getRetryAfterMs(driverException.toString());
+                    }
+
+                    if (retryMillis == -1) {
+                        retryMillis = this.growingBackOffTimeMillis * retryNumber + random.nextInt(growingBackOffSaltMillis);
+                    }
+
+                    Thread.sleep(retryMillis);
+                    retryDecision = RetryDecision.retry(null);
+                } else {
+                    retryDecision = RetryDecision.rethrow();
+                }
             } else {
                 retryDecision = RetryDecision.rethrow();
             }
@@ -119,7 +129,6 @@ public class CosmosRetryPolicy implements RetryPolicy {
             int requiredReplica,
             int aliveReplica,
             int retryNumber) {
-
         return retryManyTimesOrThrow(retryNumber);
     }
 
@@ -131,7 +140,6 @@ public class CosmosRetryPolicy implements RetryPolicy {
             int requiredAcks,
             int receivedAcks,
             int retryNumber) {
-
         return retryManyTimesOrThrow(retryNumber);
     }
 
@@ -143,62 +151,19 @@ public class CosmosRetryPolicy implements RetryPolicy {
     private boolean useRetryMillisIfAvailable;
 
     private RetryDecision retryManyTimesOrThrow(int retryNumber) {
-
         return (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) ?
                 RetryDecision.retry(null) : RetryDecision.rethrow();
     }
 
-    private RetryDecision retryManyTimesWithBackOffOrThrow(int retryNumber) throws InterruptedException {
-
-        RetryDecision retryDecision = null;
-
-        if (this.maxRetryCount == -1) {
-            Thread.sleep(this.fixedBackOffTimeMillis);
-            retryDecision = RetryDecision.retry(null);
-        } else {
-            if (retryNumber < this.maxRetryCount) {
-                Thread.sleep(this.growingBackOffTimeMillis * retryNumber + random.nextInt(growingBackOffSaltMillis));
-                retryDecision = RetryDecision.retry(null);
-            } else {
-                retryDecision = RetryDecision.rethrow();
-            }
-        }
-
-        return retryDecision;
-    }
-
-    private RetryDecision retryManyTimesWithMsInfoOrThrow(int retryNumber, String exception) throws InterruptedException {
-
-        RetryDecision retryDecision = null;
-
-        if (this.maxRetryCount == -1) {
-            Thread.sleep(retryWaitTime);
-            retryDecision = RetryDecision.retry(null);
-        } else if (retryNumber >= this.maxRetryCount) {
-            retryDecision = RetryDecision.rethrow();
-        } else {
-            retryWaitTime = getRetryAfterMs(exception);
-            if (retryWaitTime > 0) {
-                Thread.sleep(retryWaitTime);
-                retryDecision = RetryDecision.retry(null);
-            }else{
-                return retryManyTimesWithBackOffOrThrow(retryNumber);
-            }
-        }
-
-        return retryDecision;
-    }
-
     public int getRetryAfterMs(String exceptionString){
         String[] exceptions = exceptionString.toString().split(",");
-
         if (exceptions.length < 2) return -1;
         String[] retryProperty = exceptions[1].toString().split("=");
 
         if (retryProperty.length < 2) return -1;
         exceptionString = retryProperty[0].toString().trim();
 
-        if (exceptionString.equals("RetryAfterMs")){
+        if (exceptionString.equals("RetryAfterMs")) {
             String value = retryProperty[1];
             return Integer.parseInt(value);
         }
