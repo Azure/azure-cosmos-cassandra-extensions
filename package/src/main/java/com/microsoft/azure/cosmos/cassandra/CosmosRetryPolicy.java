@@ -142,6 +142,9 @@ public class CosmosRetryPolicy implements RetryPolicy {
                 RetryDecision.retry(null) : RetryDecision.rethrow();
     }
 
+    // Example exceptionString:
+    // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babatsai.cassandra.cosmos.azure.com/40.65.106.154:10350)
+    // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10, Additional details='
     public int getRetryAfterMs(String exceptionString){
         String[] exceptions = exceptionString.toString().split(",");
         if (exceptions.length < 2) return -1;
