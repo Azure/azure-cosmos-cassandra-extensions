@@ -86,7 +86,7 @@ public class CosmosRetryPolicy implements RetryPolicy {
 
         try {
             if (driverException instanceof OverloadedException || driverException instanceof WriteFailureException) {
-                if (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount){
+                if (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) {
                     int retryMillis = getRetryAfterMs(driverException.toString());
                     if (retryMillis == -1) {
                         retryMillis = (this.maxRetryCount == -1) ?
@@ -146,16 +146,14 @@ public class CosmosRetryPolicy implements RetryPolicy {
     // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babatsai.cassandra.cosmos.azure.com/40.65.106.154:10350)
     // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10, Additional details='
     public int getRetryAfterMs(String exceptionString){
-        String[] exceptions = exceptionString.toString().split(",");
-        if (exceptions.length < 2) return -1;
-        String[] retryProperty = exceptions[1].toString().split("=");
-
-        if (retryProperty.length < 2) return -1;
-        exceptionString = retryProperty[0].toString().trim();
-
-        if (exceptionString.equals("RetryAfterMs")) {
-            String value = retryProperty[1];
-            return Integer.parseInt(value);
+        String[] tokens = exceptionString.toString().split(",");
+        for (String token: tokens) {
+            String[] kvp = token.split("=");
+            if (kvp.length != 2) continue;
+            if (kvp[0].trim().equals("RetryAfterMs")) {
+                String value = kvp[1];
+                return Integer.parseInt(value);
+            }
         }
 
         return -1;
