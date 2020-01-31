@@ -54,9 +54,9 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public class CosmosDBLoadBalancingPolicyTest {
 
-    public String globalEndpoint = "babatsai-glowroot.cassandra.cosmos.azure.com";
-    public String username = "babatsai-glowroot";
-    public String password = "QpqiHPYVaKj14dcUpmL8eSvigMeSxvgcKjCtJKB00FfwGVUSCqX9A3VYfLQYZ6PocSP7AoDQ39SaKr6j6CAaGg==";
+    public String globalEndpoint = "<FILLME>";
+    public String username = "<FILLME>";
+    public String password = "<FILLME>";
     public int port = 10350;
     public String readDC = "East US 2";
     public String writeDC = "West US 2";
