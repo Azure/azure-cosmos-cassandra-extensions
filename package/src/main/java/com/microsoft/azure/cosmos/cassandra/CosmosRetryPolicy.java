@@ -135,7 +135,6 @@ public class CosmosRetryPolicy implements RetryPolicy {
     private final int fixedBackOffTimeMillis;
     private final int growingBackOffTimeMillis;
     private final int maxRetryCount;
-    private boolean useRetryMillisIfAvailable;
 
     private RetryDecision retryManyTimesOrThrow(int retryNumber) {
         return (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) ?
