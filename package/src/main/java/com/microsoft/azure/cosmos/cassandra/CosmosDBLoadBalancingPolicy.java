@@ -31,13 +31,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * CosmosLoadBalancingPolicy allows you to specify readDC and writeDC to route read and write requests to their
- * corresponding datacenters.
- * globalEndpoint can also be used for writeDC. This allows the client to gracefully failover
- * when the default write region is changed. dnsExpirationInSeconds is essentially the max duration to figure out the
- * failover scenario. By default, it is 60 seconds.
+ * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify readDC and writeDC
+ * to route read and write requests to their corresponding data centers.
  * If readDC is specified, we prioritize nodes in the readDC for read requests.
- * If writeDC is specified, we prioritize nodes in the writeDC for write requests.
+ * writeDC or globalEndpoint needs to be specified for computing which nodes to send write requests.
+ * When globalEndpoint is specified, the write requests will be prioritized for the default write region.
+ * globalEndpoint allows the client to gracefully failover when the default write region is changed.
+ * dnsExpirationInSeconds is essentially the max duration to recover from the failover. By default, it is 60 seconds.
  */
 public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
 
@@ -106,9 +106,9 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
      *
      * <p>For read requests, the returned plan will always try each known host in the readDC first.
      * if none of the host is reachable, it will try all other hosts.
-     * For write and all other requests, the returned plan will always try each known host in the writeDC or the
-     * default write region first. If none of the host is reachable, it will try all other hosts.
-     *
+     * For writes and all other requests, the returned plan will always try each known host in the writeDC or the
+     * default write region (looked up and cached from the globalEndpoint) first.
+     * If none of the host is reachable, it will try all other hosts.
      * @param loggedKeyspace the keyspace currently logged in on for this query.
      * @param statement the query for which to build the plan.
      * @return a new query plan, i.e. an iterator indicating which host to try first for querying,
@@ -300,8 +300,8 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private final AtomicInteger index = new AtomicInteger();
     private long lastDnsLookupTime = Long.MIN_VALUE;
-    private InetAddress[] localAddresses = null;
 
+    private InetAddress[] localAddresses = null;
     private CopyOnWriteArrayList<Host> readLocalDCHosts;
     private CopyOnWriteArrayList<Host> writeLocalDCHosts;
     private CopyOnWriteArrayList<Host> remoteDCHosts;
@@ -319,7 +319,7 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         } else {
             if (!builder.writeDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint, you can't provide writeDC. Writes will go " +
+                throw new IllegalArgumentException("When the globalEndpoint is specified, you can't provide writeDC. Writes will go " +
                         "to the default write region when the globalEndpoint is specified.");
             }
         }

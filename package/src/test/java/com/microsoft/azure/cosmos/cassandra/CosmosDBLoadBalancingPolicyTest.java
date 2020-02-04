@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.fail;
  *
  * <p>Preconditions:
  * <ul>
- * <li> CosmosDB Cassandra account must be created. It should have two regions: readDC (e.g, East US 2)
+ * <li> A CosmosDB CassandraAPI account is required. It should have two regions: readDC (e.g, East US 2)
  * and writeDC (e.g, West US 2). globalEndpoint, username, and password fields should be populated.
  * <p>
  *
@@ -46,7 +46,7 @@ import static org.assertj.core.api.Assertions.fail;
  * keyspace with this name already exists, it will be reused;
  * <li>Creates a new table {@code keyspaceName.tableName}. If a table with that name exists
  * already, it will be reused.
- * <li>Creates a new table {@code keyspaceName.tableName}. Executes all types of Statement queries.
+ * <li>Executes all types of Statement queries.
  * </ol>
  * <p>
  *
@@ -62,7 +62,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     public String writeDC = "West US 2";
 
     @AfterTest
-    private void cleanUp() {
+    public void cleanUp() {
         if (session != null) {
             session.execute(String.format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
         }
