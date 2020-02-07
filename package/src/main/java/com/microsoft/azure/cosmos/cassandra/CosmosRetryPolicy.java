@@ -32,8 +32,8 @@ import java.util.Random;
 
 /**
  * Implements a Cassandra {@link RetryPolicy} with back-offs for {@link OverloadedException} failures
- * <p> {@link #maxRetryCount} specifies the number of retries should be attempted. A value of -1 specifies that an
- * indefinite number of retries should be attempted. For readTimeout, writeTimeout, and onUnavailable, we retry
+ * <p> {@link #maxRetryCount} specifies the number of retries that should be attempted. A value of -1 specifies that an
+ * indefinite number of retries should be attempted. For {@link #readTimeout}, {@link writeTimeout}, and {@link onUnavailable}, we retry
  * immediately. For onRequestErrors such as OverLoadedError, we try to parse the exception message and use RetryAfterMs
  * field provided from the server as the back-off duration. If RetryAfterMs is not available, we default to exponential
  * growing back-off scheme. In this case the time between retries is increased by {@link #growingBackOffTimeMillis}

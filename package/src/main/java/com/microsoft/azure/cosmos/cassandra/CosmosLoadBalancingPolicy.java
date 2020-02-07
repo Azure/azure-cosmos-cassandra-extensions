@@ -19,7 +19,14 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
+import com.datastax.driver.core.BatchStatement;
+import com.datastax.driver.core.BoundStatement;
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.Host;
+import com.datastax.driver.core.HostDistance;
+import com.datastax.driver.core.RegularStatement;
+import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.querybuilder.BuiltStatement;
 import com.google.common.collect.AbstractIterator;
@@ -34,9 +41,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify readDC and writeDC
  * to route read and write requests to their corresponding data centers.
  * If readDC is specified, we prioritize nodes in the readDC for read requests.
- * writeDC or globalEndpoint needs to be specified for computing which nodes to send write requests.
+ * Either one of writeDC or globalEndpoint needs to be specified in order to determine the data center for write requests.
+ * If writeDC is specified, writes will be prioritized for that region. 
  * When globalEndpoint is specified, the write requests will be prioritized for the default write region.
- * globalEndpoint allows the client to gracefully failover when the default write region is changed.
+ * globalEndpoint allows the client to gracefully failover by changing the default write region addresses.
  * dnsExpirationInSeconds is essentially the max duration to recover from the failover. By default, it is 60 seconds.
  */
 public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
@@ -63,8 +71,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if ((!this.writeDC.isEmpty() && host.getDatacenter().equals(writeDC))
                     || dnsLookupAddresses.contains(host.getAddress())) {
                 writeLocalDCAddresses.add(host);
-            }
-            else {
+            } else {
                 remoteDCAddresses.add(host);
             }
         }
@@ -78,7 +85,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     /**
      * Return the HostDistance for the provided host.
      *
-     * <p>This policy consider the nodes for the writeDC and the default write region at distance {@code LOCAL}.
+     * <p>This policy considers the nodes for the writeDC and the default write region at distance {@code LOCAL}.
      *
      * @param host the host of which to return the distance of.
      * @return the HostDistance to {@code host}.
