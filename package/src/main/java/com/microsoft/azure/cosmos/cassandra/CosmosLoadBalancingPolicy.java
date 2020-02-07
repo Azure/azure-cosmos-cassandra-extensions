@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * globalEndpoint allows the client to gracefully failover when the default write region is changed.
  * dnsExpirationInSeconds is essentially the max duration to recover from the failover. By default, it is 60 seconds.
  */
-public final class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
+public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     /**
      * Initializes the list of hosts in read, write, local, and remote categories.
@@ -232,13 +232,13 @@ public final class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
             return this;
         }
 
-        public CosmosDBLoadBalancingPolicy build() {
+        public CosmosLoadBalancingPolicy build() {
             validate(this);
-            return CosmosDBLoadBalancingPolicy.buildFrom(this);
+            return CosmosLoadBalancingPolicy.buildFrom(this);
         }
     }
 
-    private CosmosDBLoadBalancingPolicy(String readDC, String writeDC, String globalContactPoint, int dnsExpirationInSeconds) {
+    private CosmosLoadBalancingPolicy(String readDC, String writeDC, String globalContactPoint, int dnsExpirationInSeconds) {
         this.readDC = readDC;
         this.writeDC = writeDC;
         this.globalContactPoint = globalContactPoint;
@@ -358,7 +358,7 @@ public final class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
-    private static CosmosDBLoadBalancingPolicy buildFrom(Builder builder) {
-        return new CosmosDBLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
+    private static CosmosLoadBalancingPolicy buildFrom(Builder builder) {
+        return new CosmosLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
     }
 }

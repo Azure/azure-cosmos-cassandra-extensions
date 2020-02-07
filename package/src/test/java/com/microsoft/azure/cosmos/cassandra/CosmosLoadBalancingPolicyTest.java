@@ -32,7 +32,7 @@ import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * This test illustrates use of the {@link CosmosDBLoadBalancingPolicy} class.
+ * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
  *
  * <p>Preconditions:
  * <ul>
@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.fail;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosDBLoadBalancingPolicyTest {
+public class CosmosLoadBalancingPolicyTest {
 
     public String globalEndpoint = "<FILLME>";
     public String username = "<FILLME>";
@@ -73,27 +73,27 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestInvalid() {
         try {
-            CosmosDBLoadBalancingPolicy.builder().build();
+            CosmosLoadBalancingPolicy.builder().build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            CosmosDBLoadBalancingPolicy.builder().withReadDC(readDC).build();
+            CosmosLoadBalancingPolicy.builder().withReadDC(readDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            CosmosDBLoadBalancingPolicy.builder().withWriteDC(writeDC).build();
+            CosmosLoadBalancingPolicy.builder().withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withWriteDC(writeDC).build();
+            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).withWriteDC(writeDC).build();
+            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
     }
@@ -101,7 +101,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestGlobalEndpointOnly() {
         keyspaceName = "globalOnly";
-        LoadBalancingPolicy policy = CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).build();
+        LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).build();
         this.connectWithSslAndLoadBalancingPolicy(policy);
         TestAllStatements();
     }
@@ -109,7 +109,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestGlobalAndReadDC() {
         keyspaceName = "globalAndRead";
-        LoadBalancingPolicy policy = CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
+        LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
         this.connectWithSslAndLoadBalancingPolicy(policy);
         TestAllStatements();
     }
@@ -117,7 +117,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestReadAndWrite() {
         keyspaceName = "readWriteDCv2";
-        LoadBalancingPolicy policy = CosmosDBLoadBalancingPolicy.builder().withReadDC(readDC).withWriteDC(writeDC).build();
+        LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withReadDC(readDC).withWriteDC(writeDC).build();
         this.connectWithSslAndLoadBalancingPolicy(policy);
         TestAllStatements();
     }
