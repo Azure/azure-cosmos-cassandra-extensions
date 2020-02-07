@@ -41,7 +41,7 @@ import java.util.Random;
  * {@link #fixedBackOffTimeMillis} duration.
  * </p>
  */
-public class CosmosRetryPolicy implements RetryPolicy {
+public final class CosmosRetryPolicy implements RetryPolicy {
 
     public CosmosRetryPolicy(int maxRetryCount) {
         this(maxRetryCount, 5000, 1000);
@@ -89,9 +89,9 @@ public class CosmosRetryPolicy implements RetryPolicy {
                 if (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) {
                     int retryMillis = getRetryAfterMs(driverException.toString());
                     if (retryMillis == -1) {
-                        retryMillis = (this.maxRetryCount == -1) ?
-                                this.fixedBackOffTimeMillis :
-                                this.growingBackOffTimeMillis * retryNumber + random.nextInt(growingBackOffSaltMillis);
+                        retryMillis = (this.maxRetryCount == -1)
+                                ? this.fixedBackOffTimeMillis
+                                : this.growingBackOffTimeMillis * retryNumber + random.nextInt(growingBackOffSaltMillis);
                     }
 
                     Thread.sleep(retryMillis);
@@ -137,14 +137,15 @@ public class CosmosRetryPolicy implements RetryPolicy {
     private final int maxRetryCount;
 
     private RetryDecision retryManyTimesOrThrow(int retryNumber) {
-        return (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) ?
-                RetryDecision.retry(null) : RetryDecision.rethrow();
+        return (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount)
+                ? RetryDecision.retry(null)
+                : RetryDecision.rethrow();
     }
 
     // Example exceptionString:
     // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babatsai.cassandra.cosmos.azure.com/40.65.106.154:10350)
     // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10, Additional details='
-    public int getRetryAfterMs(String exceptionString){
+    private static int getRetryAfterMs(String exceptionString){
         String[] tokens = exceptionString.toString().split(",");
         for (String token: tokens) {
             String[] kvp = token.split("=");

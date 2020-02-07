@@ -39,12 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * globalEndpoint allows the client to gracefully failover when the default write region is changed.
  * dnsExpirationInSeconds is essentially the max duration to recover from the failover. By default, it is 60 seconds.
  */
-public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
-
-    public static CosmosDBLoadBalancingPolicy buildFrom(Builder builder) {
-        validate(builder);
-        return new CosmosDBLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
-    }
+public final class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
 
     /**
      * Initializes the list of hosts in read, write, local, and remote categories.
@@ -206,6 +201,64 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
         // nothing to do
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+
+        private String readDC = "";
+        private String writeDC = "";
+        private String globalEndpoint = "";
+        private int dnsExpirationInSeconds = 60;
+
+        public Builder withReadDC(String readDC) {
+            this.readDC = readDC;
+            return this;
+        }
+
+        public Builder withWriteDC(String writeDC) {
+            this.writeDC = writeDC;
+            return this;
+        }
+
+        public Builder withGlobalEndpoint(String globalEndpoint) {
+            this.globalEndpoint = globalEndpoint;
+            return this;
+        }
+
+        public Builder withDnsExpirationInSeconds(int dnsExpirationInSeconds) {
+            this.dnsExpirationInSeconds = dnsExpirationInSeconds;
+            return this;
+        }
+
+        public CosmosDBLoadBalancingPolicy build() {
+            validate(this);
+            return CosmosDBLoadBalancingPolicy.buildFrom(this);
+        }
+    }
+
+    private CosmosDBLoadBalancingPolicy(String readDC, String writeDC, String globalContactPoint, int dnsExpirationInSeconds) {
+        this.readDC = readDC;
+        this.writeDC = writeDC;
+        this.globalContactPoint = globalContactPoint;
+        this.dnsExpirationInSeconds = dnsExpirationInSeconds;
+    }
+
+    private final AtomicInteger index = new AtomicInteger();
+    private long lastDnsLookupTime = Long.MIN_VALUE;
+
+    private InetAddress[] localAddresses = null;
+    private CopyOnWriteArrayList<Host> readLocalDCHosts;
+    private CopyOnWriteArrayList<Host> writeLocalDCHosts;
+    private CopyOnWriteArrayList<Host> remoteDCHosts;
+
+    private String readDC;
+    private String writeDC;
+    private String globalContactPoint;
+    private int dnsExpirationInSeconds;
+
+
     @SuppressWarnings("unchecked")
     private static CopyOnWriteArrayList<Host> cloneList(CopyOnWriteArrayList<Host> list) {
         return (CopyOnWriteArrayList<Host>) list.clone();
@@ -268,7 +321,7 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
         return System.currentTimeMillis()/1000 > lastDnsLookupTime + dnsExpirationInSeconds;
     }
 
-    private boolean isReadRequest(Statement statement) {
+    private static boolean isReadRequest(Statement statement) {
         if (statement instanceof RegularStatement) {
             if (statement instanceof SimpleStatement) {
                 SimpleStatement simpleStatement = (SimpleStatement) statement;
@@ -291,26 +344,6 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
         return query.toLowerCase().startsWith("select");
     }
 
-    private CosmosDBLoadBalancingPolicy(String readDC, String writeDC, String globalContactPoint, int dnsExpirationInSeconds) {
-        this.readDC = readDC;
-        this.writeDC = writeDC;
-        this.globalContactPoint = globalContactPoint;
-        this.dnsExpirationInSeconds = dnsExpirationInSeconds;
-    }
-
-    private final AtomicInteger index = new AtomicInteger();
-    private long lastDnsLookupTime = Long.MIN_VALUE;
-
-    private InetAddress[] localAddresses = null;
-    private CopyOnWriteArrayList<Host> readLocalDCHosts;
-    private CopyOnWriteArrayList<Host> writeLocalDCHosts;
-    private CopyOnWriteArrayList<Host> remoteDCHosts;
-
-    private String readDC;
-    private String writeDC;
-    private String globalContactPoint;
-    private int dnsExpirationInSeconds;
-
     private static void validate(Builder builder) {
         if (builder.globalEndpoint.isEmpty()) {
             if (builder.writeDC.isEmpty() || builder.readDC.isEmpty()) {
@@ -325,35 +358,7 @@ public class CosmosDBLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
-    public static class Builder {
-
-        private String readDC = "";
-        private String writeDC = "";
-        private String globalEndpoint = "";
-        private int dnsExpirationInSeconds = 60;
-
-        public Builder withReadDC(String readDC) {
-            this.readDC = readDC;
-            return this;
-        }
-
-        public Builder withWriteDC(String writeDC) {
-            this.writeDC = writeDC;
-            return this;
-        }
-
-        public Builder withGlobalEndpoint(String globalEndpoint) {
-            this.globalEndpoint = globalEndpoint;
-            return this;
-        }
-
-        public Builder withDnsExpirationInSeconds(int dnsExpirationInSeconds) {
-            this.dnsExpirationInSeconds = dnsExpirationInSeconds;
-            return this;
-        }
-
-        public CosmosDBLoadBalancingPolicy build() {
-            return CosmosDBLoadBalancingPolicy.buildFrom(this);
-        }
+    private static CosmosDBLoadBalancingPolicy buildFrom(Builder builder) {
+        return new CosmosDBLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
     }
 }
