@@ -73,27 +73,27 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestInvalid() {
         try {
-            new CosmosDBLoadBalancingPolicy.Builder().build();
+            CosmosDBLoadBalancingPolicy.builder().build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            new CosmosDBLoadBalancingPolicy.Builder().withReadDC(readDC).build();
+            CosmosDBLoadBalancingPolicy.builder().withReadDC(readDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            new CosmosDBLoadBalancingPolicy.Builder().withWriteDC(writeDC).build();
+            CosmosDBLoadBalancingPolicy.builder().withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            new CosmosDBLoadBalancingPolicy.Builder().withGlobalEndpoint(globalEndpoint).withWriteDC(writeDC).build();
+            CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            new CosmosDBLoadBalancingPolicy.Builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).withWriteDC(writeDC).build();
+            CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
     }
@@ -101,7 +101,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestGlobalEndpointOnly() {
         keyspaceName = "globalOnly";
-        LoadBalancingPolicy policy = new CosmosDBLoadBalancingPolicy.Builder().withGlobalEndpoint(globalEndpoint).build();
+        LoadBalancingPolicy policy = CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).build();
         this.connectWithSslAndLoadBalancingPolicy(policy);
         TestAllStatements();
     }
@@ -109,7 +109,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestGlobalAndReadDC() {
         keyspaceName = "globalAndRead";
-        LoadBalancingPolicy policy = new CosmosDBLoadBalancingPolicy.Builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
+        LoadBalancingPolicy policy = CosmosDBLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
         this.connectWithSslAndLoadBalancingPolicy(policy);
         TestAllStatements();
     }
@@ -117,7 +117,7 @@ public class CosmosDBLoadBalancingPolicyTest {
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestReadAndWrite() {
         keyspaceName = "readWriteDCv2";
-        LoadBalancingPolicy policy = new CosmosDBLoadBalancingPolicy.Builder().withReadDC(readDC).withWriteDC(writeDC).build();
+        LoadBalancingPolicy policy = CosmosDBLoadBalancingPolicy.builder().withReadDC(readDC).withWriteDC(writeDC).build();
         this.connectWithSslAndLoadBalancingPolicy(policy);
         TestAllStatements();
     }
