@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
 
-import static com.datastax.driver.core.ConsistencyLevel.QUORUM;
+import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -128,7 +128,7 @@ public class CosmosRetryPolicyTest {
         retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
     }
 
-    private static final ConsistencyLevel CONSISTENCY_LEVEL = QUORUM;
+    private static final ConsistencyLevel CONSISTENCY_LEVEL = ONE;
     private static final int FIXED_BACK_OFF_TIME = 5000;
     private static final int GROWING_BACK_OFF_TIME = 1000;
     private static final int MAX_RETRY_COUNT = 5;

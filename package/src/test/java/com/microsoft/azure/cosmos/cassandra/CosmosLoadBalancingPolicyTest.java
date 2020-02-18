@@ -54,9 +54,9 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public class CosmosLoadBalancingPolicyTest {
 
-    public String globalEndpoint = "<FILLME>";
-    public String username = "<FILLME>";
-    public String password = "<FILLME>";
+    public String globalEndpoint = "<FILL ME>";
+    public String username = "<FILL ME>";
+    public String password = "<FILL ME>";
     public int port = 10350;
     public String readDC = "East US 2";
     public String writeDC = "West US 2";
@@ -100,26 +100,32 @@ public class CosmosLoadBalancingPolicyTest {
 
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestGlobalEndpointOnly() {
-        keyspaceName = "globalOnly";
-        LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).build();
-        this.connectWithSslAndLoadBalancingPolicy(policy);
-        TestAllStatements();
+        if (globalEndpoint != "<FILL ME>") {
+            keyspaceName = "globalOnly";
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).build();
+            this.connectWithSslAndLoadBalancingPolicy(policy);
+            TestAllStatements();
+        }
     }
 
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestGlobalAndReadDC() {
-        keyspaceName = "globalAndRead";
-        LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
-        this.connectWithSslAndLoadBalancingPolicy(policy);
-        TestAllStatements();
+        if (globalEndpoint != "<FILL ME>") {
+            keyspaceName = "globalAndRead";
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
+            this.connectWithSslAndLoadBalancingPolicy(policy);
+            TestAllStatements();
+        }
     }
 
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void TestReadAndWrite() {
-        keyspaceName = "readWriteDCv2";
-        LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withReadDC(readDC).withWriteDC(writeDC).build();
-        this.connectWithSslAndLoadBalancingPolicy(policy);
-        TestAllStatements();
+        if (globalEndpoint != "<FILL ME>") {
+            keyspaceName = "readWriteDCv2";
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withReadDC(readDC).withWriteDC(writeDC).build();
+            this.connectWithSslAndLoadBalancingPolicy(policy);
+            TestAllStatements();
+        }
     }
 
     private void TestAllStatements() {
