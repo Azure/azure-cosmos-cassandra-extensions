@@ -67,6 +67,9 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public class CosmosRetryPolicyTest {
 
+    private String keyspaceName = "downgrading";
+    private String tableName = "sensor_data";
+
     @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT, FIXED_BACK_OFF_TIME, GROWING_BACK_OFF_TIME);
@@ -80,19 +83,19 @@ public class CosmosRetryPolicyTest {
 
         try {
             try {
-                TestCommon.createSchema(session);
+                TestCommon.createSchema(session, keyspaceName, tableName);
 
             } catch (Exception error) {
                 fail(String.format("createSchema failed: %s", error));
             }
             try {
-                TestCommon.write(session, CONSISTENCY_LEVEL);
+                TestCommon.write(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
 
             } catch (Exception error) {
                 fail(String.format("write failed: %s", error));
             }
             try {
-                ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL);
+                ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
                 TestCommon.display(rows);
 
             } catch (Exception error) {
@@ -129,7 +132,7 @@ public class CosmosRetryPolicyTest {
     private static final int FIXED_BACK_OFF_TIME = 5000;
     private static final int GROWING_BACK_OFF_TIME = 1000;
     private static final int MAX_RETRY_COUNT = 5;
-    private static final int TIMEOUT = 30000;
+    private static final int TIMEOUT = 300000;
 
     private Cluster cluster;
     private Session session;

@@ -34,6 +34,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * @deprecated Please use CosmosLoadBalancingPolicy instead.
  * CosmosDB failover aware Round-robin load balancing policy.
  * This policy allows the user to seamlessly failover the default write region.
  * This is very similar to DCAwareRoundRobinPolicy, with a difference that
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The nodes in the default write region are retrieved from the global endpoint
  * of the account, based on the dns refresh interval of 60 seconds by default.
  */
+@Deprecated
 public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     private final AtomicInteger index = new AtomicInteger();
     private long lastDnsLookupTime = Long.MIN_VALUE;

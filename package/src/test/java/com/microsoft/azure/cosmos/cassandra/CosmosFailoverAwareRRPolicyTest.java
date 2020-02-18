@@ -66,18 +66,18 @@ public class CosmosFailoverAwareRRPolicyTest {
 
         try {
             try {
-                TestCommon.createSchema(session);
+                TestCommon.createSchema(session, keyspaceName, tableName);
             } catch (Exception error) {
                 fail(String.format("createSchema failed: %s", error));
             }
             try {
-                TestCommon.write(session);
+                TestCommon.write(session, keyspaceName, tableName);
 
             } catch (Exception error) {
                 fail(String.format("write failed: %s", error));
             }
             try {
-                ResultSet rows = TestCommon.read(session);
+                ResultSet rows = TestCommon.read(session, keyspaceName, tableName);
                 TestCommon.display(rows);
 
             } catch (Exception error) {
@@ -93,6 +93,8 @@ public class CosmosFailoverAwareRRPolicyTest {
 
     private Cluster cluster;
     private Session session;
+    private String keyspaceName = "downgrading";
+    private String tableName = "sensor_data";
 
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.

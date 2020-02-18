@@ -41,24 +41,28 @@ public class TestCommon {
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
      */
-    static void createSchema(Session session) {
-        session.execute(
-                "CREATE KEYSPACE IF NOT EXISTS downgrading WITH replication "
-                        + "= {'class':'SimpleStrategy', 'replication_factor':3}");
+    static void createSchema(Session session, String keyspaceName, String tableName) throws InterruptedException {
+        session.execute(String.format(
+                "CREATE KEYSPACE IF NOT EXISTS %s WITH replication "
+                        + "= {'class':'SimpleStrategy', 'replication_factor':3}", keyspaceName));
 
-        session.execute(
-                "CREATE TABLE IF NOT EXISTS downgrading.sensor_data ("
+        Thread.sleep(5000);
+
+        session.execute(String.format(
+                "CREATE TABLE IF NOT EXISTS %s.%s ("
                         + "sensor_id uuid,"
                         + "date date,"
                         + // emulates bucketing by day
                         "timestamp timestamp,"
                         + "value double,"
                         + "PRIMARY KEY ((sensor_id,date),timestamp)"
-                        + ")");
+                        + ")", keyspaceName, tableName));
+
+        Thread.sleep(5000);
     }
 
-    static void write(Session session) {
-        write(session, ConsistencyLevel.ONE);
+    static void write(Session session, String keyspaceName, String tableName) {
+        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
         /**
@@ -66,41 +70,41 @@ public class TestCommon {
          *
          * @param consistencyLevel the consistency level to apply.
          */
-    static void write(Session session, ConsistencyLevel consistencyLevel) {
+    static void write(Session session, ConsistencyLevel consistencyLevel, String keyspaceName, String tableName) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
         BatchStatement batch = new BatchStatement(UNLOGGED);
 
         batch.add(
-                new SimpleStatement(
-                        "INSERT INTO downgrading.sensor_data "
+                new SimpleStatement(String.format(
+                        "INSERT INTO %s.%s "
                                 + "(sensor_id, date, timestamp, value) "
                                 + "VALUES ("
                                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                                 + "'2018-02-26',"
                                 + "'2018-02-26T13:53:46.345+01:00',"
-                                + "2.34)"));
+                                + "2.34)", keyspaceName, tableName)));
 
         batch.add(
-                new SimpleStatement(
-                        "INSERT INTO downgrading.sensor_data "
+                new SimpleStatement(String.format(
+                        "INSERT INTO %s.%s "
                                 + "(sensor_id, date, timestamp, value) "
                                 + "VALUES ("
                                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                                 + "'2018-02-26',"
                                 + "'2018-02-26T13:54:27.488+01:00',"
-                                + "2.47)"));
+                                + "2.47)", keyspaceName, tableName)));
 
         batch.add(
-                new SimpleStatement(
-                        "INSERT INTO downgrading.sensor_data "
+                new SimpleStatement(String.format(
+                        "INSERT INTO %s.%s "
                                 + "(sensor_id, date, timestamp, value) "
                                 + "VALUES ("
                                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                                 + "'2018-02-26',"
                                 + "'2018-02-26T13:56:33.739+01:00',"
-                                + "2.52)"));
+                                + "2.52)", keyspaceName, tableName)));
 
         batch.setConsistencyLevel(consistencyLevel);
 
@@ -108,8 +112,8 @@ public class TestCommon {
         System.out.println("Write succeeded at " + consistencyLevel);
     }
 
-    static ResultSet read(Session session) {
-        return read(session, ConsistencyLevel.ONE);
+    static ResultSet read(Session session, String keyspaceName, String tableName) {
+        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
     /**
@@ -117,18 +121,18 @@ public class TestCommon {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    static ResultSet read(Session session, ConsistencyLevel consistencyLevel) {
+    static ResultSet read(Session session, ConsistencyLevel consistencyLevel, String keyspaceName, String tableName) {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
         Statement statement =
-                new SimpleStatement(
+                new SimpleStatement(String.format(
                         "SELECT sensor_id, date, timestamp, value "
-                                + "FROM downgrading.sensor_data "
+                                + "FROM %s.%s "
                                 + "WHERE "
                                 + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
                                 + "date = '2018-02-26' AND "
-                                + "timestamp > '2018-02-26+01:00'")
+                                + "timestamp > '2018-02-26+01:00'", keyspaceName, tableName))
                         .setConsistencyLevel(consistencyLevel);
 
         ResultSet rows = session.execute(statement);
