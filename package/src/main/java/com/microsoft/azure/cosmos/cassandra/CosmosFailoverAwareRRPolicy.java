@@ -26,7 +26,6 @@ import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.google.common.collect.AbstractIterator;
 
-import javafx.util.Pair;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -34,6 +33,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * @deprecated Please use CosmosLoadBalancingPolicy instead.
  * CosmosDB failover aware Round-robin load balancing policy.
  * This policy allows the user to seamlessly failover the default write region.
  * This is very similar to DCAwareRoundRobinPolicy, with a difference that
@@ -42,12 +42,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The nodes in the default write region are retrieved from the global endpoint
  * of the account, based on the dns refresh interval of 60 seconds by default.
  */
+@Deprecated
 public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     private final AtomicInteger index = new AtomicInteger();
     private long lastDnsLookupTime = Long.MIN_VALUE;
     private String globalContactPoint;
     private int dnsExpirationInSeconds;
-    private Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> hosts;
+    private Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> hosts;
     private InetAddress[] localAddresses = null;
 
     /**
@@ -82,7 +83,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
             }
         }
 
-        this.hosts = new Pair(localDcAddresses, remoteDcAddresses);
+        this.hosts = new AbstractMap.SimpleEntry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>>(localDcAddresses, remoteDcAddresses);
         this.index.set(new Random().nextInt(Math.max(hosts.size(), 1)));
     }
 
@@ -118,7 +119,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
      */
     @Override
     public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
-        Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
+        Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
         final List<Host> localHosts = cloneList(allHosts.getKey());
         final List<Host> remoteHosts = cloneList(allHosts.getValue());
         final int startIdx = index.getAndIncrement();
@@ -207,7 +208,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         return this.localAddresses;
     }
 
-    private Pair<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> getHosts() {
+    private Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> getHosts() {
         if (hosts != null && !dnsExpired()) {
             return hosts;
         }
@@ -235,7 +236,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
             }
         }
 
-        return hosts = new Pair(localDcHosts, remoteDcHosts);
+        return hosts = new AbstractMap.SimpleEntry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>>(localDcHosts, remoteDcHosts);
     }
 
     private boolean dnsExpired() {
