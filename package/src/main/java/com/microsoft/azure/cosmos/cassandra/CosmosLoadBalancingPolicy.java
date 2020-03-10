@@ -162,9 +162,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onUp(Host host) {
-		if (host == null || host.getDatacenter() == null) {
-			return;
-		}
+        if (host == null || host.getDatacenter() == null) {
+            return;
+        }
 
         if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
             this.readLocalDCHosts.addIfAbsent(host);
@@ -183,9 +183,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onDown(Host host) {
-		if (host == null || host.getDatacenter() == null) {
-			return;
-		}
+        if (host == null || host.getDatacenter() == null) {
+            return;
+        }
 
         if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
             this.readLocalDCHosts.remove(host);
