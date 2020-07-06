@@ -23,6 +23,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.WriteType;
+import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
 import com.datastax.driver.core.exceptions.WriteFailureException;
@@ -85,6 +86,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         RetryDecision retryDecision;
 
         try {
+            if (driverException instanceof ConnectionException) {
+                return retryManyTimesOrThrow(retryNumber);
+            }
+            
             if (driverException instanceof OverloadedException || driverException instanceof WriteFailureException) {
                 if (this.maxRetryCount == -1 || retryNumber < this.maxRetryCount) {
                     int retryMillis = getRetryAfterMs(driverException.toString());

@@ -20,6 +20,7 @@
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.driver.core.*;
+import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
 import com.datastax.driver.core.policies.RetryPolicy;
@@ -126,6 +127,18 @@ public class CosmosRetryPolicyTest {
 
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
         retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
+    }
+    
+    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
+    public void canRetryOnConnectionException() {
+        DriverException driverException = new ConnectionException (new InetSocketAddress(TestCommon.CONTACT_POINTS[0], TestCommon.PORT), "retry");
+        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        Statement statement = new SimpleStatement("SELECT * FROM retry");
+
+        for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
+            RetryDecision retryDecision = retryPolicy.onRequestError(statement, CONSISTENCY_LEVEL, driverException, retryNumber);
+            assertThat(retryDecision.getType()).isEqualTo(RetryDecision.Type.RETRY);
+        }
     }
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ONE;
