@@ -1,34 +1,25 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.Host;
-import com.datastax.driver.core.HostDistance;
-import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.policies.LoadBalancingPolicy;
-import com.google.common.collect.AbstractIterator;
+//import com.datastax.driver.core.Cluster;
+//import com.datastax.driver.core.Host;
+//import com.datastax.driver.core.HostDistance;
+import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.metadata.Node;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -43,7 +34,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * of the account, based on the dns refresh interval of 60 seconds by default.
  */
 @Deprecated
-public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
+public class CosmosFailoverAwareRRPolicy implements com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy {
+    
     private final AtomicInteger index = new AtomicInteger();
     private long lastDnsLookupTime = Long.MIN_VALUE;
     private String globalContactPoint;
@@ -71,10 +63,12 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     }
 
     @Override
-    public void init(Cluster cluster, Collection<Host> hosts) {
+    public void init(Map<UUID, Node> cluster, LoadBalancingPolicy.DistanceReporter reporter) {
+        
         CopyOnWriteArrayList<Host> localDcAddresses = new CopyOnWriteArrayList<Host>();
         CopyOnWriteArrayList<Host> remoteDcAddresses = new CopyOnWriteArrayList<Host>();
         List<InetAddress> localAddressesFromLookup = Arrays.asList(getLocalAddresses());
+        
         for (Host host : hosts) {
             if (localAddressesFromLookup.contains(host.getAddress())) {
                 localDcAddresses.add(host);
@@ -119,18 +113,21 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
      */
     @Override
     public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
+        
         Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
+        
         final List<Host> localHosts = cloneList(allHosts.getKey());
         final List<Host> remoteHosts = cloneList(allHosts.getValue());
-        final int startIdx = index.getAndIncrement();
+        final int startIndex = index.getAndIncrement();
 
         // Overflow protection; not theoretically thread safe but should be good enough
-        if (startIdx > Integer.MAX_VALUE - 10000) {
+        if (startIndex > Integer.MAX_VALUE - 10000) {
             index.set(0);
         }
 
-        return new AbstractIterator<Host>() {
-            private int idx = startIdx;
+        return new Iterator<Host>() {
+
+            private int index = startIndex;
             private int remainingLocal = localHosts.size();
             private int remainingRemote = remoteHosts.size();
 
@@ -138,16 +135,35 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
                 while (true) {
                     if (remainingLocal > 0) {
                         remainingLocal--;
-                        return localHosts.get(idx ++ % localHosts.size());
+                        return localHosts.get(index ++ % localHosts.size());
                     }
 
                     if (remainingRemote > 0) {
                         remainingRemote--;
-                        return remoteHosts.get(idx ++ % remoteHosts.size());
+                        return remoteHosts.get(index ++ % remoteHosts.size());
                     }
 
                     return endOfData();
                 }
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (this.remainingLocal > 0) {
+                    this.remainingLocal--;
+                    return localHosts.get(index ++ % localHosts.size());
+                }
+
+                if (remainingRemote > 0) {
+                    remainingRemote--;
+                    return remoteHosts.get(index ++ % remoteHosts.size());
+                }
+            }
+
+            @Override
+            public Host next() {
+                // TODO Auto-generated method stub
+                return null;
             }
         };
     }
@@ -209,6 +225,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     }
 
     private Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> getHosts() {
+        
         if (hosts != null && !dnsExpired()) {
             return hosts;
         }

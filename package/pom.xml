@@ -20,7 +20,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
+<project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
@@ -33,31 +33,31 @@
   <packaging>jar</packaging>
   <properties>
     <version.assertj-core>3.11.1</version.assertj-core>
-    <version.cassandra-driver-core>3.6.0</version.cassandra-driver-core>
+    <version.cassandra-driver-core>4.9.0</version.cassandra-driver-core>
     <version.org.apache.commons.io>2.4</version.org.apache.commons.io>
     <version.testng>6.14.3</version.testng>
   </properties>
   <dependencyManagement/>
   <dependencies>
     <dependency>
-      <artifactId>cassandra-driver-core</artifactId>
-      <groupId>com.datastax.cassandra</groupId>
+      <groupId>com.datastax.oss</groupId>
+      <artifactId>java-driver-core</artifactId>
       <version>${version.cassandra-driver-core}</version>
     </dependency>
     <dependency>
-      <artifactId>org.apache.commons.io</artifactId>
       <groupId>org.apache.directory.studio</groupId>
+      <artifactId>org.apache.commons.io</artifactId>
       <version>${version.org.apache.commons.io}</version>
     </dependency>
     <dependency>
-      <artifactId>assertj-core</artifactId>
       <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
       <version>${version.assertj-core}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <artifactId>testng</artifactId>
       <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
       <version>${version.testng}</version>
       <scope>test</scope>
     </dependency>
