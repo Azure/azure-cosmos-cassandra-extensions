@@ -19,75 +19,83 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.BatchStatement;
-import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.RegularStatement;
-import com.datastax.driver.core.SimpleStatement;
-import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.querybuilder.BuiltStatement;
-import com.google.common.collect.AbstractIterator;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.session.Request;
+import com.datastax.oss.driver.api.core.session.Session;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify readDC and writeDC
- * to route read and write requests to their corresponding data centers.
- * If readDC is specified, we prioritize nodes in the readDC for read requests.
- * Either one of writeDC or globalEndpoint needs to be specified in order to determine the data center for write requests.
- * If writeDC is specified, writes will be prioritized for that region. 
- * When globalEndpoint is specified, the write requests will be prioritized for the default write region.
- * globalEndpoint allows the client to gracefully failover by changing the default write region addresses.
- * dnsExpirationInSeconds is essentially the max duration to recover from the failover. By default, it is 60 seconds.
+ * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify readDC and writeDC to route read and
+ * write requests to their corresponding data centers.
+ * <p>
+ *     If readDC is specified, we prioritize nodes in the readDC for
+ * read requests. Either one of writeDC or globalEndpoint needs to be specified in order to determine the data center
+ * for write requests. If writeDC is specified, writes will be prioritized for that region. When globalEndpoint is
+ * specified, the write requests will be prioritized for the default write region. globalEndpoint allows the client to
+ * gracefully failover by changing the default write region addresses. dnsExpirationInSeconds is essentially the max
+ * duration to recover from the failover. By default, it is 60 seconds.
  */
 public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
-    /**
-     * Initializes the list of hosts in read, write, local, and remote categories.
-     */
-    @Override
-    public void init(Cluster cluster, Collection<Host> hosts) {
-        CopyOnWriteArrayList<Host> readLocalDCAddresses = new CopyOnWriteArrayList<Host>();
-        CopyOnWriteArrayList<Host> writeLocalDCAddresses = new CopyOnWriteArrayList<Host>();
-        CopyOnWriteArrayList<Host> remoteDCAddresses = new CopyOnWriteArrayList<Host>();
+    private final int dnsExpirationInSeconds;
+    private final String globalContactPoint;
+    private final AtomicInteger index = new AtomicInteger();
+    private final String readDC;
+    private final String writeDC;
+    private long lastDnsLookupTime = Long.MIN_VALUE;
+    private InetAddress[] localAddresses = null;
+    private CopyOnWriteArrayList<Host> readLocalDCHosts;
+    private CopyOnWriteArrayList<Host> remoteDCHosts;
+    private CopyOnWriteArrayList<Host> writeLocalDCHosts;
 
-        List<InetAddress> dnsLookupAddresses = new ArrayList<InetAddress>();
-        if (!globalContactPoint.isEmpty()) {
-            dnsLookupAddresses = Arrays.asList(getLocalAddresses());
-        }
+    private CosmosLoadBalancingPolicy(String readDC, String writeDC, String globalContactPoint,
+                                      int dnsExpirationInSeconds) {
+        this.readDC = readDC;
+        this.writeDC = writeDC;
+        this.globalContactPoint = globalContactPoint;
+        this.dnsExpirationInSeconds = dnsExpirationInSeconds;
+    }
 
-        for (Host host : hosts) {
-            if (!this.readDC.isEmpty() && host.getDatacenter().equals(readDC)) {
-                readLocalDCAddresses.add(host);
-            }
+    public static Builder builder() {
+        return new Builder();
+    }
 
-            if ((!this.writeDC.isEmpty() && host.getDatacenter().equals(writeDC))
-                    || dnsLookupAddresses.contains(host.getAddress())) {
-                writeLocalDCAddresses.add(host);
-            } else {
-                remoteDCAddresses.add(host);
-            }
-        }
-
-        this.readLocalDCHosts = readLocalDCAddresses;
-        this.writeLocalDCHosts = writeLocalDCAddresses;
-        this.remoteDCHosts = remoteDCAddresses;
-        this.index.set(new Random().nextInt(Math.max(hosts.size(), 1)));
+    public void close() {
+        // nothing to do
     }
 
     /**
      * Return the HostDistance for the provided host.
-     *
-     * <p>This policy considers the nodes for the writeDC and the default write region at distance {@code LOCAL}.
+     * <p>
+     * This policy considers the nodes for the writeDC and the default write region at distance {@code LOCAL}.
      *
      * @param host the host of which to return the distance of.
+     *
      * @return the HostDistance to {@code host}.
      */
     @Override
@@ -104,20 +112,64 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
+     * Initializes the list of hosts in read, write, local, and remote categories.
+     */
+    @Override
+    public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
+
+        CopyOnWriteArrayList<Host> readLocalDCAddresses = new CopyOnWriteArrayList<Host>();
+        CopyOnWriteArrayList<Host> writeLocalDCAddresses = new CopyOnWriteArrayList<Host>();
+        CopyOnWriteArrayList<Host> remoteDCAddresses = new CopyOnWriteArrayList<Host>();
+
+        List<InetAddress> dnsLookupAddresses = new ArrayList<InetAddress>();
+
+        if (!globalContactPoint.isEmpty()) {
+            dnsLookupAddresses = Arrays.asList(getLocalAddresses());
+        }
+
+        for (Host host : hosts) {
+            if (!this.readDC.isEmpty() && host.getDatacenter().equals(readDC)) {
+                readLocalDCAddresses.add(host);
+            }
+
+            if ((!this.writeDC.isEmpty() && host.getDatacenter().equals(writeDC))
+                || dnsLookupAddresses.contains(host.getAddress())) {
+                writeLocalDCAddresses.add(host);
+            } else {
+                remoteDCAddresses.add(host);
+            }
+        }
+
+        this.readLocalDCHosts = readLocalDCAddresses;
+        this.writeLocalDCHosts = writeLocalDCAddresses;
+        this.remoteDCHosts = remoteDCAddresses;
+
+        this.index.set(new Random().nextInt(Math.max(hosts.size(), 1)));
+    }
+
+    @Override
+    @NonNull
+    public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+        return null;
+    }
+
+    /**
      * Returns the hosts to use for a new query.
      *
      * <p>For read requests, the returned plan will always try each known host in the readDC first.
-     * if none of the host is reachable, it will try all other hosts.
-     * For writes and all other requests, the returned plan will always try each known host in the writeDC or the
-     * default write region (looked up and cached from the globalEndpoint) first.
-     * If none of the host is reachable, it will try all other hosts.
+     * if none of the host is reachable, it will try all other hosts. For writes and all other requests, the returned
+     * plan will always try each known host in the writeDC or the default write region (looked up and cached from the
+     * globalEndpoint) first. If none of the host is reachable, it will try all other hosts.
+     *
      * @param loggedKeyspace the keyspace currently logged in on for this query.
-     * @param statement the query for which to build the plan.
-     * @return a new query plan, i.e. an iterator indicating which host to try first for querying,
-     *     which one to use as failover, etc...
+     * @param statement      the query for which to build the plan.
+     *
+     * @return a new query plan, i.e. an iterator indicating which host to try first for querying, which one to use as
+     * failover, etc...
      */
     @Override
     public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
+
         refreshHostsIfDnsExpired();
 
         final List<Host> readHosts = cloneList(this.readLocalDCHosts);
@@ -132,26 +184,26 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         return new AbstractIterator<Host>() {
-            private int idx = startIdx;
             public int remainingRead = readHosts.size();
             public int remainingWrite = writeHosts.size();
+            private int idx = startIdx;
             private int remainingRemote = remoteHosts.size();
 
             protected Host computeNext() {
                 while (true) {
                     if (remainingRead > 0 && isReadRequest(statement)) {
                         remainingRead--;
-                        return readHosts.get(idx ++ % readHosts.size());
+                        return readHosts.get(idx++ % readHosts.size());
                     }
 
                     if (remainingWrite > 0) {
                         remainingWrite--;
-                        return writeHosts.get(idx ++ % writeHosts.size());
+                        return writeHosts.get(idx++ % writeHosts.size());
                     }
 
                     if (remainingRemote > 0) {
                         remainingRemote--;
-                        return remoteHosts.get(idx ++ % remoteHosts.size());
+                        return remoteHosts.get(idx++ % remoteHosts.size());
                     }
 
                     return endOfData();
@@ -161,24 +213,18 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @Override
-    public void onUp(Host host) {
-        if (host == null || host.getDatacenter() == null) {
-            return;
-        }
+    public void onAdd(@NonNull Node node) {
 
-        if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
-            this.readLocalDCHosts.addIfAbsent(host);
-        }
+    }
 
-        if (!this.writeDC.isEmpty()) {
-            if (host.getDatacenter().equals(this.writeDC)) {
-                this.writeLocalDCHosts.addIfAbsent(host);
-            }
-        } else if (Arrays.asList(getLocalAddresses()).contains(host.getAddress())) {
-                this.writeLocalDCHosts.addIfAbsent(host);
-        } else {
-            this.remoteDCHosts.addIfAbsent(host);
-        }
+    @Override
+    public void onAdd(Host host) {
+        onUp(host);
+    }
+
+    @Override
+    public void onDown(@NonNull Node node) {
+
     }
 
     @Override
@@ -203,8 +249,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @Override
-    public void onAdd(Host host) {
-        onUp(host);
+    public void onRemove(@NonNull Node node) {
+
     }
 
     @Override
@@ -212,87 +258,47 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         onDown(host);
     }
 
-    public void close() {
-        // nothing to do
+    @Override
+    public void onUp(@NonNull Node node) {
+
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static class Builder {
-
-        private String readDC = "";
-        private String writeDC = "";
-        private String globalEndpoint = "";
-        private int dnsExpirationInSeconds = 60;
-
-        public Builder withReadDC(String readDC) {
-            this.readDC = readDC;
-            return this;
+    @Override
+    public void onUp(Host host) {
+        if (host == null || host.getDatacenter() == null) {
+            return;
         }
 
-        public Builder withWriteDC(String writeDC) {
-            this.writeDC = writeDC;
-            return this;
+        if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
+            this.readLocalDCHosts.addIfAbsent(host);
         }
 
-        public Builder withGlobalEndpoint(String globalEndpoint) {
-            this.globalEndpoint = globalEndpoint;
-            return this;
+        if (!this.writeDC.isEmpty()) {
+            if (host.getDatacenter().equals(this.writeDC)) {
+                this.writeLocalDCHosts.addIfAbsent(host);
+            }
+        } else if (Arrays.asList(getLocalAddresses()).contains(host.getAddress())) {
+            this.writeLocalDCHosts.addIfAbsent(host);
+        } else {
+            this.remoteDCHosts.addIfAbsent(host);
         }
-
-        public Builder withDnsExpirationInSeconds(int dnsExpirationInSeconds) {
-            this.dnsExpirationInSeconds = dnsExpirationInSeconds;
-            return this;
-        }
-
-        public CosmosLoadBalancingPolicy build() {
-            validate(this);
-            return CosmosLoadBalancingPolicy.buildFrom(this);
-        }
-    }
-
-    private CosmosLoadBalancingPolicy(String readDC, String writeDC, String globalContactPoint, int dnsExpirationInSeconds) {
-        this.readDC = readDC;
-        this.writeDC = writeDC;
-        this.globalContactPoint = globalContactPoint;
-        this.dnsExpirationInSeconds = dnsExpirationInSeconds;
-    }
-
-    private final AtomicInteger index = new AtomicInteger();
-    private long lastDnsLookupTime = Long.MIN_VALUE;
-
-    private InetAddress[] localAddresses = null;
-    private CopyOnWriteArrayList<Host> readLocalDCHosts;
-    private CopyOnWriteArrayList<Host> writeLocalDCHosts;
-    private CopyOnWriteArrayList<Host> remoteDCHosts;
-
-    private String readDC;
-    private String writeDC;
-    private String globalContactPoint;
-    private int dnsExpirationInSeconds;
-
-
-    @SuppressWarnings("unchecked")
-    private static CopyOnWriteArrayList<Host> cloneList(CopyOnWriteArrayList<Host> list) {
-        return (CopyOnWriteArrayList<Host>) list.clone();
     }
 
     /**
      * DNS lookup based on the globalContactPoint and update localAddresses.
+     *
      * @return
      */
     private InetAddress[] getLocalAddresses() {
         if (this.localAddresses == null || dnsExpired()) {
             try {
                 this.localAddresses = InetAddress.getAllByName(globalContactPoint);
-                this.lastDnsLookupTime = System.currentTimeMillis()/1000;
-            }
-            catch (UnknownHostException ex) {
+                this.lastDnsLookupTime = System.currentTimeMillis() / 1000;
+            } catch (UnknownHostException ex) {
                 // dns entry may be temporarily unavailable
                 if (this.localAddresses == null) {
-                    throw new IllegalArgumentException("The dns could not resolve the globalContactPoint the first time.");
+                    throw new IllegalArgumentException("The dns could not resolve the globalContactPoint the first " +
+                        "time.");
                 }
             }
         }
@@ -300,43 +306,26 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return this.localAddresses;
     }
 
-    private void refreshHostsIfDnsExpired() {
-        if (this.globalContactPoint.isEmpty() || (this.writeLocalDCHosts != null && !dnsExpired())) {
-            return;
-        }
+    private static CosmosLoadBalancingPolicy buildFrom(Builder builder) {
+        return new CosmosLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint,
+            builder.dnsExpirationInSeconds);
+    }
 
-        CopyOnWriteArrayList<Host> oldLocalDCHosts = this.writeLocalDCHosts;
-        CopyOnWriteArrayList<Host> oldRemoteDCHosts = this.remoteDCHosts;
-
-        List<InetAddress> localAddresses = Arrays.asList(getLocalAddresses());
-        CopyOnWriteArrayList<Host> localDcHosts = new CopyOnWriteArrayList<Host>();
-        CopyOnWriteArrayList<Host> remoteDcHosts = new CopyOnWriteArrayList<Host>();
-
-        for (Host host: oldLocalDCHosts) {
-            if (localAddresses.contains(host.getAddress())) {
-                localDcHosts.addIfAbsent(host);
-            } else {
-                remoteDcHosts.addIfAbsent(host);
-            }
-        }
-
-        for (Host host: oldRemoteDCHosts) {
-            if (localAddresses.contains(host.getAddress())) {
-                localDcHosts.addIfAbsent(host);
-            } else {
-                remoteDcHosts.addIfAbsent(host);
-            }
-        }
-
-        this.writeLocalDCHosts = localDcHosts;
-        this.remoteDCHosts = remoteDcHosts;
+    @SuppressWarnings("unchecked")
+    private static CopyOnWriteArrayList<Host> cloneList(CopyOnWriteArrayList<Host> list) {
+        return (CopyOnWriteArrayList<Host>) list.clone();
     }
 
     private boolean dnsExpired() {
-        return System.currentTimeMillis()/1000 > lastDnsLookupTime + dnsExpirationInSeconds;
+        return System.currentTimeMillis() / 1000 > lastDnsLookupTime + dnsExpirationInSeconds;
+    }
+
+    private static boolean isReadRequest(String query) {
+        return query.toLowerCase().startsWith("select");
     }
 
     private static boolean isReadRequest(Statement statement) {
+
         if (statement instanceof RegularStatement) {
             if (statement instanceof SimpleStatement) {
                 SimpleStatement simpleStatement = (SimpleStatement) statement;
@@ -355,25 +344,84 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return false;
     }
 
-    private static boolean isReadRequest(String query) {
-        return query.toLowerCase().startsWith("select");
+    private void refreshHostsIfDnsExpired() {
+        if (this.globalContactPoint.isEmpty() || (this.writeLocalDCHosts != null && !dnsExpired())) {
+            return;
+        }
+
+        CopyOnWriteArrayList<Host> oldLocalDCHosts = this.writeLocalDCHosts;
+        CopyOnWriteArrayList<Host> oldRemoteDCHosts = this.remoteDCHosts;
+
+        List<InetAddress> localAddresses = Arrays.asList(getLocalAddresses());
+        CopyOnWriteArrayList<Host> localDcHosts = new CopyOnWriteArrayList<Host>();
+        CopyOnWriteArrayList<Host> remoteDcHosts = new CopyOnWriteArrayList<Host>();
+
+        for (Host host : oldLocalDCHosts) {
+            if (localAddresses.contains(host.getAddress())) {
+                localDcHosts.addIfAbsent(host);
+            } else {
+                remoteDcHosts.addIfAbsent(host);
+            }
+        }
+
+        for (Host host : oldRemoteDCHosts) {
+            if (localAddresses.contains(host.getAddress())) {
+                localDcHosts.addIfAbsent(host);
+            } else {
+                remoteDcHosts.addIfAbsent(host);
+            }
+        }
+
+        this.writeLocalDCHosts = localDcHosts;
+        this.remoteDCHosts = remoteDcHosts;
     }
 
     private static void validate(Builder builder) {
         if (builder.globalEndpoint.isEmpty()) {
             if (builder.writeDC.isEmpty() || builder.readDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint is not specified, you need to provide both " +
-                        "readDC and writeDC.");
+                throw new IllegalArgumentException("When the globalEndpoint is not specified, you need to provide " +
+                    "both " +
+                    "readDC and writeDC.");
             }
         } else {
             if (!builder.writeDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint is specified, you can't provide writeDC. Writes will go " +
-                        "to the default write region when the globalEndpoint is specified.");
+                throw new IllegalArgumentException("When the globalEndpoint is specified, you can't provide writeDC. " +
+                    "Writes will go " +
+                    "to the default write region when the globalEndpoint is specified.");
             }
         }
     }
 
-    private static CosmosLoadBalancingPolicy buildFrom(Builder builder) {
-        return new CosmosLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
+    public static class Builder {
+
+        private int dnsExpirationInSeconds = 60;
+        private String globalEndpoint = "";
+        private String readDC = "";
+        private String writeDC = "";
+
+        public CosmosLoadBalancingPolicy build() {
+            validate(this);
+            return CosmosLoadBalancingPolicy.buildFrom(this);
+        }
+
+        public Builder withDnsExpirationInSeconds(int dnsExpirationInSeconds) {
+            this.dnsExpirationInSeconds = dnsExpirationInSeconds;
+            return this;
+        }
+
+        public Builder withGlobalEndpoint(String globalEndpoint) {
+            this.globalEndpoint = globalEndpoint;
+            return this;
+        }
+
+        public Builder withReadDC(String readDC) {
+            this.readDC = readDC;
+            return this;
+        }
+
+        public Builder withWriteDC(String writeDC) {
+            this.writeDC = writeDC;
+            return this;
+        }
     }
 }
