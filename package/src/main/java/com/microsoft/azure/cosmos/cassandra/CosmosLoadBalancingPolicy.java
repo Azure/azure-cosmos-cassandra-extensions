@@ -66,8 +66,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private long lastDnsLookupTime = Long.MIN_VALUE;
     private InetAddress[] localAddresses = null;
     private CopyOnWriteArrayList<Node> readLocalDcNodes;
-    private CopyOnWriteArrayList<Node> remoteDCHosts;
-    private CopyOnWriteArrayList<Node> writeLocalDCHosts;
+    private CopyOnWriteArrayList<Node> remoteDcNodes;
+    private CopyOnWriteArrayList<Node> writeLocalDcNodes;
 
     private CosmosLoadBalancingPolicy(
         String readDC,
@@ -90,36 +90,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Return the HostDistance for the provided host.
-     * <p>
-     * This policy considers the nodes for the writeDC and the default write region at distance {@code LOCAL}.
-     *
-     * @param host the host of which to return the distance of.
-     *
-     * @return the HostDistance to {@code host}.
-     */
-    @Override
-    public HostDistance distance(Host host) {
-        if (!this.writeDC.isEmpty()) {
-            if (host.getDatacenter().equals(this.writeDC)) {
-                return HostDistance.LOCAL;
-            }
-        } else if (Arrays.asList(getLocalAddresses()).contains(host.getAddress())) {
-            return HostDistance.LOCAL;
-        }
-
-        return HostDistance.REMOTE;
-    }
-
-    /**
      * Initializes the list of hosts in read, write, local, and remote categories.
      */
     @Override
     public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
-
-        final CopyOnWriteArrayList<Node> readLocalDCAddresses = new CopyOnWriteArrayList<>();
-        final CopyOnWriteArrayList<Node> writeLocalDCAddresses = new CopyOnWriteArrayList<>();
-        final CopyOnWriteArrayList<Node> remoteDCAddresses = new CopyOnWriteArrayList<>();
 
         List<InetAddress> dnsLookupAddresses = new ArrayList<>();
 
@@ -127,25 +101,32 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             dnsLookupAddresses = Arrays.asList(this.getLocalAddresses());
         }
 
+        this.readLocalDcNodes = new CopyOnWriteArrayList<>();
+        this.writeLocalDcNodes = new CopyOnWriteArrayList<>();
+        this.remoteDcNodes = new CopyOnWriteArrayList<>();
+
         for (Node node : nodes.values()) {
 
             final String datacenter = node.getDatacenter();
+            NodeDistance distance = NodeDistance.IGNORED;
 
-            if (!this.readDC.isEmpty() && Objects.equals(datacenter, this.writeDC)) {
-                readLocalDCAddresses.add(node);
+            if (!this.readDC.isEmpty() && Objects.equals(datacenter, this.readDC)) {
+                this.readLocalDcNodes.add(node);
+                distance = NodeDistance.LOCAL;
             }
 
             if ((!this.writeDC.isEmpty() && Objects.equals(datacenter, this.writeDC))
                 || dnsLookupAddresses.contains(this.getAddress(node))) {
-                writeLocalDCAddresses.add(node);
+                this.writeLocalDcNodes.add(node);
+                distance = NodeDistance.LOCAL;
             } else {
-                remoteDCAddresses.add(node);
+                assert distance == NodeDistance.IGNORED;
+                this.remoteDcNodes.add(node);
+                distance = NodeDistance.REMOTE;
             }
-        }
 
-        this.readLocalDcNodes = readLocalDCAddresses;
-        this.writeLocalDCHosts = writeLocalDCAddresses;
-        this.remoteDCHosts = remoteDCAddresses;
+            distanceReporter.setDistance(node, distance);
+        }
 
         this.index.set(new Random().nextInt(Math.max(nodes.size(), 1)));
     }
@@ -176,8 +157,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             addTo(queryPlan, start, this.readLocalDcNodes);
         }
 
-        addTo(queryPlan, start, this.writeLocalDCHosts);
-        addTo(queryPlan, start, this.remoteDCHosts);
+        addTo(queryPlan, start, this.writeLocalDcNodes);
+        addTo(queryPlan, start, this.remoteDcNodes);
 
         return queryPlan;
     }
@@ -210,12 +191,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (!this.writeDC.isEmpty()) {
             if (node.getDatacenter().equals(this.writeDC)) {
-                this.writeLocalDCHosts.remove(node);
+                this.writeLocalDcNodes.remove(node);
             }
         } else if (Arrays.asList(getLocalAddresses()).contains(this.getAddress(node))) {
-            this.writeLocalDCHosts.remove(node);
+            this.writeLocalDcNodes.remove(node);
         } else {
-            this.remoteDCHosts.remove(node);
+            this.remoteDcNodes.remove(node);
         }
     }
 
@@ -237,12 +218,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (!this.writeDC.isEmpty()) {
             if (node.getDatacenter().equals(this.writeDC)) {
-                this.writeLocalDCHosts.addIfAbsent(node);
+                this.writeLocalDcNodes.addIfAbsent(node);
             }
         } else if (Arrays.asList(getLocalAddresses()).contains(this.getAddress(node))) {
-            this.writeLocalDCHosts.addIfAbsent(node);
+            this.writeLocalDcNodes.addIfAbsent(node);
         } else {
-            this.remoteDCHosts.addIfAbsent(node);
+            this.remoteDcNodes.addIfAbsent(node);
         }
     }
 
@@ -319,12 +300,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private void refreshHostsIfDnsExpired() {
 
-        if (this.globalContactPoint.isEmpty() || (this.writeLocalDCHosts != null && !dnsExpired())) {
+        if (this.globalContactPoint.isEmpty() || (this.writeLocalDcNodes != null && !dnsExpired())) {
             return;
         }
 
-        CopyOnWriteArrayList<Node> oldLocalDCHosts = this.writeLocalDCHosts;
-        CopyOnWriteArrayList<Node> oldRemoteDCHosts = this.remoteDCHosts;
+        CopyOnWriteArrayList<Node> oldLocalDCHosts = this.writeLocalDcNodes;
+        CopyOnWriteArrayList<Node> oldRemoteDCHosts = this.remoteDcNodes;
 
         List<InetAddress> localAddresses = Arrays.asList(getLocalAddresses());
         CopyOnWriteArrayList<Node> localDcHosts = new CopyOnWriteArrayList<>();
@@ -346,11 +327,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        this.writeLocalDCHosts = localDcHosts;
-        this.remoteDCHosts = remoteDcHosts;
+        this.writeLocalDcNodes = localDcHosts;
+        this.remoteDcNodes = remoteDcHosts;
     }
 
     private static void validate(Builder builder) {
+
         if (builder.globalEndpoint.isEmpty()) {
             if (builder.writeDC.isEmpty() || builder.readDC.isEmpty()) {
                 throw new IllegalArgumentException("When the globalEndpoint is not specified, you need to provide " +
@@ -396,13 +378,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         public Builder withWriteDC(String writeDC) {
             this.writeDC = writeDC;
             return this;
-        }
-    }
-
-    private static class CosmosDistanceReporter implements DistanceReporter {
-        @Override
-        public void setDistance(@NonNull Node node, @NonNull NodeDistance distance) {
-
         }
     }
 }
