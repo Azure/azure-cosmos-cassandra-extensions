@@ -3,15 +3,12 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
-import com.datastax.oss.driver.api.core.DriverException;
-import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
+import com.datastax.oss.driver.api.core.servererrors.ServerError;
 import com.datastax.oss.driver.api.core.servererrors.WriteFailureException;
 import com.datastax.oss.driver.api.core.servererrors.WriteType;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -27,8 +24,8 @@ import java.util.Random;
  * #onUnavailable}, we retry immediately. For onRequestErrors such as OverLoadedError, we try to parse the exception
  * message and use RetryAfterMs field provided from the server as the back-off duration. If RetryAfterMs is not
  * available, we default to exponential growing back-off scheme. In this case the time between retries is increased by
- * {@link #growingBackoffTimeInMillis} milliseconds (default: 1000 ms) on each retry, unless maxRetryCount is -1, in which
- * case we back-off with fixed {@link #fixedBackoffTimeInMillis} duration.
+ * {@link #growingBackoffTimeInMillis} milliseconds (default: 1000 ms) on each retry, unless maxRetryCount is -1, in
+ * which case we back-off with fixed {@link #fixedBackoffTimeInMillis} duration.
  */
 public final class CosmosRetryPolicy implements RetryPolicy {
 
@@ -79,14 +76,15 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         RetryDecision retryDecision;
 
+        // TODO (DANOBLE) ServerError is not the same as ConnectionException which no longer exists
+        //  This decision tree must be rethought based on the new and very different CoordinatorException hierarchy
         try {
-            if (error instanceof ConnectionException) {
-                return retryManyTimesOrThrow(retryCount);
+            if (error instanceof ServerError) {
+                return this.retryManyTimesOrThrow(retryCount);
             }
-
             if (error instanceof OverloadedException || error instanceof WriteFailureException) {
                 if (this.maxRetryCount == -1 || retryCount < this.maxRetryCount) {
-                    int retryMillis = getRetryAfterMs(error.toString());
+                    int retryMillis = this.getRetryAfterMs(error.toString());
                     if (retryMillis == -1) {
                         retryMillis = (this.maxRetryCount == -1)
                             ? this.fixedBackoffTimeInMillis
@@ -94,7 +92,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
                     }
 
                     Thread.sleep(retryMillis);
-                    retryDecision = RetryDecision.retry(null);
+                    retryDecision = RetryDecision.RETRY_SAME;
                 } else {
                     retryDecision = RetryDecision.RETHROW;
                 }
@@ -176,7 +174,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     private RetryDecision retryManyTimesOrThrow(int retryCount) {
         return this.maxRetryCount == -1 || retryCount < this.maxRetryCount
-            ? RetryDecision.retry(null)
+            ? RetryDecision.RETRY_SAME
             : RetryDecision.RETHROW;
     }
 }
