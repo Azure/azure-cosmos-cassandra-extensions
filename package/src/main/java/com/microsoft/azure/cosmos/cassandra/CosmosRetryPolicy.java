@@ -76,15 +76,16 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         RetryDecision retryDecision;
 
-        // TODO (DANOBLE) ServerError is not the same as ConnectionException which no longer exists
-        //  This decision tree must be rethought based on the new and very different CoordinatorException hierarchy
+        // TODO (DANOBLE) ServerError is not the same as ConnectionException and there is no obvious replacement
+        //  Consequently this decision tree must be rethought based on the new and very different CoordinatorException
+        //  hierarchy
         try {
             if (error instanceof ServerError) {
                 return this.retryManyTimesOrThrow(retryCount);
             }
             if (error instanceof OverloadedException || error instanceof WriteFailureException) {
                 if (this.maxRetryCount == -1 || retryCount < this.maxRetryCount) {
-                    int retryMillis = this.getRetryAfterMs(error.toString());
+                    int retryMillis = getRetryAfterMs(error.toString());
                     if (retryMillis == -1) {
                         retryMillis = (this.maxRetryCount == -1)
                             ? this.fixedBackoffTimeInMillis
@@ -119,9 +120,9 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return this.retryManyTimesOrThrow(retryCount);
     }
 
-    // TODO (DANOBLE) Implement CosmosRetryPolicy.onRequestAborted
     @Override
     public RetryDecision onRequestAborted(@NonNull Request request, @NonNull Throwable error, int retryCount) {
+        // TODO (DANOBLE) Implement CosmosRetryPolicy.onRequestAborted
         return null;
     }
 
