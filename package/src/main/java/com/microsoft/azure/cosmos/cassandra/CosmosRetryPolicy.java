@@ -85,14 +85,13 @@ public final class CosmosRetryPolicy implements RetryPolicy {
             }
             if (error instanceof OverloadedException || error instanceof WriteFailureException) {
                 if (this.maxRetryCount == -1 || retryCount < this.maxRetryCount) {
-                    int retryMillis = getRetryAfterMs(error.toString());
-                    if (retryMillis == -1) {
-                        retryMillis = (this.maxRetryCount == -1)
+                    int retryAfterMillis = getRetryAfterMillis(error.toString());
+                    if (retryAfterMillis == -1) {
+                        retryAfterMillis = this.maxRetryCount == -1
                             ? this.fixedBackoffTimeInMillis
                             : this.growingBackoffTimeInMillis * retryCount + random.nextInt(growingBackoffSaltMillis);
                     }
-
-                    Thread.sleep(retryMillis);
+                    Thread.sleep(retryAfterMillis);
                     retryDecision = RetryDecision.RETRY_SAME;
                 } else {
                     retryDecision = RetryDecision.RETHROW;
@@ -154,7 +153,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // .65.106.154:10350)
     // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10,
     // Additional details='
-    private static int getRetryAfterMs(String exceptionString) {
+    private static int getRetryAfterMillis(String exceptionString) {
 
         final String[] tokens = exceptionString.toString().split(",");
 
