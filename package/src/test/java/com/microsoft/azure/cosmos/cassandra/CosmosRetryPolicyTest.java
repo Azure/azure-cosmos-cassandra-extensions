@@ -19,17 +19,19 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
-import com.datastax.driver.core.exceptions.ConnectionException;
-import com.datastax.driver.core.exceptions.DriverException;
-import com.datastax.driver.core.exceptions.OverloadedException;
-import com.datastax.driver.core.policies.RetryPolicy;
+import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverException;
+import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.retry.RetryDecision;
+import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
+import com.datastax.oss.driver.api.core.session.Session;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
 
-import static com.datastax.driver.core.ConsistencyLevel.ONE;
-import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
+import static com.datastax.oss.driver.api.core.ConsistencyLevel.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -136,7 +138,7 @@ public class CosmosRetryPolicyTest {
         Statement statement = new SimpleStatement("SELECT * FROM retry");
 
         for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
-            RetryDecision retryDecision = retryPolicy.onRequestError(statement, CONSISTENCY_LEVEL, driverException, retryNumber);
+            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, CONSISTENCY_LEVEL, driverException, retryNumber);
             assertThat(retryDecision.getType()).isEqualTo(RetryDecision.Type.RETRY);
         }
     }
@@ -153,7 +155,7 @@ public class CosmosRetryPolicyTest {
     /**
      * Tests a retry operation
      */
-    private void retry(CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryPolicy.RetryDecision.Type expectedRetryDecisionType) {
+    private void retry(CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryDecision.Type expectedRetryDecisionType) {
 
         DriverException driverException = new OverloadedException(new InetSocketAddress(TestCommon.CONTACT_POINTS[0], TestCommon.PORT), "retry");
         Statement statement = new SimpleStatement("SELECT * FROM retry");
@@ -164,7 +166,7 @@ public class CosmosRetryPolicyTest {
             long expectedDuration = 1000000 * (retryPolicy.getMaxRetryCount() == -1 ? FIXED_BACK_OFF_TIME : retryNumber * GROWING_BACK_OFF_TIME);
             long startTime = System.nanoTime();
 
-            RetryDecision retryDecision = retryPolicy.onRequestError(statement, consistencyLevel, driverException, retryNumber);
+            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, consistencyLevel, driverException, retryNumber);
 
             long duration = System.nanoTime() - startTime;
 

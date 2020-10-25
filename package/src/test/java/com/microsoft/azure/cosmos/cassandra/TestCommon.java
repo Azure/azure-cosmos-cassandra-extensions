@@ -1,8 +1,16 @@
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
+import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.session.Session;
+
 import java.text.SimpleDateFormat;
-import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
+
+import static com.datastax.oss.protocol.internal.ProtocolConstants.BatchType.UNLOGGED;
 
 public class TestCommon {
 

@@ -19,16 +19,28 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
-import com.datastax.driver.core.policies.LoadBalancingPolicy;
-import com.datastax.driver.core.querybuilder.*;
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.api.querybuilder.delete.Delete;
+import com.datastax.oss.driver.api.querybuilder.insert.Insert;
+import com.datastax.oss.driver.api.querybuilder.update.Update;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
+import java.net.InetSocketAddress;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.UUID;
 
-import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
@@ -196,14 +208,24 @@ public class CosmosLoadBalancingPolicyTest {
         session.execute(batchStatement);
     }
 
-    private Cluster cluster;
-    private Session session;
+    private CqlSession session;
     private String keyspaceName = "downgrading";
     private String tableName = "sensor_data";
 
     private static final int TIMEOUT = 300000;
 
     private void connectWithSslAndLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {
+        final Collection<EndPoint> endpoints = new ArrayList<>(hostnames.length);
+
+        for (String hostname : hostnames) {
+            final InetSocketAddress address = new InetSocketAddress(hostname, port);
+        }
+
+        this.session = CqlSession.builder().addContactEndPoints(endpoints).build();
+        System.out.println("Connected to session: " + session.getName());
+
+        return session;
+
         cluster = Cluster.builder().addContactPoints(globalEndpoint).withPort(port).withCredentials(username, password).withSSL().withLoadBalancingPolicy(loadBalancingPolicy).build();
         System.out.println("Connected to cluster: " + cluster.getClusterName());
         session = cluster.connect();
@@ -215,7 +237,6 @@ public class CosmosLoadBalancingPolicyTest {
     private void close() {
         if (session != null) {
             session.close();
-            cluster.close();
         }
     }
 }
