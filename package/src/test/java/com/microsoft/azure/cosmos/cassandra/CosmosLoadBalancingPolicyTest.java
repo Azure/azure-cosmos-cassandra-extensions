@@ -27,9 +27,13 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.querybuilder.CqlSnippet;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
+import com.datastax.oss.driver.api.querybuilder.insert.InsertInto;
+import com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause;
+import com.datastax.oss.driver.api.querybuilder.relation.Relation;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
@@ -38,12 +42,15 @@ import org.testng.annotations.Test;
 
 import javax.net.ssl.SSLContext;
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 
+import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
+import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.tuple;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -166,27 +173,31 @@ public class CosmosLoadBalancingPolicyTest {
         // BuiltStatements
 
         final LocalDate date = LocalDate.of(2016, 06, 30);
-        final Date timestamp = new Date();
+        final Instant timestamp = Instant.now();
         final UUID uuid = UUID.randomUUID();
 
-        Clause pk1Clause = QueryBuilder.eq("sensor_id", uuid);
-        Clause pk2Clause = QueryBuilder.eq("date", date);
-        Clause ckClause = QueryBuilder.eq("timestamp", 1000);
-        Select select = QueryBuilder.select().all().from(keyspaceName, tableName);
-        select.where(pk1Clause).and(pk2Clause).and(ckClause);
-        session.execute(select);
+        Relation relation = Relation.columns("sensor_id", "date", "timestamp").isEqualTo(tuple(
+            literal(uuid), literal(date), literal(timestamp)
+        ));
 
-        Insert insert = QueryBuilder.insertInto(keyspaceName, tableName);
-        insert.values(new String[] { "sensor_id", "date", "timestamp" }, new Object[] { uuid, date, 1000 });
-        session.execute(insert);
+        Select select = QueryBuilder.selectFrom(keyspaceName, tableName).all().where(relation);
+        session.execute(select.build());
 
-        Update update = QueryBuilder.update(keyspaceName, tableName);
-        update.with(set("value", 1.0)).where(pk1Clause).and(pk2Clause).and(ckClause);
-        session.execute(update);
+        Insert insert = QueryBuilder.insertInto(keyspaceName, tableName)
+            .value("sensor_data", literal(uuid))
+            .value("date", literal(date))
+            .value("timestamp", literal(1000));
 
-        Delete delete = QueryBuilder.delete().from(keyspaceName, tableName);
-        delete.where(pk1Clause).and(pk2Clause).and(ckClause);
-        session.execute(delete);
+        session.execute(insert.build());
+
+        Update update = QueryBuilder.update(keyspaceName, tableName)
+            .setColumn("value", literal(1.0))
+            .where(relation);
+
+        session.execute(update.build());
+
+        Delete delete = QueryBuilder.deleteFrom(keyspaceName, tableName).where(relation);
+        session.execute(delete.build());
 
         // BoundStatements
 
@@ -224,9 +235,10 @@ public class CosmosLoadBalancingPolicyTest {
 
         // BatchStatement
 
-        BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED);
-        batchStatement.add(simpleStatement);
-        batchStatement.add(boundStatement);
+        BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
+            .add(simpleStatement)
+            .add(boundStatement);
+
         session.execute(batchStatement);
     }
 
