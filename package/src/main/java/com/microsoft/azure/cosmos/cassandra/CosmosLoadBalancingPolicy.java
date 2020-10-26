@@ -1,21 +1,5 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
@@ -97,7 +81,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         List<InetAddress> dnsLookupAddresses = new ArrayList<>();
 
-        if (!globalContactPoint.isEmpty()) {
+        if (!this.globalContactPoint.isEmpty()) {
             dnsLookupAddresses = Arrays.asList(this.getLocalAddresses());
         }
 
@@ -151,7 +135,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.refreshHostsIfDnsExpired();
 
         final ArrayDeque<Node> queryPlan =  new ArrayDeque<>();
-        final int start = index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
+        final int start = this.index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
 
         if (isReadRequest(request)) {
             addTo(queryPlan, start, this.readLocalDcNodes);
@@ -193,7 +177,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (node.getDatacenter().equals(this.writeDC)) {
                 this.writeLocalDcNodes.remove(node);
             }
-        } else if (Arrays.asList(getLocalAddresses()).contains(this.getAddress(node))) {
+        } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
             this.writeLocalDcNodes.remove(node);
         } else {
             this.remoteDcNodes.remove(node);
@@ -202,7 +186,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onRemove(@NonNull Node node) {
-        onDown(node);
+        this.onDown(node);
     }
 
     @Override
@@ -220,7 +204,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (node.getDatacenter().equals(this.writeDC)) {
                 this.writeLocalDcNodes.addIfAbsent(node);
             }
-        } else if (Arrays.asList(getLocalAddresses()).contains(this.getAddress(node))) {
+        } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
             this.writeLocalDcNodes.addIfAbsent(node);
         } else {
             this.remoteDcNodes.addIfAbsent(node);
@@ -230,7 +214,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     /**
      * DNS lookup based on the globalContactPoint and update localAddresses.
      *
-     * @return
+     * @return updated array of local addresses corresponding to the globalContactPoint.
      */
     private InetAddress[] getLocalAddresses() {
 
@@ -261,7 +245,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private boolean dnsExpired() {
-        return System.currentTimeMillis() / 1000 > lastDnsLookupTime + dnsExpirationInSeconds;
+        return System.currentTimeMillis() / 1000 > this.lastDnsLookupTime + this.dnsExpirationInSeconds;
     }
 
     private InetAddress getAddress(Node node) {
@@ -300,14 +284,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private void refreshHostsIfDnsExpired() {
 
-        if (this.globalContactPoint.isEmpty() || (this.writeLocalDcNodes != null && !dnsExpired())) {
+        if (this.globalContactPoint.isEmpty() || (this.writeLocalDcNodes != null && !this.dnsExpired())) {
             return;
         }
 
         CopyOnWriteArrayList<Node> oldLocalDCHosts = this.writeLocalDcNodes;
         CopyOnWriteArrayList<Node> oldRemoteDCHosts = this.remoteDcNodes;
 
-        List<InetAddress> localAddresses = Arrays.asList(getLocalAddresses());
+        List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
         CopyOnWriteArrayList<Node> localDcHosts = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<Node> remoteDcHosts = new CopyOnWriteArrayList<>();
 

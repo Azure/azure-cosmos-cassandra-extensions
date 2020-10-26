@@ -57,7 +57,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // region Accessors
 
     public int getMaxRetryCount() {
-        return maxRetryCount;
+        return this.maxRetryCount;
     }
 
     // endregion
@@ -149,13 +149,13 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     }
 
     // Example exceptionString:
-    // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babatsai.cassandra.cosmos.azure.com/40
+    // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babas.cassandra.cosmos.azure.com/40
     // .65.106.154:10350)
     // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10,
     // Additional details='
     private static int getRetryAfterMillis(String exceptionString) {
 
-        final String[] tokens = exceptionString.toString().split(",");
+        final String[] tokens = exceptionString.split(",");
 
         for (String token : tokens) {
 

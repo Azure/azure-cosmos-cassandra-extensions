@@ -1,21 +1,5 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
@@ -36,7 +20,6 @@ import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
-import jdk.internal.jline.internal.Nullable;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
@@ -167,8 +150,8 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
      */
     @Override
     public void close() {
-        if (session != null) {
-            session.close();
+        if (this.session != null) {
+            this.session.close();
         }
     }
 
@@ -187,9 +170,9 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         }
 
         this.session = CqlSession.builder().addContactEndPoints(endpoints).build();
-        System.out.println("Connected to session: " + session.getName());
+        System.out.println("Connected to session: " + this.session.getName());
 
-        return session;
+        return this.session;
     }
 
     /**
@@ -197,22 +180,20 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
      */
     private void createSchema() {
 
-        session.execute(SimpleStatement.newInstance(
+        this.session.execute(SimpleStatement.newInstance(
             "CREATE KEYSPACE IF NOT EXISTS downgrading WITH replication = {"
                 + "'class':'SimpleStrategy',"
                 + "'replication_factor':3"
-                + "}"),
-            GenericType.optionalOf(Void.class));
+                + "}"));
 
-        session.execute(SimpleStatement.newInstance(
+        this.session.execute(SimpleStatement.newInstance(
             "CREATE TABLE IF NOT EXISTS downgrading.sensor_data ("
                 + "sensor_id uuid,"
                 + "date date,"
                 + "timestamp timestamp,"
                 + "value double,"
                 + "PRIMARY KEY ((sensor_id,date),timestamp)"
-                + ")"),
-            GenericType.optionalOf(Void.class));
+                + ")"));
     }
 
     /**
@@ -280,7 +261,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
                     + "timestamp > '2018-02-26+01:00'")
                 .setConsistencyLevel(consistencyLevel);
 
-        ResultSet rows = session.execute(statement, GenericType.of(ResultSet.class));
+        ResultSet rows = this.session.execute(statement, GenericType.of(ResultSet.class));
         System.out.println("Read succeeded at " + consistencyLevel);
 
         return rows;
@@ -324,7 +305,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    private void write(@Nullable ConsistencyLevel consistencyLevel) {
+    private void write(ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
@@ -360,8 +341,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
                     + "'2018-02-26T13:56:33.739+01:00',"
                     + "2.52)"));
 
-        session.execute(batch);
-
+        this.session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
     }
 }

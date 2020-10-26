@@ -86,9 +86,9 @@
     </license>
   </licenses>
   <scm>
-    <connection>scm:githttps://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</connection>
+    <connection>scm:git:https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</connection>
     <developerConnection>scm:git:https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</developerConnection>
-    <url>hhttps://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</url>
+    <url>https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</url>
   </scm>
   <developers>
     <developer>

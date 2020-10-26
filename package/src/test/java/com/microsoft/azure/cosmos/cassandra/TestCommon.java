@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
@@ -7,7 +10,6 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.cql.Statement;
 
 import java.text.SimpleDateFormat;
 
@@ -16,6 +18,7 @@ import static java.lang.String.format;
 public class TestCommon {
 
     static final String[] CONTACT_POINTS;
+    static final int PORT;
 
     static {
 
@@ -29,10 +32,8 @@ public class TestCommon {
             value = "localhost";
         }
 
-        CONTACT_POINTS = new String[] {value};
+        CONTACT_POINTS = new String[] { value };
     }
-
-    static final int PORT;
 
     static {
 
@@ -75,15 +76,77 @@ public class TestCommon {
         Thread.sleep(5000);
     }
 
-    static void write(CqlSession session, String keyspaceName, String tableName) {
-        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
+    /**
+     * Displays the results on the console.
+     *
+     * @param rows the results to display.
+     */
+    static void display(ResultSet rows) {
+
+        final int width1 = 38;
+        final int width2 = 12;
+        final int width3 = 30;
+        final int width4 = 21;
+
+        final String format = "%-" + width1 + "s%-" + width2 + "s%-" + width3 + "s%-" + width4 + "s%n";
+        final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+
+        // headings
+        System.out.printf(format, "sensor_id", "date", "timestamp", "value");
+
+        // separators
+        drawLine(width1, width2, width3, width4);
+
+        // data
+
+        for (Row row : rows) {
+            System.out.printf(format,
+                row.getUuid("sensor_id"),
+                row.getLocalDate("date"),
+                sdf.format(row.getInstant("timestamp")),
+                row.getDouble("value"));
+        }
     }
 
-        /**
-         * Inserts data, retrying if necessary with a downgraded CL.
-         *
-         * @param consistencyLevel the consistency level to apply.
-         */
+    /**
+     * Queries data, retrying if necessary with a downgraded CL.
+     *
+     * @param consistencyLevel the consistency level to apply.
+     */
+    static ResultSet read(
+        CqlSession session,
+        ConsistencyLevel consistencyLevel,
+        String keyspaceName,
+        String tableName) {
+
+        System.out.printf("Reading at %s%n", consistencyLevel);
+
+        SimpleStatement statement = SimpleStatement.newInstance(format(
+            "SELECT sensor_id, date, timestamp, value "
+                + "FROM %s.%s "
+                + "WHERE "
+                + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
+                + "date = '2018-02-26' AND "
+                + "timestamp > '2018-02-26+01:00'",
+            keyspaceName,
+            tableName)
+        ).setConsistencyLevel(consistencyLevel);
+
+        ResultSet rows = session.execute(statement);
+
+        System.out.println("Read succeeded at " + consistencyLevel);
+        return rows;
+    }
+
+    static ResultSet read(CqlSession session, String keyspaceName, String tableName) {
+        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
+    }
+
+    /**
+     * Inserts data, retrying if necessary with a downgraded CL.
+     *
+     * @param consistencyLevel the consistency level to apply.
+     */
     static void write(CqlSession session, ConsistencyLevel consistencyLevel, String keyspaceName, String tableName) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
@@ -121,63 +184,8 @@ public class TestCommon {
         System.out.println("Write succeeded at " + consistencyLevel);
     }
 
-    static ResultSet read(CqlSession session, String keyspaceName, String tableName) {
-        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
-    }
-
-    /**
-     * Queries data, retrying if necessary with a downgraded CL.
-     *
-     * @param consistencyLevel the consistency level to apply.
-     */
-    static ResultSet read(CqlSession session, ConsistencyLevel consistencyLevel, String keyspaceName, String tableName) {
-
-        System.out.printf("Reading at %s%n", consistencyLevel);
-
-        Statement statement = SimpleStatement.newInstance(format(
-            "SELECT sensor_id, date, timestamp, value "
-                + "FROM %s.%s "
-                + "WHERE "
-                + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
-                + "date = '2018-02-26' AND "
-                + "timestamp > '2018-02-26+01:00'", keyspaceName, tableName))
-            .setConsistencyLevel(consistencyLevel);
-
-        ResultSet rows = session.execute(statement);
-        System.out.println("Read succeeded at " + consistencyLevel);
-        return rows;
-    }
-
-    /**
-     * Displays the results on the console.
-     *
-     * @param rows the results to display.
-     */
-    static void display(ResultSet rows) {
-
-        final int width1 = 38;
-        final int width2 = 12;
-        final int width3 = 30;
-        final int width4 = 21;
-
-        final String format = "%-" + width1 + "s%-" + width2 + "s%-" + width3 + "s%-" + width4 + "s%n";
-        final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-
-        // headings
-        System.out.printf(format, "sensor_id", "date", "timestamp", "value");
-
-        // separators
-        drawLine(width1, width2, width3, width4);
-
-        // data
-
-        for (Row row : rows) {
-            System.out.printf(format,
-                row.getUuid("sensor_id"),
-                row.getLocalDate("date"),
-                sdf.format(row.getInstant("timestamp")),
-                row.getDouble("value"));
-        }
+    static void write(CqlSession session, String keyspaceName, String tableName) {
+        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
     /**
