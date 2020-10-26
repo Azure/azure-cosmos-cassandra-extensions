@@ -20,13 +20,13 @@
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
-import com.datastax.oss.driver.api.core.session.Session;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
@@ -73,8 +73,9 @@ public class CosmosRetryPolicyTest {
     private String keyspaceName = "downgrading";
     private String tableName = "sensor_data";
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
+
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT, FIXED_BACK_OFF_TIME, GROWING_BACK_OFF_TIME);
 
         try {
@@ -110,28 +111,28 @@ public class CosmosRetryPolicyTest {
         }
     }
 
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
 
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
         retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
     }
 
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
 
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
         retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
     }
 
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
 
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
         retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
     }
     
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
     public void canRetryOnConnectionException() {
         DriverException driverException = new ConnectionException (new InetSocketAddress(TestCommon.CONTACT_POINTS[0], TestCommon.PORT), "retry");
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
@@ -149,8 +150,7 @@ public class CosmosRetryPolicyTest {
     private static final int MAX_RETRY_COUNT = 5;
     private static final int TIMEOUT = 300000;
 
-    private Cluster cluster;
-    private Session session;
+    private CqlSession session;
 
     /**
      * Tests a retry operation
@@ -158,7 +158,7 @@ public class CosmosRetryPolicyTest {
     private void retry(CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryDecision.Type expectedRetryDecisionType) {
 
         DriverException driverException = new OverloadedException(new InetSocketAddress(TestCommon.CONTACT_POINTS[0], TestCommon.PORT), "retry");
-        Statement statement = new SimpleStatement("SELECT * FROM retry");
+        Statement statement = SimpleStatement.newInstance("SELECT * FROM retry");
         ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
 
         for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {

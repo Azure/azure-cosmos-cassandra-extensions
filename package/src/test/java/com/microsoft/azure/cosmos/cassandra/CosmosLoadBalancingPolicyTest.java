@@ -21,37 +21,40 @@ package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
-import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
+import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
+import javax.net.ssl.SSLContext;
 import java.net.InetSocketAddress;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.UUID;
 
+import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
- *
- * <p>Preconditions:
+ * <p>
+ * Preconditions:
  * <ul>
  * <li> A CosmosDB CassandraAPI account is required. It should have two regions: readDC (e.g, East US 2)
  * and writeDC (e.g, West US 2). globalEndpoint, username, and password fields should be populated.
  * <p>
- *
  * Side effects:
  * <ol>
  * <li>Creates a new keyspace {@code keyspaceName} in the cluster, with replication factor 3. If a
@@ -60,13 +63,12 @@ import static org.assertj.core.api.Assertions.fail;
  * already, it will be reused.
  * <li>Executes all types of Statement queries.
  * </ol>
- * <p>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
 public class CosmosLoadBalancingPolicyTest {
 
-    public String globalEndpoint = "<FILL ME>";
+    public String hostname = "<FILL ME>";
     public String username = "<FILL ME>";
     public String password = "<FILL ME>";
     public int port = 10350;
@@ -76,13 +78,13 @@ public class CosmosLoadBalancingPolicyTest {
     @AfterTest
     public void cleanUp() {
         if (session != null) {
-            session.execute(String.format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
+            session.execute(format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
         }
 
         this.close();
     }
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestInvalid() {
         try {
             CosmosLoadBalancingPolicy.builder().build();
@@ -100,39 +102,39 @@ public class CosmosLoadBalancingPolicyTest {
         }
 
         try {
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withWriteDC(writeDC).build();
+            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(hostname).withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
 
         try {
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).withWriteDC(writeDC).build();
+            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(hostname).withReadDC(readDC).withWriteDC(writeDC).build();
         } catch (IllegalArgumentException e) {
         }
     }
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestGlobalEndpointOnly() {
-        if (globalEndpoint != "<FILL ME>") {
+        if (hostname != "<FILL ME>") {
             keyspaceName = "globalOnly";
-            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).build();
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(hostname).build();
             this.connectWithSslAndLoadBalancingPolicy(policy);
             TestAllStatements();
         }
     }
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestGlobalAndReadDC() {
-        if (globalEndpoint != "<FILL ME>") {
+        if (hostname != "<FILL ME>") {
             keyspaceName = "globalAndRead";
-            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(globalEndpoint).withReadDC(readDC).build();
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(hostname).withReadDC(readDC).build();
             this.connectWithSslAndLoadBalancingPolicy(policy);
             TestAllStatements();
         }
     }
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
+    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestReadAndWrite() {
-        if (globalEndpoint != "<FILL ME>") {
+        if (hostname != "<FILL ME>") {
             keyspaceName = "readWriteDCv2";
             LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withReadDC(readDC).withWriteDC(writeDC).build();
             this.connectWithSslAndLoadBalancingPolicy(policy);
@@ -141,29 +143,31 @@ public class CosmosLoadBalancingPolicyTest {
     }
 
     private void TestAllStatements() {
+
         try {
             TestCommon.createSchema(session, keyspaceName, tableName);
-        } catch (Exception error) {
-            fail(String.format("createSchema failed: %s", error));
+        } catch (Throwable error) {
+            fail(format("createSchema failed: %s", error));
         }
 
         // SimpleStatements
-        SimpleStatement simpleStatement = new SimpleStatement(String.format("SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())", keyspaceName, tableName));
+        SimpleStatement simpleStatement = SimpleStatement.newInstance(format("SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())", keyspaceName, tableName));
         session.execute(simpleStatement);
 
-        simpleStatement = new SimpleStatement(String.format("INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));", keyspaceName, tableName));
+        simpleStatement = SimpleStatement.newInstance(format("INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));", keyspaceName, tableName));
         session.execute(simpleStatement);
 
-        simpleStatement = new SimpleStatement(String.format("UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())", keyspaceName, tableName));
+        simpleStatement = SimpleStatement.newInstance(format("UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())", keyspaceName, tableName));
         session.execute(simpleStatement);
 
-        simpleStatement = new SimpleStatement(String.format("DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())", keyspaceName, tableName));
+        simpleStatement = SimpleStatement.newInstance(format("DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())", keyspaceName, tableName));
         session.execute(simpleStatement);
 
         // BuiltStatements
-        UUID uuid = UUID.randomUUID();
-        LocalDate date = LocalDate.fromYearMonthDay(2016, 06, 30);
-        Date timestamp = new Date();
+
+        final LocalDate date = LocalDate.of(2016, 06, 30);
+        final Date timestamp = new Date();
+        final UUID uuid = UUID.randomUUID();
 
         Clause pk1Clause = QueryBuilder.eq("sensor_id", uuid);
         Clause pk2Clause = QueryBuilder.eq("date", date);
@@ -185,24 +189,42 @@ public class CosmosLoadBalancingPolicyTest {
         session.execute(delete);
 
         // BoundStatements
-        PreparedStatement preparedStatement = session.prepare(String.format("SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?", keyspaceName, tableName));
+
+        PreparedStatement preparedStatement = session.prepare(format(
+            "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
+            keyspaceName,
+            tableName));
+
         BoundStatement boundStatement = preparedStatement.bind(uuid, date);
         session.execute(boundStatement);
 
-        preparedStatement = session.prepare(String.format("INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)", keyspaceName, tableName));
+        preparedStatement = session.prepare(format(
+            "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
+            keyspaceName,
+            tableName));
+
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
         session.execute(boundStatement);
 
-        preparedStatement = session.prepare(String.format("UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?", keyspaceName, tableName));
+        preparedStatement = session.prepare(format(
+            "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+            keyspaceName,
+            tableName));
+
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
         session.execute(boundStatement);
 
-        preparedStatement = session.prepare(String.format("DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?", keyspaceName, tableName));
+        preparedStatement = session.prepare(format(
+            "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+            keyspaceName,
+            tableName));
+
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
         session.execute(boundStatement);
 
         // BatchStatement
-        BatchStatement batchStatement = new BatchStatement(BatchStatement.Type.UNLOGGED);
+
+        BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED);
         batchStatement.add(simpleStatement);
         batchStatement.add(boundStatement);
         session.execute(batchStatement);
@@ -212,23 +234,31 @@ public class CosmosLoadBalancingPolicyTest {
     private String keyspaceName = "downgrading";
     private String tableName = "sensor_data";
 
-    private static final int TIMEOUT = 300000;
+    private static final int TIMEOUT = 300_000;
 
-    private void connectWithSslAndLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {
-        final Collection<EndPoint> endpoints = new ArrayList<>(hostnames.length);
+    private CqlSession connectWithSslAndLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {
 
-        for (String hostname : hostnames) {
-            final InetSocketAddress address = new InetSocketAddress(hostname, port);
+        final Collection<EndPoint> endpoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
+            this.hostname,
+            this.port)));
+
+        final SSLContext sslContext;
+
+        try {
+            sslContext = SSLContext.getDefault();
+        } catch (Throwable error) {
+            fail("could not obtain the default SSL context due to " + error.getClass().getName());
+            return null;
         }
 
-        this.session = CqlSession.builder().addContactEndPoints(endpoints).build();
+        this.session = CqlSession.builder()
+            .addContactEndPoints(endpoints)
+            .withAuthCredentials(username, password)
+            .withSslContext(sslContext)
+            .build();
+
         System.out.println("Connected to session: " + session.getName());
-
         return session;
-
-        cluster = Cluster.builder().addContactPoints(globalEndpoint).withPort(port).withCredentials(username, password).withSSL().withLoadBalancingPolicy(loadBalancingPolicy).build();
-        System.out.println("Connected to cluster: " + cluster.getClusterName());
-        session = cluster.connect();
     }
 
     /**
