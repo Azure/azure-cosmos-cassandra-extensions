@@ -24,8 +24,11 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import static com.azure.cosmos.cassandra.TestCommon.*;
 import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.azure.cosmos.cassandra.TestCommon.CREDENTIALS_PASSWORD;
+import static com.azure.cosmos.cassandra.TestCommon.CREDENTIALS_USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.PORT;
+import static com.azure.cosmos.cassandra.TestCommon.display;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
@@ -85,15 +88,15 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
         try (CqlSession session = this.connect(CONTACT_POINTS, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
 
             assertThatCode(() ->
-                createSchema(session, this.keyspaceName, this.tableName)
+                TestCommon.createSchema(session, this.keyspaceName, this.tableName)
             ).doesNotThrowAnyException();
 
             assertThatCode(() ->
-                write(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName)
+                TestCommon.write(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName)
             ).doesNotThrowAnyException();
 
             assertThatCode(() -> {
-                ResultSet rows = read(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName);
+                ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName);
                 display(rows);
             }).doesNotThrowAnyException();
 
@@ -164,6 +167,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
 
         for (String hostname : hostnames) {
             final InetSocketAddress address = new InetSocketAddress(hostname, port);
+            endpoints.add(new DefaultEndPoint(address));
         }
 
         this.session = CqlSession.builder()

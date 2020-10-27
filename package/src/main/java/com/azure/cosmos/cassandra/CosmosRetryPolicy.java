@@ -74,6 +74,14 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Accessors
 
+    public int getFixedBackoffTimeInMillis() {
+        return this.fixedBackoffTimeInMillis;
+    }
+
+    public int getGrowingBackoffTimeInMillis() {
+        return this.growingBackoffTimeInMillis;
+    }
+
     public int getMaxRetryCount() {
         return this.maxRetryCount;
     }
@@ -166,6 +174,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return this.retryManyTimesOrThrow(retryCount);
     }
 
+    // endregion
+
+    // region Privates
+
     // Example exceptionString:
     // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babas.cassandra.cosmos.azure.com/40
     // .65.106.154:10350)
@@ -200,11 +212,11 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Types
 
-    private static enum Option implements DriverOption {
+    private enum Option implements DriverOption {
 
         FIXED_BACKOFF_TIME(DefaultDriverOption.RETRY_POLICY + ".fixed-backoff-time", 5_000),
         GROWING_BACKOFF_TIME(DefaultDriverOption.RETRY_POLICY + ".growing-backoff-time", 1_000),
-        MAX_RETRY_COUNT(DefaultDriverOption.RETRY_POLICY + ".max-retry-count", 3);
+        MAX_RETRY_COUNT(DefaultDriverOption.RETRY_POLICY + ".max-retries", 3);
 
         private final int defaultValue;
         private final String path;
