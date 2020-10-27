@@ -4,6 +4,10 @@
 package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.config.DriverOption;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
@@ -31,8 +35,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Fields
 
-    private static final int growingBackoffSaltMillis = 2000;
-    private static final Random random = new Random();
+    private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 2_000;
+    private static final Random RANDOM = new Random();
 
     private final int fixedBackoffTimeInMillis;
     private final int growingBackoffTimeInMillis;
@@ -42,13 +46,27 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Constructors
 
-    public CosmosRetryPolicy(int maxRetryCount) {
-        this(maxRetryCount, 5000, 1000);
+    public CosmosRetryPolicy(DriverContext driverContext, String profileName) {
+
+        final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
+
+        this.maxRetryCount = profile.getInt(Option.MAX_RETRY_COUNT,
+            Option.MAX_RETRY_COUNT.getDefaultValue());
+
+        this.fixedBackoffTimeInMillis = profile.getInt(Option.FIXED_BACKOFF_TIME,
+            Option.FIXED_BACKOFF_TIME.getDefaultValue());
+
+        this.growingBackoffTimeInMillis = profile.getInt(Option.GROWING_BACKOFF_TIME,
+            Option.GROWING_BACKOFF_TIME.getDefaultValue());
     }
 
-    public CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeMillis, int growingBackoffTimeInMillis) {
+    CosmosRetryPolicy(int maxRetryCount) {
+        this(maxRetryCount, Option.FIXED_BACKOFF_TIME.getDefaultValue(), Option.GROWING_BACKOFF_TIME.getDefaultValue());
+    }
+
+    CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeInMillis, int growingBackoffTimeInMillis) {
         this.maxRetryCount = maxRetryCount;
-        this.fixedBackoffTimeInMillis = fixedBackOffTimeMillis;
+        this.fixedBackoffTimeInMillis = fixedBackOffTimeInMillis;
         this.growingBackoffTimeInMillis = growingBackoffTimeInMillis;
     }
 
@@ -89,7 +107,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
                     if (retryAfterMillis == -1) {
                         retryAfterMillis = this.maxRetryCount == -1
                             ? this.fixedBackoffTimeInMillis
-                            : this.growingBackoffTimeInMillis * retryCount + random.nextInt(growingBackoffSaltMillis);
+                            : this.growingBackoffTimeInMillis * retryCount + RANDOM.nextInt(GROWING_BACKOFF_SALT_IN_MILLIS);
                     }
                     Thread.sleep(retryAfterMillis);
                     retryDecision = RetryDecision.RETRY_SAME;
@@ -177,4 +195,35 @@ public final class CosmosRetryPolicy implements RetryPolicy {
             ? RetryDecision.RETRY_SAME
             : RetryDecision.RETHROW;
     }
+
+    // endregion
+
+    // region Types
+
+    private static enum Option implements DriverOption {
+
+        FIXED_BACKOFF_TIME(DefaultDriverOption.RETRY_POLICY + ".fixed-backoff-time", 5_000),
+        GROWING_BACKOFF_TIME(DefaultDriverOption.RETRY_POLICY + ".growing-backoff-time", 1_000),
+        MAX_RETRY_COUNT(DefaultDriverOption.RETRY_POLICY + ".max-retry-count", 3);
+
+        private final int defaultValue;
+        private final String path;
+
+        Option(String path, int defaultValue) {
+            this.path = path;
+            this.defaultValue = defaultValue;
+        }
+
+        @NonNull
+        @Override
+        public String getPath() {
+            return this.path;
+        }
+
+        public int getDefaultValue() {
+            return this.defaultValue;
+        }
+    }
+
+    // endregion
 }

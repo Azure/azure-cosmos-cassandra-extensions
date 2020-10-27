@@ -17,15 +17,49 @@ import static java.lang.String.format;
 
 public class TestCommon {
 
+    // region Fields
+
     static final String[] CONTACT_POINTS;
+    static final String CREDENTIALS_PASSWORD;
+    static final String CREDENTIALS_USERNAME;
     static final int PORT;
 
     static {
 
-        String value = System.getProperty("COSMOS_HOSTNAME");
+        String value = System.getProperty("azure.cosmos.cassandra.credentials.password");
 
         if (value == null) {
-            value = System.getenv("COSMOS_HOSTNAME");
+            value = System.getenv("CASSANDRA_CREDENTIALS_PASSWORD");
+        }
+
+        if (value == null) {
+            value = "";
+        }
+
+        CREDENTIALS_PASSWORD = value;
+    }
+
+    static {
+
+        String value = System.getProperty("azure.cosmos.cassandra.credentials.username");
+
+        if (value == null) {
+            value = System.getenv("CASSANDRA_CREDENTIALS_USERNAME");
+        }
+
+        if (value == null) {
+            value = "";
+        }
+
+        CREDENTIALS_USERNAME = value;
+    }
+
+    static {
+
+        String value = System.getProperty("azure.cosmos.cassandra.contactPoint");
+
+        if (value == null) {
+            value = System.getenv("CASSANDRA_CONTACT_POINT");
         }
 
         if (value == null) {
@@ -37,10 +71,10 @@ public class TestCommon {
 
     static {
 
-        String value = System.getProperty("COSMOS_PORT");
+        String value = System.getProperty("azure.cosmos.cassandra.port");
 
         if (value == null) {
-            value = System.getenv("COSMOS_PORT");
+            value = System.getenv("CASSANDRA_PORT");
         }
 
         if (value == null) {
@@ -49,6 +83,14 @@ public class TestCommon {
 
         PORT = Short.parseShort(value);
     }
+
+    private TestCommon() {  // this is a static class
+
+    }
+
+    // endregion
+
+    // region Methods
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
