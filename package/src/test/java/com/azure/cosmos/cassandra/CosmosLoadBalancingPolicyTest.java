@@ -54,25 +54,54 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosLoadBalancingPolicyTest {
+public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
 
+    // region Fields
+
+    private static final int TIMEOUT = 300_000;
     public final String hostname = "<FILL ME>";
-    public final String username = "<FILL ME>";
     public final String password = "<FILL ME>";
     public final int port = 10350;
     public final String readDC = "East US 2";
+    public final String username = "<FILL ME>";
     public final String writeDC = "West US 2";
+    private final String tableName = "sensor_data";
+    private String keyspaceName = "downgrading";
+    private CqlSession session;
 
-    @AfterTest
-    public void cleanUp() {
-        if (this.session != null) {
-            this.session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
+    // endregion
+
+    // region Methods
+
+    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
+    public void TestGlobalAndReadDC() {
+
+        if (this.hostname != "<FILL ME>") {
+
+            this.keyspaceName = "globalAndRead";
+
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
+                .withGlobalEndpoint(this.hostname)
+                .withReadDC(this.readDC)
+                .build();
+
+            try (CqlSession ignored = this.connectWithSslAndLoadBalancingPolicy(policy)) {
+                this.TestAllStatements();
+            }
         }
-
-        this.close();
     }
 
     @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
+    public void TestGlobalEndpointOnly() {
+        if (this.hostname != "<FILL ME>") {
+            this.keyspaceName = "globalOnly";
+            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(this.hostname).build();
+            this.connectWithSslAndLoadBalancingPolicy(policy);
+            this.TestAllStatements();
+        }
+    }
+
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void TestInvalid() {
 
         try {
@@ -102,34 +131,6 @@ public class CosmosLoadBalancingPolicyTest {
     }
 
     @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
-    public void TestGlobalEndpointOnly() {
-        if (this.hostname != "<FILL ME>") {
-            this.keyspaceName = "globalOnly";
-            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(this.hostname).build();
-            this.connectWithSslAndLoadBalancingPolicy(policy);
-            this.TestAllStatements();
-        }
-    }
-
-    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
-    public void TestGlobalAndReadDC() {
-
-        if (this.hostname != "<FILL ME>") {
-
-            this.keyspaceName = "globalAndRead";
-
-            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(this.hostname)
-                .withReadDC(this.readDC)
-                .build();
-
-            try (CqlSession ignored = this.connectWithSslAndLoadBalancingPolicy(policy)) {
-                this.TestAllStatements();
-            }
-        }
-    }
-
-    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestReadAndWrite() {
 
         if (this.hostname != "<FILL ME>") {
@@ -144,6 +145,28 @@ public class CosmosLoadBalancingPolicyTest {
             try (CqlSession ignored = this.connectWithSslAndLoadBalancingPolicy(policy)) {
                 this.TestAllStatements();
             }
+        }
+    }
+
+    @AfterTest
+    public void cleanUp() {
+        if (this.session != null) {
+            this.session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
+        }
+
+        this.close();
+    }
+
+    // endregion
+
+    // region Privates
+
+    /**
+     * Closes the session and the cluster.
+     */
+    public void close() {
+        if (this.session != null) {
+            this.session.close();
         }
     }
 
@@ -250,12 +273,6 @@ public class CosmosLoadBalancingPolicyTest {
         this.session.execute(batchStatement);
     }
 
-    private CqlSession session;
-    private String keyspaceName = "downgrading";
-    private final String tableName = "sensor_data";
-
-    private static final int TIMEOUT = 300_000;
-
     private CqlSession connectWithSslAndLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {
 
         final Collection<EndPoint> endpoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
@@ -281,12 +298,5 @@ public class CosmosLoadBalancingPolicyTest {
         return this.session;
     }
 
-    /**
-     * Closes the session and the cluster.
-     */
-    private void close() {
-        if (this.session != null) {
-            this.session.close();
-        }
-    }
+    // endregion
 }
