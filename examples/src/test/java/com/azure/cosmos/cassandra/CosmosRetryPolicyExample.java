@@ -5,8 +5,6 @@ package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
@@ -91,9 +89,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         "9042"));
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
-    private static final int FIXED_BACK_OFF_TIME = 5000;
-    private static final int GROWING_BACK_OFF_TIME = 1000;
-    private static final int MAX_RETRY_COUNT = 5;
     private static final int TIMEOUT = 30000;
 
     private CqlSession session;
@@ -104,11 +99,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
-
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(
-            MAX_RETRY_COUNT,
-            FIXED_BACK_OFF_TIME,
-            GROWING_BACK_OFF_TIME);
 
         try (Session session = this.connect(CONTACT_POINTS, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
 
@@ -164,9 +154,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         }
 
         this.session = CqlSession.builder()
-            .withConfigLoader(DriverConfigLoader.programmaticBuilder()
-                .withString(DefaultDriverOption.RETRY_POLICY_CLASS, CosmosRetryPolicy.class.getCanonicalName())
-                .build())
             .withAuthCredentials(username, password)
             .addContactEndPoints(endpoints)
             .build();
@@ -285,38 +272,40 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         return rows;
     }
 
-    /**
-     * Tests a retry operation
-     */
-    private void retry(
-        CosmosRetryPolicy retryPolicy,
-        int retryNumberBegin,
-        int retryNumberEnd,
-        RetryDecision expectedRetryDecisionType) {
+// TODO (DANOBLE) Move this method to CosmosRetryPolicy or remote it because it's not used here
 
-        final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
-            new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
-            (InternalDriverContext) this.session.getContext()));
-
-        final Request statement = SimpleStatement.newInstance("SELECT * FROM retry");
-        final ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
-
-        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
-
-            long expectedDuration = 1_000_000 * (retryPolicy.getMaxRetryCount() == -1
-                ? FIXED_BACK_OFF_TIME
-                : (long) retryNumber * GROWING_BACK_OFF_TIME);
-
-            long startTime = System.nanoTime();
-
-            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, coordinatorException, retryNumber);
-
-            long duration = System.nanoTime() - startTime;
-
-            assertThat(retryDecision).isEqualTo(expectedRetryDecisionType);
-            assertThat(duration).isGreaterThan(expectedDuration);
-        }
-    }
+//    /**
+//     * Tests a retry operation
+//     */
+//    private void retry(
+//        CosmosRetryPolicy retryPolicy,
+//        int retryNumberBegin,
+//        int retryNumberEnd,
+//        RetryDecision expectedRetryDecisionType) {
+//
+//        final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
+//            new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
+//            (InternalDriverContext) this.session.getContext()));
+//
+//        final Request statement = SimpleStatement.newInstance("SELECT * FROM retry");
+//        final ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
+//
+//        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
+//
+//            long expectedDuration = 1_000_000 * (retryPolicy.getMaxRetryCount() == -1
+//                ? FIXED_BACK_OFF_TIME
+//                : (long) retryNumber * GROWING_BACK_OFF_TIME);
+//
+//            long startTime = System.nanoTime();
+//
+//            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, coordinatorException, retryNumber);
+//
+//            long duration = System.nanoTime() - startTime;
+//
+//            assertThat(retryDecision).isEqualTo(expectedRetryDecisionType);
+//            assertThat(duration).isGreaterThan(expectedDuration);
+//        }
+//    }
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
