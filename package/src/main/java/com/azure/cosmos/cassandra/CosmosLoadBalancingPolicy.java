@@ -72,6 +72,25 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.writeDC = profile.getString(Option.WRITE_DC,
             Option.WRITE_DC.getDefaultValue());
+
+        this.validate();
+    }
+
+    private void validate() {
+
+        if (this.globalEndpoint.isEmpty()) {
+
+            if (this.writeDC.isEmpty() || this.readDC.isEmpty()) {
+                throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is not specified, "
+                    + "you must specify both " + Option.READ_DC.getPath() + " and " + Option.WRITE_DC.getPath()
+                    + ".");
+            }
+
+        } else if (!this.writeDC.isEmpty()) {
+            throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is specified, you must "
+                + "not specify " + Option.WRITE_DC.getPath() + ". Writes will go to the default write region when "
+                + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
+        }
     }
 
     private CosmosLoadBalancingPolicy(
@@ -223,10 +242,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Privates
 
-    static Builder builder() {
-        return new Builder();
-    }
-
     /**
      * DNS lookup based on the globalContactPoint and update localAddresses.
      *
@@ -258,11 +273,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         for (int i = start; i < end; i++) {
             queryPlan.add(nodes.get(i % length));
         }
-    }
-
-    private static CosmosLoadBalancingPolicy buildFrom(Builder builder) {
-        return new CosmosLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint,
-            builder.dnsExpirationInSeconds);
     }
 
     private boolean dnsExpired() {
@@ -336,61 +346,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.remoteDcNodes = remoteDcHosts;
     }
 
-    private static void validate(Builder builder) {
-
-        if (builder.globalEndpoint.isEmpty()) {
-            if (builder.writeDC.isEmpty() || builder.readDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint is not specified, you need to provide " +
-                    "both " +
-                    "readDC and writeDC.");
-            }
-        } else {
-            if (!builder.writeDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint is specified, you can't provide writeDC. " +
-                    "Writes will go " +
-                    "to the default write region when the globalEndpoint is specified.");
-            }
-        }
-    }
-
     // endregion
 
     // region Types
 
-    static class Builder {
-
-        private int dnsExpirationInSeconds = 60;
-        private String globalEndpoint = "";
-        private String readDC = "";
-        private String writeDC = "";
-
-        public CosmosLoadBalancingPolicy build() {
-            validate(this);
-            return CosmosLoadBalancingPolicy.buildFrom(this);
-        }
-
-        public Builder withDnsExpirationInSeconds(int dnsExpirationInSeconds) {
-            this.dnsExpirationInSeconds = dnsExpirationInSeconds;
-            return this;
-        }
-
-        public Builder withGlobalEndpoint(String globalEndpoint) {
-            this.globalEndpoint = globalEndpoint;
-            return this;
-        }
-
-        public Builder withReadDC(String readDC) {
-            this.readDC = readDC;
-            return this;
-        }
-
-        public Builder withWriteDC(String writeDC) {
-            this.writeDC = writeDC;
-            return this;
-        }
-    }
-
-    private enum Option implements DriverOption {
+    enum Option implements DriverOption {
 
         DNS_EXPIRY_TIME(DefaultDriverOption.LOAD_BALANCING_POLICY + "dns-expiry-time",60 ),
         GLOBAL_ENDPOINT(DefaultDriverOption.LOAD_BALANCING_POLICY + ".global-endpoint", ""),

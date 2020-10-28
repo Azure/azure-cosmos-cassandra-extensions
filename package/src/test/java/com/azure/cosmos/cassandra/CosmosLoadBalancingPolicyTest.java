@@ -4,19 +4,22 @@
 package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
 import com.datastax.oss.driver.api.querybuilder.relation.Relation;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
+import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
@@ -59,7 +62,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     // region Fields
 
     private static final int TIMEOUT = 300_000;
-    public final String hostname = "<FILL ME>";
+    public final String globalEndpoint = "<FILL ME>";
     public final String password = "<FILL ME>";
     public final int port = 10350;
     public final String readDC = "East US 2";
@@ -76,16 +79,20 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestGlobalAndReadDC() {
 
-        if (this.hostname != "<FILL ME>") {
+        if (this.globalEndpoint != "<FILL ME>") {
 
             this.keyspaceName = "globalAndRead";
 
-            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(this.hostname)
-                .withReadDC(this.readDC)
+            DriverConfigLoader driverConfigLoader = DriverConfigLoader.programmaticBuilder()
+                .withString(
+                    DefaultDriverOption.LOAD_BALANCING_POLICY,
+                    CosmosLoadBalancingPolicy.class.getCanonicalName())
+                .withString(
+                    CosmosLoadBalancingPolicy.Option.READ_DC,
+                    this.readDC)
                 .build();
 
-            try (CqlSession ignored = this.connectWithSslAndLoadBalancingPolicy(policy)) {
+            try (CqlSession ignored = this.connectWithSslAndDriverConfigLoader(driverConfigLoader)) {
                 this.TestAllStatements();
             }
         }
@@ -93,10 +100,16 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
 
     @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestGlobalEndpointOnly() {
-        if (this.hostname != "<FILL ME>") {
+
+        if (this.globalEndpoint != "<FILL ME>") {
+
             this.keyspaceName = "globalOnly";
-            LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(this.hostname).build();
-            this.connectWithSslAndLoadBalancingPolicy(policy);
+
+            final DriverConfigLoader driverConfigLoader = DriverConfigLoader.programmaticBuilder()
+                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, this.globalEndpoint)
+                .build();
+
+            this.connectWithSslAndDriverConfigLoader(driverConfigLoader);
             this.TestAllStatements();
         }
     }
@@ -104,45 +117,67 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void TestInvalid() {
 
-        try {
-            CosmosLoadBalancingPolicy.builder().build();
-        } catch (IllegalArgumentException e) {
-        }
+        final ProgrammaticArguments programmaticArguments = ProgrammaticArguments.builder().build();
+        final IllegalArgumentException illegalArgumentException = new IllegalArgumentException();
 
-        try {
-            CosmosLoadBalancingPolicy.builder().withReadDC(this.readDC).build();
-        } catch (IllegalArgumentException e) {
-        }
+        assertThatCode(() -> new CosmosLoadBalancingPolicy(
+            new DefaultDriverContext(DriverConfigLoader.programmaticBuilder().build(), programmaticArguments),
+            "default")
+        ).hasSuppressedException(illegalArgumentException);
 
-        try {
-            CosmosLoadBalancingPolicy.builder().withWriteDC(this.writeDC).build();
-        } catch (IllegalArgumentException e) {
-        }
+        assertThatCode(() -> new CosmosLoadBalancingPolicy(
+            new DefaultDriverContext(
+                DriverConfigLoader.programmaticBuilder()
+                    .withString(CosmosLoadBalancingPolicy.Option.READ_DC, this.readDC)
+                    .build(),
+                programmaticArguments),
+            "default")
+        ).hasSuppressedException(illegalArgumentException);
 
-        try {
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(this.hostname).withWriteDC(this.writeDC).build();
-        } catch (IllegalArgumentException e) {
-        }
+        assertThatCode(() -> new CosmosLoadBalancingPolicy(
+            new DefaultDriverContext(
+                DriverConfigLoader.programmaticBuilder()
+                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
+                    .build(),
+                programmaticArguments),
+            "default")
+        ).hasSuppressedException(illegalArgumentException);
 
-        try {
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(this.hostname).withReadDC(this.readDC).withWriteDC(this.writeDC).build();
-        } catch (IllegalArgumentException e) {
-        }
+        assertThatCode(() -> new CosmosLoadBalancingPolicy(
+            new DefaultDriverContext(
+                DriverConfigLoader.programmaticBuilder()
+                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, this.globalEndpoint)
+                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
+                    .build(),
+                programmaticArguments),
+            "default")
+        ).hasSuppressedException(illegalArgumentException);
+
+        assertThatCode(() -> new CosmosLoadBalancingPolicy(
+            new DefaultDriverContext(
+                DriverConfigLoader.programmaticBuilder()
+                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, this.globalEndpoint)
+                    .withString(CosmosLoadBalancingPolicy.Option.READ_DC, this.readDC)
+                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
+                    .build(),
+                programmaticArguments),
+            "default")
+        ).hasSuppressedException(illegalArgumentException);
     }
 
     @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
     public void TestReadAndWrite() {
 
-        if (this.hostname != "<FILL ME>") {
+        if (this.globalEndpoint != "<FILL ME>") {
 
             this.keyspaceName = "readWriteDCv2";
 
-            final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-                .withReadDC(this.readDC)
-                .withWriteDC(this.writeDC)
+            DriverConfigLoader driverConfigLoader = DriverConfigLoader.programmaticBuilder()
+                .withString(CosmosLoadBalancingPolicy.Option.READ_DC, this.readDC)
+                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
                 .build();
 
-            try (CqlSession ignored = this.connectWithSslAndLoadBalancingPolicy(policy)) {
+            try (CqlSession ignored = this.connectWithSslAndDriverConfigLoader(driverConfigLoader)) {
                 this.TestAllStatements();
             }
         }
@@ -273,11 +308,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         this.session.execute(batchStatement);
     }
 
-    private CqlSession connectWithSslAndLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {
-
-        final Collection<EndPoint> endpoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
-            this.hostname,
-            this.port)));
+    private CqlSession connectWithSslAndDriverConfigLoader(DriverConfigLoader driverConfigLoader) {
 
         final SSLContext sslContext;
 
@@ -288,10 +319,14 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             return null;
         }
 
+        final Collection<EndPoint> endpoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
+            this.globalEndpoint,
+            this.port)));
+
         this.session = CqlSession.builder()
-            .addContactEndPoints(endpoints)
             .withAuthCredentials(this.username, this.password)
             .withSslContext(sslContext)
+            .addContactEndPoints(endpoints)
             .build();
 
         System.out.println("Connected to session: " + this.session.getName());
