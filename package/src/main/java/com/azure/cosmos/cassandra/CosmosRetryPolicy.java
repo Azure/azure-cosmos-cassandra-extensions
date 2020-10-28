@@ -50,8 +50,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
-        this.maxRetryCount = profile.getInt(Option.MAX_RETRY_COUNT,
-            Option.MAX_RETRY_COUNT.getDefaultValue());
+        this.maxRetryCount = profile.getInt(Option.MAX_RETRIES,
+            Option.MAX_RETRIES.getDefaultValue());
 
         this.fixedBackoffTimeInMillis = profile.getInt(Option.FIXED_BACKOFF_TIME,
             Option.FIXED_BACKOFF_TIME.getDefaultValue());
@@ -212,17 +212,19 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Types
 
+    private final static String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
+
     private enum Option implements DriverOption {
 
-        FIXED_BACKOFF_TIME(DefaultDriverOption.RETRY_POLICY + ".fixed-backoff-time", 5_000),
-        GROWING_BACKOFF_TIME(DefaultDriverOption.RETRY_POLICY + ".growing-backoff-time", 1_000),
-        MAX_RETRY_COUNT(DefaultDriverOption.RETRY_POLICY + ".max-retries", 3);
+        FIXED_BACKOFF_TIME("fixed-backoff-time", 5_000),
+        GROWING_BACKOFF_TIME("growing-backoff-time", 1_000),
+        MAX_RETRIES("max-retries", 5);
 
         private final int defaultValue;
         private final String path;
 
-        Option(String path, int defaultValue) {
-            this.path = path;
+        Option(String name, int defaultValue) {
+            this.path = PATH_PREFIX + name;
             this.defaultValue = defaultValue;
         }
 

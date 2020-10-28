@@ -13,7 +13,7 @@
   <packaging>jar</packaging>
   <properties>
     <version.assertj-core>3.11.1</version.assertj-core>
-    <version.cassandra-driver-core>3.6.0</version.cassandra-driver-core>
+    <version.cassandra-driver>4.9.0</version.cassandra-driver>
     <version.org.apache.commons.io>2.4</version.org.apache.commons.io>
     <version.testng>6.14.3</version.testng>
   </properties>
@@ -24,16 +24,11 @@
       <groupId>com.microsoft.azure</groupId>
       <version>${project.version}</version>
     </dependency>
-    <dependency>
-      <artifactId>cassandra-driver-core</artifactId>
-      <groupId>com.datastax.cassandra</groupId>
-      <version>${version.cassandra-driver-core}</version>
-    </dependency>
-    <dependency>
-      <artifactId>org.apache.commons.io</artifactId>
-      <groupId>org.apache.directory.studio</groupId>
-      <version>${version.org.apache.commons.io}</version>
-    </dependency>
+      <dependency>
+        <groupId>com.datastax.oss</groupId>
+        <artifactId>java-driver-core</artifactId>
+        <version>${version.cassandra-driver}</version>
+      </dependency>
     <dependency>
       <artifactId>assertj-core</artifactId>
       <groupId>org.assertj</groupId>

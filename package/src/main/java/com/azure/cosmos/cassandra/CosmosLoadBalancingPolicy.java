@@ -338,18 +338,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Types
 
+    private final static String PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
+
     enum Option implements DriverOption {
 
-        DNS_EXPIRY_TIME(DefaultDriverOption.LOAD_BALANCING_POLICY + "dns-expiry-time",60 ),
-        GLOBAL_ENDPOINT(DefaultDriverOption.LOAD_BALANCING_POLICY + ".global-endpoint", ""),
-        READ_DC(DefaultDriverOption.LOAD_BALANCING_POLICY + ".read-dc", ""),
-        WRITE_DC(DefaultDriverOption.LOAD_BALANCING_POLICY + ".write-dc", "");
+        DNS_EXPIRY_TIME("dns-expiry-time",60),
+        GLOBAL_ENDPOINT("global-endpoint", ""),
+        READ_DC("read-dc", ""),
+        WRITE_DC("write-dc", "");
 
         private final Object defaultValue;
         private final String path;
 
-        Option(String path, Object defaultValue) {
-            this.path = path;
+        Option(String name, Object defaultValue) {
+            this.path = PATH_PREFIX + name;
             this.defaultValue = defaultValue;
         }
 
