@@ -5,6 +5,8 @@ package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
@@ -67,43 +69,32 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
     // region Fields
 
+    static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.contactPoint",
+        "CASSANDRA_CONTACT_POINT",
+        "localhost") };
+
+    static final String CREDENTIALS_PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.credentials.password",
+        "CASSANDRA_CREDENTIALS_PASSWORD",
+        ""
+    );
+
+    static final String CREDENTIALS_USERNAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.credentials.username",
+        "CASSANDRA_CREDENTIALS_USERNAME",
+        "");
+
+    static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.port",
+        "CASSANDRA_PORT",
+        "9042"));
+
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
-    private static final String[] CONTACT_POINTS;
     private static final int FIXED_BACK_OFF_TIME = 5000;
     private static final int GROWING_BACK_OFF_TIME = 1000;
     private static final int MAX_RETRY_COUNT = 5;
-    private static final int PORT;
     private static final int TIMEOUT = 30000;
-
-    static {
-
-        String value = System.getProperty("azure.cosmos.hostname");
-
-        if (value == null) {
-            value = System.getenv("AZURE_COSMOS_HOSTNAME");
-        }
-
-        if (value == null) {
-            value = "localhost";
-        }
-
-        CONTACT_POINTS = new String[] { value };
-    }
-
-    static {
-
-        String value = System.getProperty("azure.cosmos.port");
-
-        if (value == null) {
-            value = System.getenv("AZURE_COSMOS_PORT");
-        }
-
-        if (value == null) {
-            value = "10350";
-        }
-
-        PORT = Short.parseShort(value);
-    }
 
     private CqlSession session;
 
@@ -119,7 +110,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
             FIXED_BACK_OFF_TIME,
             GROWING_BACK_OFF_TIME);
 
-        try (Session session = this.connect(CONTACT_POINTS, PORT, retryPolicy)) {
+        try (Session session = this.connect(CONTACT_POINTS, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
 
             try {
                 this.createSchema();
@@ -155,23 +146,32 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         }
     }
 
+    // region Privates
+
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
      * @param hostnames the contact points to use.
      * @param port      the port to use.
      */
-    private Session connect(String[] hostnames, int port, CosmosRetryPolicy retryPolicy) {
+    private Session connect(String[] hostnames, int port, String username, String password) {
 
         final Collection<EndPoint> endpoints = new ArrayList<>(hostnames.length);
 
         for (String hostname : hostnames) {
             final InetSocketAddress address = new InetSocketAddress(hostname, port);
+            endpoints.add(new DefaultEndPoint(address));
         }
 
-        this.session = CqlSession.builder().addContactEndPoints(endpoints).build();
-        System.out.println("Connected to session: " + this.session.getName());
+        this.session = CqlSession.builder()
+            .withConfigLoader(DriverConfigLoader.programmaticBuilder()
+                .withString(DefaultDriverOption.RETRY_POLICY_CLASS, CosmosRetryPolicy.class.getCanonicalName())
+                .build())
+            .withAuthCredentials(username, password)
+            .addContactEndPoints(endpoints)
+            .build();
 
+        System.out.println("Connected to session: " + this.session.getName());
         return this.session;
     }
 
@@ -240,6 +240,24 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
             System.out.print('+');
         }
         System.out.println();
+    }
+
+    private static String getPropertyOrEnvironmentVariable(
+        String property,
+        String variable,
+        String defaultValue) {
+
+        String value = System.getProperty(property);
+
+        if (value == null) {
+            value = System.getenv(variable);
+        }
+
+        if (value == null) {
+            value = defaultValue;
+        }
+
+        return value;
     }
 
     /**
@@ -344,4 +362,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         this.session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
     }
+
+    // endregion
 }

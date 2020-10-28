@@ -15,78 +15,35 @@ import java.text.SimpleDateFormat;
 
 import static java.lang.String.format;
 
-public class TestCommon {
+public final class TestCommon {
+
+    private TestCommon() {
+        // this is a static class
+    }
 
     // region Fields
 
-    static final String[] CONTACT_POINTS;
-    static final String CREDENTIALS_PASSWORD;
-    static final String CREDENTIALS_USERNAME;
-    static final int PORT;
+    static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.contactPoint",
+        "CASSANDRA_CONTACT_POINT",
+        "localhost") };
 
-    static {
+    static final String CREDENTIALS_PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.credentials.password",
+        "CASSANDRA_CREDENTIALS_PASSWORD",
+        ""
+    );
 
-        String value = System.getProperty("azure.cosmos.cassandra.credentials.password");
+    static final String CREDENTIALS_USERNAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.credentials.username",
+        "CASSANDRA_CREDENTIALS_USERNAME",
+        "");
 
-        if (value == null) {
-            value = System.getenv("CASSANDRA_CREDENTIALS_PASSWORD");
-        }
+    static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.port",
+        "CASSANDRA_PORT",
+        "9042"));
 
-        if (value == null) {
-            value = "";
-        }
-
-        CREDENTIALS_PASSWORD = value;
-    }
-
-    static {
-
-        String value = System.getProperty("azure.cosmos.cassandra.credentials.username");
-
-        if (value == null) {
-            value = System.getenv("CASSANDRA_CREDENTIALS_USERNAME");
-        }
-
-        if (value == null) {
-            value = "";
-        }
-
-        CREDENTIALS_USERNAME = value;
-    }
-
-    static {
-
-        String value = System.getProperty("azure.cosmos.cassandra.contactPoint");
-
-        if (value == null) {
-            value = System.getenv("CASSANDRA_CONTACT_POINT");
-        }
-
-        if (value == null) {
-            value = "localhost";
-        }
-
-        CONTACT_POINTS = new String[] { value };
-    }
-
-    static {
-
-        String value = System.getProperty("azure.cosmos.cassandra.port");
-
-        if (value == null) {
-            value = System.getenv("CASSANDRA_PORT");
-        }
-
-        if (value == null) {
-            value = "9042";
-        }
-
-        PORT = Short.parseShort(value);
-    }
-
-    private TestCommon() {  // this is a static class
-
-    }
 
     // endregion
 
@@ -230,6 +187,10 @@ public class TestCommon {
         write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
+    // endregion
+
+    // region Privates
+
     /**
      * Draws a line to isolate headings from rows.
      *
@@ -244,4 +205,24 @@ public class TestCommon {
         }
         System.out.println();
     }
+
+    private static String getPropertyOrEnvironmentVariable(
+        String property,
+        String variable,
+        String defaultValue) {
+
+        String value = System.getProperty(property);
+
+        if (value == null) {
+            value = System.getenv(variable);
+        }
+
+        if (value == null) {
+            value = defaultValue;
+        }
+
+        return value;
+    }
+
+    // endregion
 }
