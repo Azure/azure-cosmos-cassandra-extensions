@@ -93,18 +93,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
-    private CosmosLoadBalancingPolicy(
-        String readDC,
-        String writeDC,
-        String globalContactPoint,
-        int dnsExpiryTimeInSeconds) {
-
-        this.readDC = readDC;
-        this.writeDC = writeDC;
-        this.globalEndpoint = globalContactPoint;
-        this.dnsExpiryTimeInSeconds = dnsExpiryTimeInSeconds;
-    }
-
     @Override
     public void close() {
         // nothing to do
