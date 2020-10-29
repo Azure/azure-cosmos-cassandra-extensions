@@ -1,24 +1,52 @@
 <!-- Copyright (c) Microsoft Corporation. All rights reserved.
      Licensed under the MIT License. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
-  <name>Azure Cosmos Cassandra Extensions for Java</name>
-  <description>Extends the Cassandra driver with Azure Cosmos awareness features</description>
-  <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
-  <url>https://docs.microsoft.com/en-us/azure/cosmos-db</url>
-  <groupId>com.microsoft.azure</groupId>
-  <version>0.12.1</version>
+
+  <name>Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra</name>
+  <description>Extends the DataStax Java Driver 4 for Apache Cassandra with Azure Cosmos awareness features</description>
+  <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
+  <artifactId>azure-cosmos-cassandra-driver-4-parent</artifactId>
+  <groupId>com.azure</groupId>
   <packaging>pom</packaging>
+  <version>0.1.0</version>
+
+  <developers>
+    <developer>
+      <name>Azure Cosmos Cassandra API developers</name>
+      <email>azuredocumentdb@service.microsoft.com</email>
+      <organization>Microsoft Azure</organization>
+      <organizationUrl>https://azure.microsoft.com/en-us/blog/dear-cassandra-developers-welcome-to-azure-cosmosdb/</organizationUrl>
+    </developer>
+  </developers>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>http://www.opensource.org/licenses/mit-license.php</url>
+    </license>
+  </licenses>
+
   <modules>
     <module>package</module>
     <module>examples</module>
   </modules>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <javadoc.options/>
   </properties>
+
+  <scm>
+    <developerConnection>scm:git:git@github.com:Azure/azure-cosmos-cassandra-extensions.git</developerConnection>
+    <connection>scm:git:git@github.com:Azure/azure-cosmos-cassandra-extensions.git</connection>
+    <url>scm:git:https://github.com/Azure/azure-cosmos-cassandra-extensions</url>
+    <tag>HEAD</tag>
+  </scm>
+
   <build>
     <plugins>
       <plugin>
@@ -56,26 +84,9 @@
       </plugin>
     </plugins>
   </build>
+
   <dependencyManagement>
     <dependencies/>
   </dependencyManagement>
-  <licenses>
-    <license>
-      <name>MIT License</name>
-      <url>http://www.opensource.org/licenses/mit-license.php</url>
-    </license>
-  </licenses>
-  <scm>
-    <connection>scm:git:https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</connection>
-    <developerConnection>scm:git:https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</developerConnection>
-    <url>https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</url>
-  </scm>
-  <developers>
-    <developer>
-      <name>Azure Cosmos Developer Platform developers</name>
-      <email>docdbdevplatdevs@microsoft.com</email>
-      <organization>Microsoft</organization>
-      <organizationUrl>http://www.microsoft.com/</organizationUrl>
-    </developer>
-  </developers>
+  
 </project>
