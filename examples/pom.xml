@@ -1,43 +1,48 @@
 <!-- Copyright (c) Microsoft Corporation. All rights reserved.
-     Licensed under the MIT License. -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
+     Licensed under the MIT License.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
-    <groupId>com.microsoft.azure</groupId>
-    <version>0.12.1</version>
-  </parent>
-  <artifactId>azure-cosmos-cassandra-extensions.examples</artifactId>
-  <name>Azure Cosmos Cassandra Extensions for Java - Examples</name>
+
+  <artifactId>azure-cosmos-cassandra-driver-4-examples</artifactId>
+  <groupId>com.azure</groupId>
   <packaging>jar</packaging>
+  <version>0.1.0</version>
+
+  <parent>
+    <artifactId>azure-cosmos-cassandra-driver-4-parent</artifactId>
+    <groupId>com.azure</groupId>
+    <version>0.1.0</version>
+  </parent>
+
   <properties>
-    <version.assertj-core>3.11.1</version.assertj-core>
+    <version.assertj-core>3.18.0</version.assertj-core>
     <version.cassandra-driver>4.9.0</version.cassandra-driver>
-    <version.org.apache.commons.io>2.4</version.org.apache.commons.io>
-    <version.testng>6.14.3</version.testng>
+    <version.testng>7.3.0</version.testng>
   </properties>
-  <dependencyManagement/>
+
   <dependencies>
     <dependency>
-      <artifactId>azure-cosmos-cassandra-extensions</artifactId>
-      <groupId>com.microsoft.azure</groupId>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
       <version>${project.version}</version>
     </dependency>
-      <dependency>
+    <dependency>
         <groupId>com.datastax.oss</groupId>
-        <artifactId>java-driver-core</artifactId>
+        <artifactId>java-driver-query-builder</artifactId>
         <version>${version.cassandra-driver}</version>
       </dependency>
     <dependency>
-      <artifactId>assertj-core</artifactId>
       <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
       <version>${version.assertj-core}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <artifactId>testng</artifactId>
       <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
       <version>${version.testng}</version>
       <scope>test</scope>
     </dependency>
