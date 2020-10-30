@@ -7,9 +7,10 @@
 
   <name>Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra</name>
   <description>
-    Extends the DataStax Java Driver 4 for Apache Cassandra with Azure Cosmos awareness features
+    Extends the DataStax Java Driver 4 for Apache Cassandra client library with Azure Cosmos awareness features.
   </description>
   <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
+
   <artifactId>azure-cosmos-cassandra-driver-4-parent</artifactId>
   <groupId>com.azure</groupId>
   <packaging>pom</packaging>
@@ -191,14 +192,14 @@
             <artifactId>maven-compiler-plugin</artifactId>
             <version>3.8.1</version>
             <executions>
-              <!-- compile first with module-info for Java 9+ -->
+              <!-- Compile first with module-info for Java 11+ -->
               <execution>
                 <id>default-compile</id>
                 <configuration>
                   <release>11</release>
                 </configuration>
               </execution>
-              <!-- then compile without module-info for Java 8 -->
+              <!-- Then compile without module-info for Java 8 -->
               <execution>
                 <id>base-compile</id>
                 <goals>
