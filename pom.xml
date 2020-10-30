@@ -1,11 +1,14 @@
 <!-- Copyright (c) Microsoft Corporation. All rights reserved.
      Licensed under the MIT License. -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
   <name>Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra</name>
-  <description>Extends the DataStax Java Driver 4 for Apache Cassandra with Azure Cosmos awareness features</description>
+  <description>
+    Extends the DataStax Java Driver 4 for Apache Cassandra with Azure Cosmos awareness features
+  </description>
   <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
   <artifactId>azure-cosmos-cassandra-driver-4-parent</artifactId>
   <groupId>com.azure</groupId>
@@ -17,7 +20,9 @@
       <name>Azure Cosmos Cassandra API developers</name>
       <email>azuredocumentdb@service.microsoft.com</email>
       <organization>Microsoft Azure</organization>
-      <organizationUrl>https://azure.microsoft.com/en-us/blog/dear-cassandra-developers-welcome-to-azure-cosmosdb/</organizationUrl>
+      <organizationUrl>
+        https://azure.microsoft.com/en-us/blog/dear-cassandra-developers-welcome-to-azure-cosmosdb/
+      </organizationUrl>
     </developer>
   </developers>
 
@@ -47,8 +52,31 @@
     <tag>HEAD</tag>
   </scm>
 
+  <dependencyManagement>
+    <dependencies/>
+  </dependencyManagement>
+
   <build>
     <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.1</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.0.0-M1</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.0.0-M1</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <skipIfEmpty>true</skipIfEmpty>
+        </configuration>
+      </plugin>
       <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>3.2.0</version>
@@ -57,7 +85,7 @@
           <quiet>true</quiet>
           <verbose>false</verbose>
           <sourceFileExcludes>
-            <sourceFileExclude>**/internal/**/*.java</sourceFileExclude>
+            <sourceFileExclude>**/implementation/**/*.java</sourceFileExclude>
           </sourceFileExcludes>
         </configuration>
         <executions>
@@ -70,7 +98,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
         <version>3.2.1</version>
         <executions>
@@ -85,8 +112,109 @@
     </plugins>
   </build>
 
-  <dependencyManagement>
-    <dependencies/>
-  </dependencyManagement>
-  
+  <profiles>
+    <!-- Skip module-info.java on Java 8 -->
+    <profile>
+      <id>java8</id>
+      <activation>
+        <jdk>[1.8,9)</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+      </properties>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+            <filtering>true</filtering>
+          </resource>
+        </resources>
+        <plugins>
+          <!-- Don't compile module-info.java, see java 9+ profile -->
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.8.1</version>
+            <configuration>
+              <source>1.8</source>
+              <target>1.8</target>
+              <excludes>
+                <exclude>module-info.java</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+          <!-- Avoid errors from module-info -->
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.1.1</version>
+            <configuration>
+              <sourceFileExcludes>
+                <sourceFileExclude>module-info.java</sourceFileExclude>
+              </sourceFileExcludes>
+              <quiet>true</quiet>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+      <reporting>
+        <plugins>
+          <!-- Avoid errors from module-info -->
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.1.1</version>
+            <configuration>
+              <sourceFileExcludes>
+                <sourceFileExclude>module-info.java</sourceFileExclude>
+              </sourceFileExcludes>
+              <quiet>true</quiet>
+            </configuration>
+          </plugin>
+        </plugins>
+      </reporting>
+    </profile>
+
+    <!-- Setup for Java 11+ -->
+    <profile>
+      <id>java-lts</id>
+      <activation>
+        <jdk>[11,)</jdk>
+      </activation>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+            <filtering>true</filtering>
+          </resource>
+        </resources>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.8.1</version>
+            <executions>
+              <!-- compile first with module-info for Java 9+ -->
+              <execution>
+                <id>default-compile</id>
+                <configuration>
+                  <release>11</release>
+                </configuration>
+              </execution>
+              <!-- then compile without module-info for Java 8 -->
+              <execution>
+                <id>base-compile</id>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <release>8</release>
+                  <excludes>
+                    <exclude>module-info.java</exclude>
+                  </excludes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
