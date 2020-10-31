@@ -43,6 +43,13 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
+    <!-- Main dependency version numbers -->
+    <version.cassandra-driver>4.9.0</version.cassandra-driver>
+    <!-- Test dependency version numbers -->
+    <version.assertj-core>3.18.0</version.assertj-core>
+    <version.log4j>2.13.3</version.log4j>
+    <version.slf4j-api>1.7.30</version.slf4j-api>
+    <version.testng>7.3.0</version.testng>
   </properties>
 
   <scm>
@@ -53,7 +60,57 @@
   </scm>
 
   <dependencyManagement>
-    <dependencies/>
+    <dependencies>
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.datastax.oss</groupId>
+        <artifactId>java-driver-core</artifactId>
+        <version>${version.cassandra-driver}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.datastax.oss</groupId>
+        <artifactId>java-driver-query-builder</artifactId>
+        <version>${version.cassandra-driver}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${version.log4j}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${version.log4j}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-slf4j-impl</artifactId>
+        <version>${version.log4j}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${version.assertj-core}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <scope>test</scope>
+        <version>${version.slf4j-api}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.testng</groupId>
+        <artifactId>testng</artifactId>
+        <version>${version.testng}</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
   </dependencyManagement>
 
   <build>
