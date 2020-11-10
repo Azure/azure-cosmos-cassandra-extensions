@@ -23,25 +23,25 @@ public final class TestCommon {
 
     // region Fields
 
-    static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
+    static final String[] CONTACT_POINT = { getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.contactPoint",
-        "CASSANDRA_CONTACT_POINT",
+        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
         "localhost") };
 
     static final String CREDENTIALS_PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.credentials.password",
-        "CASSANDRA_CREDENTIALS_PASSWORD",
+        "azure.cosmos.cassandra.password",
+        "AZURE_COSMOS_CASSANDRA_PASSWORD",
         ""
     );
 
     static final String CREDENTIALS_USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.credentials.username",
-        "CASSANDRA_CREDENTIALS_USERNAME",
+        "azure.cosmos.cassandra.username",
+        "AZURE_COSMOS_CASSANDRA_USERNAME",
         "");
 
     static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.port",
-        "CASSANDRA_PORT",
+        "AZURE_COSMOS_CASSANDRA_PORT",
         "9042"));
 
 

@@ -88,7 +88,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
                     DefaultDriverOption.LOAD_BALANCING_POLICY,
                     CosmosLoadBalancingPolicy.class.getCanonicalName())
                 .withString(
-                    CosmosLoadBalancingPolicy.Option.READ_DC,
+                    CosmosLoadBalancingPolicy.Option.READ_DATACENTER,
                     this.readDC)
                 .build();
 
@@ -128,7 +128,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         assertThatCode(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 DriverConfigLoader.programmaticBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.READ_DC, this.readDC)
+                    .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, this.readDC)
                     .build(),
                 programmaticArguments),
             "default")
@@ -137,17 +137,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         assertThatCode(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 DriverConfigLoader.programmaticBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
-                    .build(),
-                programmaticArguments),
-            "default")
-        ).hasSuppressedException(illegalArgumentException);
-
-        assertThatCode(() -> new CosmosLoadBalancingPolicy(
-            new DefaultDriverContext(
-                DriverConfigLoader.programmaticBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, this.globalEndpoint)
-                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
+                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, this.writeDC)
                     .build(),
                 programmaticArguments),
             "default")
@@ -157,8 +147,18 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             new DefaultDriverContext(
                 DriverConfigLoader.programmaticBuilder()
                     .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, this.globalEndpoint)
-                    .withString(CosmosLoadBalancingPolicy.Option.READ_DC, this.readDC)
-                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
+                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, this.writeDC)
+                    .build(),
+                programmaticArguments),
+            "default")
+        ).hasSuppressedException(illegalArgumentException);
+
+        assertThatCode(() -> new CosmosLoadBalancingPolicy(
+            new DefaultDriverContext(
+                DriverConfigLoader.programmaticBuilder()
+                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, this.globalEndpoint)
+                    .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, this.readDC)
+                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, this.writeDC)
                     .build(),
                 programmaticArguments),
             "default")
@@ -173,8 +173,8 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             this.keyspaceName = "readWriteDCv2";
 
             DriverConfigLoader driverConfigLoader = DriverConfigLoader.programmaticBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.READ_DC, this.readDC)
-                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DC, this.writeDC)
+                .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, this.readDC)
+                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, this.writeDC)
                 .build();
 
             try (CqlSession ignored = this.connectWithSslAndDriverConfigLoader(driverConfigLoader)) {

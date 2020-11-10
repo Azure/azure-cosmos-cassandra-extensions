@@ -24,7 +24,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINT;
 import static com.azure.cosmos.cassandra.TestCommon.CREDENTIALS_PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.CREDENTIALS_USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.PORT;
@@ -85,7 +85,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
     @SuppressWarnings("CatchMayIgnoreException")
     public void canIntegrateWithCosmos() {
 
-        try (CqlSession session = this.connect(CONTACT_POINTS, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
+        try (CqlSession session = this.connect(CONTACT_POINT, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
 
             assertThatCode(() ->
                 TestCommon.createSchema(session, this.keyspaceName, this.tableName)
@@ -110,7 +110,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
 
         final CoordinatorException coordinatorException = new ServerError(
             new DefaultNode(
-                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
+                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINT[0], PORT)),
                 (InternalDriverContext) this.session.getContext()), "canRetryOnConnectionException");
 
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
@@ -189,7 +189,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
 
         final CoordinatorException coordinatorException = new OverloadedException(
             new DefaultNode(
-                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
+                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINT[0], PORT)),
                 (InternalDriverContext) this.session.getContext()));
 
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");

@@ -63,27 +63,26 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
     static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.contactPoint",
-        "CASSANDRA_CONTACT_POINT",
+        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
         "localhost") };
 
-    static final String CREDENTIALS_PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.credentials.password",
-        "CASSANDRA_CREDENTIALS_PASSWORD",
-        ""
-    );
-
-    static final String CREDENTIALS_USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.credentials.username",
-        "CASSANDRA_CREDENTIALS_USERNAME",
+    static final String PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.password",
+        "AZURE_COSMOS_CASSANDRA_PASSWORD",
         "");
 
     static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.port",
-        "CASSANDRA_PORT",
+        "AZURE_COSMOS_CASSANDRA_PORT",
         "9042"));
 
+    static final String USERNAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.username",
+        "AZURE_COSMOS_CASSANDRA_USERNAME",
+        "");
+
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
-    private static final int TIMEOUT = 30000;
+    private static final int TIMEOUT = 30_000_000;
 
     private CqlSession session;
 
@@ -94,7 +93,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
-        try (Session session = this.connect(CONTACT_POINTS, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
+        try (Session ignored = this.connect(CONTACT_POINTS, PORT, USERNAME, PASSWORD)) {
 
             try {
                 this.createSchema();
@@ -135,14 +134,15 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param hostnames the contact points to use.
+     * @param contactPoints the contact points to use.
      * @param port      the port to use.
      */
-    private Session connect(String[] hostnames, int port, String username, String password) {
+    private Session connect(String[] contactPoints, int port, String username, String password) {
 
-        final Collection<EndPoint> endpoints = new ArrayList<>(hostnames.length);
+        final Collection<EndPoint> endpoints = new ArrayList<>(contactPoints.length);
 
-        for (String hostname : hostnames) {
+        for (String contactPoint : contactPoints) {
+            final String hostname = contactPoint.substring(0, contactPoint.lastIndexOf(':'));
             final InetSocketAddress address = new InetSocketAddress(hostname, port);
             endpoints.add(new DefaultEndPoint(address));
         }
@@ -266,40 +266,41 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         return rows;
     }
 
-// TODO (DANOBLE) Move this method to CosmosRetryPolicy or remote it because it's not used here
+    // TODO (DANOBLE) Move this method to CosmosRetryPolicy or remote it because it's not used here
 
-//    /**
-//     * Tests a retry operation
-//     */
-//    private void retry(
-//        CosmosRetryPolicy retryPolicy,
-//        int retryNumberBegin,
-//        int retryNumberEnd,
-//        RetryDecision expectedRetryDecisionType) {
-//
-//        final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
-//            new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
-//            (InternalDriverContext) this.session.getContext()));
-//
-//        final Request statement = SimpleStatement.newInstance("SELECT * FROM retry");
-//        final ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
-//
-//        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
-//
-//            long expectedDuration = 1_000_000 * (retryPolicy.getMaxRetryCount() == -1
-//                ? FIXED_BACK_OFF_TIME
-//                : (long) retryNumber * GROWING_BACK_OFF_TIME);
-//
-//            long startTime = System.nanoTime();
-//
-//            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, coordinatorException, retryNumber);
-//
-//            long duration = System.nanoTime() - startTime;
-//
-//            assertThat(retryDecision).isEqualTo(expectedRetryDecisionType);
-//            assertThat(duration).isGreaterThan(expectedDuration);
-//        }
-//    }
+    //    /**
+    //     * Tests a retry operation
+    //     */
+    //    private void retry(
+    //        CosmosRetryPolicy retryPolicy,
+    //        int retryNumberBegin,
+    //        int retryNumberEnd,
+    //        RetryDecision expectedRetryDecisionType) {
+    //
+    //        final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
+    //            new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
+    //            (InternalDriverContext) this.session.getContext()));
+    //
+    //        final Request statement = SimpleStatement.newInstance("SELECT * FROM retry");
+    //        final ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
+    //
+    //        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
+    //
+    //            long expectedDuration = 1_000_000 * (retryPolicy.getMaxRetryCount() == -1
+    //                ? FIXED_BACK_OFF_TIME
+    //                : (long) retryNumber * GROWING_BACK_OFF_TIME);
+    //
+    //            long startTime = System.nanoTime();
+    //
+    //            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, coordinatorException,
+    //            retryNumber);
+    //
+    //            long duration = System.nanoTime() - startTime;
+    //
+    //            assertThat(retryDecision).isEqualTo(expectedRetryDecisionType);
+    //            assertThat(duration).isGreaterThan(expectedDuration);
+    //        }
+    //    }
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.

@@ -34,23 +34,24 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify a {@link #readDC} and a {@link #writeDC}
- * to route read and write requests to their corresponding data centers.
+ * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify a {@link #readDatacenter} and a
+ * {@link #writeDatacenter} to route read and write requests to their corresponding datacenters.
  * <p>
- * If {@link #readDC} is specified, we prioritize {@linkplain Node nodes} in the {@link #readDC} for read requests.
- * Either one of {@link #writeDC} or {@link #globalEndpoint} needs to be specified in order to determine the data
- * center for write requests. If {@link #writeDC} is specified, writes will be prioritized for that region. When a
- * {@link #globalEndpoint} is specified, the write requests will be prioritized for the default write region. {@link
- * #globalEndpoint} allows the client to gracefully failover by changing the default write region addresses. {@link
- * #dnsExpiryTimeInSeconds} is essentially the max duration to recover from the failover. By default, it is 60 seconds.
+ * If {@link #readDatacenter} is specified, we prioritize {@linkplain Node nodes} in the {@link #readDatacenter} for
+ * read requests. Either one of {@link #writeDatacenter} or {@link #globalEndpoint} needs to be specified in order to
+ * determine the datacenter for write requests. If {@link #writeDatacenter} is specified, writes will be prioritized for
+ * that region. When a {@link #globalEndpoint} is specified, the write requests will be prioritized for the default
+ * write region. {@link #globalEndpoint} allows the client to gracefully failover by changing the default write region
+ * addresses. {@link #dnsExpiryTimeInSeconds} is essentially the max duration to recover from the failover. By default,
+ * it is 60 seconds.
  */
 public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private final int dnsExpiryTimeInSeconds;
     private final String globalEndpoint;
     private final AtomicInteger index = new AtomicInteger();
-    private final String readDC;
-    private final String writeDC;
+    private final String readDatacenter;
+    private final String writeDatacenter;
     private long lastDnsLookupTime = Long.MIN_VALUE;
     private InetAddress[] localAddresses = null;
     private CopyOnWriteArrayList<Node> readLocalDcNodes;
@@ -67,11 +68,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.globalEndpoint = profile.getString(Option.GLOBAL_ENDPOINT,
             Option.GLOBAL_ENDPOINT.getDefaultValue());
 
-        this.readDC = profile.getString(Option.READ_DC,
-            Option.READ_DC.getDefaultValue());
+        this.readDatacenter = profile.getString(Option.READ_DATACENTER,
+            Option.READ_DATACENTER.getDefaultValue());
 
-        this.writeDC = profile.getString(Option.WRITE_DC,
-            Option.WRITE_DC.getDefaultValue());
+        this.writeDatacenter = profile.getString(Option.WRITE_DATACENTER,
+            Option.WRITE_DATACENTER.getDefaultValue());
 
         this.validate();
     }
@@ -80,15 +81,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (this.globalEndpoint.isEmpty()) {
 
-            if (this.writeDC.isEmpty() || this.readDC.isEmpty()) {
+            if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
                 throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is not specified, "
-                    + "you must specify both " + Option.READ_DC.getPath() + " and " + Option.WRITE_DC.getPath()
+                    + "you must specify both " + Option.READ_DATACENTER.getPath() + " and " + Option.WRITE_DATACENTER.getPath()
                     + ".");
             }
 
-        } else if (!this.writeDC.isEmpty()) {
+        } else if (!this.writeDatacenter.isEmpty()) {
             throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is specified, you must "
-                + "not specify " + Option.WRITE_DC.getPath() + ". Writes will go to the default write region when "
+                + "not specify " + Option.WRITE_DATACENTER.getPath() + ". Writes will go to the default write region when "
                 + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
         }
     }
@@ -119,12 +120,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             final String datacenter = node.getDatacenter();
             NodeDistance distance = NodeDistance.IGNORED;
 
-            if (!this.readDC.isEmpty() && Objects.equals(datacenter, this.readDC)) {
+            if (!this.readDatacenter.isEmpty() && Objects.equals(datacenter, this.readDatacenter)) {
                 this.readLocalDcNodes.add(node);
                 distance = NodeDistance.LOCAL;
             }
 
-            if ((!this.writeDC.isEmpty() && Objects.equals(datacenter, this.writeDC))
+            if ((!this.writeDatacenter.isEmpty() && Objects.equals(datacenter, this.writeDatacenter))
                 || dnsLookupAddresses.contains(this.getAddress(node))) {
                 this.writeLocalDcNodes.add(node);
                 distance = NodeDistance.LOCAL;
@@ -184,12 +185,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return;
         }
 
-        if (!this.readDC.isEmpty() && node.getDatacenter().equals(this.readDC)) {
+        if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
             this.readLocalDcNodes.remove(node);
         }
 
-        if (!this.writeDC.isEmpty()) {
-            if (node.getDatacenter().equals(this.writeDC)) {
+        if (!this.writeDatacenter.isEmpty()) {
+            if (node.getDatacenter().equals(this.writeDatacenter)) {
                 this.writeLocalDcNodes.remove(node);
             }
         } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
@@ -211,12 +212,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return;
         }
 
-        if (!this.readDC.isEmpty() && node.getDatacenter().equals(this.readDC)) {
+        if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
             this.readLocalDcNodes.addIfAbsent(node);
         }
 
-        if (!this.writeDC.isEmpty()) {
-            if (node.getDatacenter().equals(this.writeDC)) {
+        if (!this.writeDatacenter.isEmpty()) {
+            if (node.getDatacenter().equals(this.writeDatacenter)) {
                 this.writeLocalDcNodes.addIfAbsent(node);
             }
         } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
@@ -307,14 +308,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return;
         }
 
-        CopyOnWriteArrayList<Node> oldLocalDCHosts = this.writeLocalDcNodes;
-        CopyOnWriteArrayList<Node> oldRemoteDCHosts = this.remoteDcNodes;
+        CopyOnWriteArrayList<Node> oldLocalDcHosts = this.writeLocalDcNodes;
+        CopyOnWriteArrayList<Node> oldRemoteDcHosts = this.remoteDcNodes;
 
         List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
         CopyOnWriteArrayList<Node> localDcHosts = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<Node> remoteDcHosts = new CopyOnWriteArrayList<>();
 
-        for (Node node : oldLocalDCHosts) {
+        for (Node node : oldLocalDcHosts) {
             if (localAddresses.contains(this.getAddress(node))) {
                 localDcHosts.addIfAbsent(node);
             } else {
@@ -322,7 +323,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        for (Node node : oldRemoteDCHosts) {
+        for (Node node : oldRemoteDcHosts) {
             if (localAddresses.contains(this.getAddress(node))) {
                 localDcHosts.addIfAbsent(node);
             } else {
@@ -344,8 +345,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         DNS_EXPIRY_TIME("dns-expiry-time",60),
         GLOBAL_ENDPOINT("global-endpoint", ""),
-        READ_DC("read-dc", ""),
-        WRITE_DC("write-dc", "");
+        READ_DATACENTER("read-datacenter", ""),
+        WRITE_DATACENTER("write-datacenter", "");
 
         private final Object defaultValue;
         private final String path;
