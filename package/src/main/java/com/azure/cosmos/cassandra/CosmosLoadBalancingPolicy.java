@@ -20,6 +20,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 
 /**
  * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify a {@link #readDatacenter} and a
@@ -62,17 +64,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
-        this.dnsExpiryTimeInSeconds = profile.getInt(Option.DNS_EXPIRY_TIME,
-            Option.DNS_EXPIRY_TIME.getDefaultValue());
-
-        this.globalEndpoint = profile.getString(Option.GLOBAL_ENDPOINT,
-            Option.GLOBAL_ENDPOINT.getDefaultValue());
-
-        this.readDatacenter = profile.getString(Option.READ_DATACENTER,
-            Option.READ_DATACENTER.getDefaultValue());
-
-        this.writeDatacenter = profile.getString(Option.WRITE_DATACENTER,
-            Option.WRITE_DATACENTER.getDefaultValue());
+        this.dnsExpiryTimeInSeconds = Option.DNS_EXPIRY_TIME.getValue(profile);
+        this.globalEndpoint = Option.GLOBAL_ENDPOINT.getValue(profile);
+        this.readDatacenter = Option.READ_DATACENTER.getValue(profile);
+        this.writeDatacenter = Option.WRITE_DATACENTER.getValue(profile);
 
         this.validate();
     }
@@ -245,8 +240,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } catch (UnknownHostException error) {
                 // DNS entry may be temporarily unavailable
                 if (this.localAddresses == null) {
-                    throw new IllegalArgumentException(
-                        "The DNS could not resolve the globalContactPoint the first time.");
+                    throw new IllegalArgumentException("The DNS could not resolve "
+                        + Option.GLOBAL_ENDPOINT.getPath()
+                        + " = "
+                        + this.globalEndpoint
+                        + " the first time.");
                 }
             }
         }
@@ -343,17 +341,33 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     enum Option implements DriverOption {
 
-        DNS_EXPIRY_TIME("dns-expiry-time",60),
-        GLOBAL_ENDPOINT("global-endpoint", ""),
-        READ_DATACENTER("read-datacenter", ""),
-        WRITE_DATACENTER("write-datacenter", "");
+        DNS_EXPIRY_TIME("dns-expiry-time", (option, profile) ->
+            profile.getInt(option, option.getDefaultValue()),
+            60),
+
+        GLOBAL_ENDPOINT("global-endpoint", (option, profile) -> {
+                final String value = profile.getString(option, option.getDefaultValue());
+                final int index = value.lastIndexOf(':');
+                return index < 0 ? value : value.substring(0, index);
+            },
+            ""),
+
+        READ_DATACENTER("read-datacenter", (option, profile) ->
+            profile.getString(option, option.getDefaultValue()),
+            ""),
+
+        WRITE_DATACENTER("write-datacenter", (option, profile) ->
+            profile.getString(option, option.getDefaultValue()),
+            "");
 
         private final Object defaultValue;
+        private final BiFunction<Option, DriverExecutionProfile, ?> getter;
         private final String path;
 
-        Option(String name, Object defaultValue) {
-            this.path = PATH_PREFIX + name;
+        <T, R> Option(String name, BiFunction<Option, DriverExecutionProfile, R> getter, T defaultValue) {
             this.defaultValue = defaultValue;
+            this.getter = getter;
+            this.path = PATH_PREFIX + name;
         }
 
         @SuppressWarnings("unchecked")
@@ -365,6 +379,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         @Override
         public String getPath() {
             return this.path;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> T getValue(@NonNull DriverExecutionProfile profile) {
+            Objects.requireNonNull(profile, "expected non-null profile");
+            return (T) this.getter.apply(this, profile);
         }
     }
 

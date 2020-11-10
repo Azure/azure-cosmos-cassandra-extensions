@@ -18,7 +18,9 @@ import com.datastax.oss.driver.api.core.servererrors.WriteType;
 import com.datastax.oss.driver.api.core.session.Request;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+import java.util.Objects;
 import java.util.Random;
+import java.util.function.BiFunction;
 
 /**
  * Implements a Cassandra {@link RetryPolicy} with back-offs for {@link OverloadedException} failures.
@@ -50,14 +52,9 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
-        this.maxRetryCount = profile.getInt(Option.MAX_RETRIES,
-            Option.MAX_RETRIES.getDefaultValue());
-
-        this.fixedBackoffTimeInMillis = profile.getInt(Option.FIXED_BACKOFF_TIME,
-            Option.FIXED_BACKOFF_TIME.getDefaultValue());
-
-        this.growingBackoffTimeInMillis = profile.getInt(Option.GROWING_BACKOFF_TIME,
-            Option.GROWING_BACKOFF_TIME.getDefaultValue());
+        this.maxRetryCount = Option.MAX_RETRIES.getValue(profile);
+        this.fixedBackoffTimeInMillis = Option.FIXED_BACKOFF_TIME.getValue(profile);
+        this.growingBackoffTimeInMillis = Option.GROWING_BACKOFF_TIME.getValue(profile);
     }
 
     CosmosRetryPolicy(int maxRetryCount) {
@@ -216,16 +213,31 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     private enum Option implements DriverOption {
 
-        FIXED_BACKOFF_TIME("fixed-backoff-time", 5_000),
-        GROWING_BACKOFF_TIME("growing-backoff-time", 1_000),
-        MAX_RETRIES("max-retries", 5);
+        FIXED_BACKOFF_TIME("fixed-backoff-time", (option, profile) ->
+            profile.getInt(option, option.getDefaultValue()),
+            5_000),
 
-        private final int defaultValue;
+        GROWING_BACKOFF_TIME("growing-backoff-time", (option, profile) ->
+            profile.getInt(option, option.getDefaultValue()),
+            1_000),
+
+        MAX_RETRIES("max-retries", (option, profile) ->
+            profile.getInt(option, option.getDefaultValue()),
+            5);
+
+        private final Object defaultValue;
+        private final BiFunction<Option, DriverExecutionProfile, ?> getter;
         private final String path;
 
-        Option(String name, int defaultValue) {
-            this.path = PATH_PREFIX + name;
+        <T, R> Option(String name, BiFunction<Option, DriverExecutionProfile, R> getter, T defaultValue) {
             this.defaultValue = defaultValue;
+            this.getter = getter;
+            this.path = PATH_PREFIX + name;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> T getDefaultValue() {
+            return (T) this.defaultValue;
         }
 
         @NonNull
@@ -234,8 +246,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
             return this.path;
         }
 
-        public int getDefaultValue() {
-            return this.defaultValue;
+        @SuppressWarnings("unchecked")
+        public <T> T getValue(@NonNull DriverExecutionProfile profile) {
+            Objects.requireNonNull(profile, "expected non-null profile");
+            return (T) this.getter.apply(this, profile);
         }
     }
 

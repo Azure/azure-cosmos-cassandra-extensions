@@ -10,34 +10,27 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
-import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import org.testng.annotations.Test;
 
 import javax.net.ssl.SSLContext;
-import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
 
+import static java.lang.String.format;
 import static org.testng.AssertJUnit.fail;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
- *
- * <p>Preconditions:
- *
+ * <p>
+ * Preconditions:
  * <ul>
- * <li>An Apache Cassandra cluster is running and accessible through the contacts points
- * identified by {@link #CONTACT_POINTS} and {@link #PORT}.
+ * <li>An Apache Cassandra cluster is running and accessible through the configuration specified by application.conf.
  * </ul>
  * <p>
  * Side effects:
- *
  * <ol>
  * <li>Creates a new keyspace {@code downgrading} in the cluster, with replication factor 3. If a
  * keyspace with this name already exists, it will be reused;
@@ -49,7 +42,6 @@ import static org.testng.AssertJUnit.fail;
  * </ol>
  * <p>
  * Notes:
- *
  * <ul>
  * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy}
  * does; feel free to adapt it to your application needs;
@@ -63,26 +55,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
     // region Fields
 
-    static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.contactPoint",
-        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
-        "localhost") };
-
-    static final String PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.password",
-        "AZURE_COSMOS_CASSANDRA_PASSWORD",
-        "");
-
-    static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.port",
-        "AZURE_COSMOS_CASSANDRA_PORT",
-        "9042"));
-
-    static final String USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.username",
-        "AZURE_COSMOS_CASSANDRA_USERNAME",
-        "");
-
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
     private static final int TIMEOUT = 30_000_000;
 
@@ -95,29 +67,29 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
-        try (Session ignored = this.connect(CONTACT_POINTS, PORT, USERNAME, PASSWORD)) {
+        try (Session ignored = this.connect()) {
 
             try {
                 this.createSchema();
             } catch (Exception error) {
-                fail(String.format("createSchema failed: %s", error));
+                fail(format("createSchema failed: %s", error));
             }
             try {
                 this.write(CONSISTENCY_LEVEL);
 
             } catch (Exception error) {
-                fail(String.format("write failed: %s", error));
+                fail(format("write failed: %s", error));
             }
             try {
                 ResultSet rows = this.read(CONSISTENCY_LEVEL);
                 this.display(rows);
 
             } catch (Exception error) {
-                fail(String.format("read failed: %s", error));
+                fail(format("read failed: %s", error));
             }
 
         } catch (Exception error) {
-            fail(String.format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
+            fail(format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
         }
     }
 
@@ -134,26 +106,13 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
     // region Privates
 
     /**
-     * Initiates a connection to the cluster specified by the given contact points and port.
-     *
-     * @param contactPoints the contact points to use.
-     * @param port      the port to use.
+     * Initiates a connection to the cluster specified by application.conf.
      */
-    private Session connect(String[] contactPoints, int port, String username, String password)
+    private Session connect()
         throws NoSuchAlgorithmException {
 
-        final Collection<EndPoint> endpoints = new ArrayList<>(contactPoints.length);
-
-        for (String contactPoint : contactPoints) {
-            final String hostname = contactPoint.substring(0, contactPoint.lastIndexOf(':'));
-            final InetSocketAddress address = new InetSocketAddress(hostname, port);
-            endpoints.add(new DefaultEndPoint(address));
-        }
-
         this.session = CqlSession.builder()
-            .withAuthCredentials(username, password)
             .withSslContext(SSLContext.getDefault())
-            .addContactEndPoints(endpoints)
             .build();
 
         System.out.println("Connected to session: " + this.session.getName());
