@@ -17,7 +17,9 @@ import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import org.testng.annotations.Test;
 
+import javax.net.ssl.SSLContext;
 import java.net.InetSocketAddress;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -137,7 +139,8 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
      * @param contactPoints the contact points to use.
      * @param port      the port to use.
      */
-    private Session connect(String[] contactPoints, int port, String username, String password) {
+    private Session connect(String[] contactPoints, int port, String username, String password)
+        throws NoSuchAlgorithmException {
 
         final Collection<EndPoint> endpoints = new ArrayList<>(contactPoints.length);
 
@@ -149,6 +152,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
         this.session = CqlSession.builder()
             .withAuthCredentials(username, password)
+            .withSslContext(SSLContext.getDefault())
             .addContactEndPoints(endpoints)
             .build();
 
