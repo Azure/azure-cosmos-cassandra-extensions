@@ -15,8 +15,6 @@ import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import org.testng.annotations.Test;
 
-import javax.net.ssl.SSLContext;
-import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 
 import static java.lang.String.format;
@@ -108,13 +106,8 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
     /**
      * Initiates a connection to the cluster specified by application.conf.
      */
-    private Session connect()
-        throws NoSuchAlgorithmException {
-
-        this.session = CqlSession.builder()
-            .withSslContext(SSLContext.getDefault())
-            .build();
-
+    private Session connect() {
+        this.session = CqlSession.builder().build();
         System.out.println("Connected to session: " + this.session.getName());
         return this.session;
     }
@@ -229,7 +222,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         return rows;
     }
 
-    // TODO (DANOBLE) Move this method to CosmosRetryPolicy or remote it because it's not used here
+    // TODO (DANOBLE) Move this method to CosmosRetryPolicy or remove it because it's not used here
 
     //    /**
     //     * Tests a retry operation
