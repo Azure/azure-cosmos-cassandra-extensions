@@ -19,6 +19,8 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
@@ -87,24 +89,18 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     @SuppressWarnings("CatchMayIgnoreException")
     public void canIntegrateWithCosmos() {
 
-        try (CqlSession session = this.connect(CONTACT_POINTS, PORT, USERNAME, PASSWORD, LOCAL_DATACENTER)) {
+        assertThatCode(() ->
+            TestCommon.createSchema(session, this.keyspaceName, this.tableName)
+        ).doesNotThrowAnyException();
 
-            assertThatCode(() ->
-                TestCommon.createSchema(session, this.keyspaceName, this.tableName)
-            ).doesNotThrowAnyException();
+        assertThatCode(() ->
+            TestCommon.write(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName)
+        ).doesNotThrowAnyException();
 
-            assertThatCode(() ->
-                TestCommon.write(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName)
-            ).doesNotThrowAnyException();
-
-            assertThatCode(() -> {
-                ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName);
-                display(rows);
-            }).doesNotThrowAnyException();
-
-        } catch (Throwable error) {
-            fail(String.format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
-        }
+        assertThatCode(() -> {
+            ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName);
+            display(rows);
+        }).doesNotThrowAnyException();
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
@@ -120,31 +116,39 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
 
         for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
             final RetryDecision retryDecision = retryPolicy.onErrorResponse(request, coordinatorException, retryNumber);
-            assertThat(retryDecision).isEqualTo(RetryDecision.RETRY_NEXT);
+            // TODO (DANOBLE) Is this the expected return value or should it be RETRY_NEXT?
+            //  Should we cycle through nodes in response to an error or retry on the same node?
+            assertThat(retryDecision).isEqualTo(RetryDecision.RETRY_SAME);
         }
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
-        // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_NEXT or something else?
-        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_NEXT);
+        // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
+        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_SAME);
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
-        // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_NEXT or something else?
-        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_NEXT);
+        // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
+        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_SAME);
     }
 
     /**
      * Closes the session, if it's been instantiated.
      */
+    @AfterClass
     public void close() {
         if (this.session != null) {
             this.session.close();
         }
+    }
+
+    @BeforeClass
+    public void connect() {
+        this.session = this.connect(CONTACT_POINTS, PORT, USERNAME, PASSWORD, LOCAL_DATACENTER);
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)

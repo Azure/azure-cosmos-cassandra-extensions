@@ -51,7 +51,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
     // region Fields
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
-    private static final int TIMEOUT = 30_000_000;
+    private static final int TIMEOUT = 30_000;
 
     private CqlSession session;
 
