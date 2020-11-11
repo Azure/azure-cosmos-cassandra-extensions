@@ -10,6 +10,7 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
@@ -74,14 +75,12 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
             }
             try {
                 this.write(CONSISTENCY_LEVEL);
-
             } catch (Exception error) {
                 fail(format("write failed: %s", error));
             }
             try {
                 ResultSet rows = this.read(CONSISTENCY_LEVEL);
                 this.display(rows);
-
             } catch (Exception error) {
                 fail(format("read failed: %s", error));
             }
@@ -179,24 +178,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         System.out.println();
     }
 
-    private static String getPropertyOrEnvironmentVariable(
-        String property,
-        String variable,
-        String defaultValue) {
-
-        String value = System.getProperty(property);
-
-        if (value == null) {
-            value = System.getenv(variable);
-        }
-
-        if (value == null) {
-            value = defaultValue;
-        }
-
-        return value;
-    }
-
     /**
      * Queries data, retrying if necessary with a downgraded CL.
      *
@@ -206,57 +187,20 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
-        Request statement =
-            SimpleStatement.newInstance(
-                "SELECT sensor_id, date, timestamp, value "
-                    + "FROM downgrading.sensor_data "
-                    + "WHERE "
-                    + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
-                    + "date = '2018-02-26' AND "
-                    + "timestamp > '2018-02-26+01:00'")
-                .setConsistencyLevel(consistencyLevel);
+        Statement statement = SimpleStatement.newInstance(
+            "SELECT sensor_id, date, timestamp, value "
+                + "FROM downgrading.sensor_data "
+                + "WHERE "
+                + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
+                + "date = '2018-02-26' AND "
+                + "timestamp > '2018-02-26+01:00'")
+            .setConsistencyLevel(consistencyLevel);
 
-        ResultSet rows = this.session.execute(statement, GenericType.of(ResultSet.class));
+        ResultSet rows = this.session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
 
         return rows;
     }
-
-    // TODO (DANOBLE) Move this method to CosmosRetryPolicy or remove it because it's not used here
-
-    //    /**
-    //     * Tests a retry operation
-    //     */
-    //    private void retry(
-    //        CosmosRetryPolicy retryPolicy,
-    //        int retryNumberBegin,
-    //        int retryNumberEnd,
-    //        RetryDecision expectedRetryDecisionType) {
-    //
-    //        final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
-    //            new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
-    //            (InternalDriverContext) this.session.getContext()));
-    //
-    //        final Request statement = SimpleStatement.newInstance("SELECT * FROM retry");
-    //        final ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
-    //
-    //        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
-    //
-    //            long expectedDuration = 1_000_000 * (retryPolicy.getMaxRetryCount() == -1
-    //                ? FIXED_BACK_OFF_TIME
-    //                : (long) retryNumber * GROWING_BACK_OFF_TIME);
-    //
-    //            long startTime = System.nanoTime();
-    //
-    //            RetryDecision retryDecision = retryPolicy.onErrorResponse(statement, coordinatorException,
-    //            retryNumber);
-    //
-    //            long duration = System.nanoTime() - startTime;
-    //
-    //            assertThat(retryDecision).isEqualTo(expectedRetryDecisionType);
-    //            assertThat(duration).isGreaterThan(expectedDuration);
-    //        }
-    //    }
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
@@ -267,30 +211,24 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
-        BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel);
-
-        batch.add(
-            SimpleStatement.newInstance(
+        BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
+            .add(SimpleStatement.newInstance(
                 "INSERT INTO downgrading.sensor_data "
                     + "(sensor_id, date, timestamp, value) "
                     + "VALUES ("
                     + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                     + "'2018-02-26',"
                     + "'2018-02-26T13:53:46.345+01:00',"
-                    + "2.34)"));
-
-        batch.add(
-            SimpleStatement.newInstance(
+                    + "2.34)"))
+            .add(SimpleStatement.newInstance(
                 "INSERT INTO downgrading.sensor_data "
                     + "(sensor_id, date, timestamp, value) "
                     + "VALUES ("
                     + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                     + "'2018-02-26',"
                     + "'2018-02-26T13:54:27.488+01:00',"
-                    + "2.47)"));
-
-        batch.add(
-            SimpleStatement.newInstance(
+                    + "2.47)"))
+            .add(SimpleStatement.newInstance(
                 "INSERT INTO downgrading.sensor_data "
                     + "(sensor_id, date, timestamp, value) "
                     + "VALUES ("
