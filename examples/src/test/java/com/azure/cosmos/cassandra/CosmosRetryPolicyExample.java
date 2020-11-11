@@ -11,12 +11,8 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
-import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import org.testng.annotations.Test;
-
-import java.text.SimpleDateFormat;
 
 import static java.lang.String.format;
 import static org.testng.AssertJUnit.fail;
@@ -145,14 +141,9 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         final int width4 = 21;
 
         final String format = "%-" + width1 + "s" + "%-" + width2 + "s" + "%-" + width3 + "s" + "%-" + width4 + "s%n";
-
-        // headings
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
-
-        // separators
         drawLine(width1, width2, width3, width4);
 
-        // data
         for (Row row : rows) {
             System.out.printf(format,
                 row.getUuid("sensor_id"),

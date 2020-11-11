@@ -11,8 +11,6 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 
-import java.text.SimpleDateFormat;
-
 import static java.lang.String.format;
 
 public final class TestCommon {
@@ -23,27 +21,32 @@ public final class TestCommon {
 
     // region Fields
 
-    static final String[] CONTACT_POINT = { getPropertyOrEnvironmentVariable(
+    static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.contactPoint",
         "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
         "localhost") };
 
-    static final String CREDENTIALS_PASSWORD = getPropertyOrEnvironmentVariable(
+    // TODO (DANOBLE) what does the cassandra api return for the local datacenter name when it is hosted by the emulator
+
+    static final String LOCAL_DATACENTER = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.localDatacenter",
+        "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
+        "localhost");
+
+    static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
         ""
     );
-
-    static final String CREDENTIALS_USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.username",
-        "AZURE_COSMOS_CASSANDRA_USERNAME",
-        "");
-
     static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.port",
         "AZURE_COSMOS_CASSANDRA_PORT",
         "9042"));
 
+    static final String USERNAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.username",
+        "AZURE_COSMOS_CASSANDRA_USERNAME",
+        "");
 
     // endregion
 
@@ -58,7 +61,7 @@ public final class TestCommon {
             "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}",
             keyspaceName));
 
-        Thread.sleep(5000);
+        Thread.sleep(5_000);
 
         session.execute(format(
             "CREATE TABLE IF NOT EXISTS %s.%s ("
@@ -72,7 +75,7 @@ public final class TestCommon {
             keyspaceName,
             tableName));
 
-        Thread.sleep(5000);
+        Thread.sleep(5_000);
     }
 
     /**
@@ -88,21 +91,14 @@ public final class TestCommon {
         final int width4 = 21;
 
         final String format = "%-" + width1 + "s%-" + width2 + "s%-" + width3 + "s%-" + width4 + "s%n";
-        final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-
-        // headings
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
-
-        // separators
         drawLine(width1, width2, width3, width4);
-
-        // data
 
         for (Row row : rows) {
             System.out.printf(format,
                 row.getUuid("sensor_id"),
                 row.getLocalDate("date"),
-                sdf.format(row.getInstant("timestamp")),
+                row.getInstant("timestamp"),
                 row.getDouble("value"));
         }
     }
@@ -137,10 +133,6 @@ public final class TestCommon {
         return rows;
     }
 
-    static ResultSet read(CqlSession session, String keyspaceName, String tableName) {
-        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
-    }
-
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *
@@ -150,28 +142,22 @@ public final class TestCommon {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
-        BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel);
-
-        batch.add(SimpleStatement.newInstance(format(
-            "INSERT INTO %s.%s "
+        BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
+            .add(SimpleStatement.newInstance(format("INSERT INTO %s.%s "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:53:46.345+01:00',"
-                + "2.34)", keyspaceName, tableName)));
-
-        batch.add(SimpleStatement.newInstance(format(
-            "INSERT INTO %s.%s "
+                + "2.34)", keyspaceName, tableName)))
+            .add(SimpleStatement.newInstance(format("INSERT INTO %s.%s "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:54:27.488+01:00',"
-                + "2.47)", keyspaceName, tableName)));
-
-        batch.add(SimpleStatement.newInstance(format(
-            "INSERT INTO %s.%s "
+                + "2.47)", keyspaceName, tableName)))
+            .add(SimpleStatement.newInstance(format("INSERT INTO %s.%s "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
@@ -181,10 +167,6 @@ public final class TestCommon {
 
         session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
-    }
-
-    static void write(CqlSession session, String keyspaceName, String tableName) {
-        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
     // endregion

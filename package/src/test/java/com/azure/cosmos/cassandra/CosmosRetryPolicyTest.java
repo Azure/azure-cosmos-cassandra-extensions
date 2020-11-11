@@ -16,6 +16,7 @@ import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
 import com.datastax.oss.driver.api.core.servererrors.ServerError;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import org.testng.annotations.Test;
@@ -24,10 +25,11 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINT;
-import static com.azure.cosmos.cassandra.TestCommon.CREDENTIALS_PASSWORD;
-import static com.azure.cosmos.cassandra.TestCommon.CREDENTIALS_USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.azure.cosmos.cassandra.TestCommon.LOCAL_DATACENTER;
+import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.PORT;
+import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.display;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -63,7 +65,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosRetryPolicyTest implements AutoCloseable{
+public class CosmosRetryPolicyTest implements AutoCloseable {
 
     // region Fields
 
@@ -81,11 +83,11 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
 
     // region Methods
 
-    @Test(groups = {"integration", "checkin"}, timeOut = TIMEOUT)
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     @SuppressWarnings("CatchMayIgnoreException")
     public void canIntegrateWithCosmos() {
 
-        try (CqlSession session = this.connect(CONTACT_POINT, PORT, CREDENTIALS_USERNAME, CREDENTIALS_PASSWORD)) {
+        try (CqlSession session = this.connect(CONTACT_POINTS, PORT, USERNAME, PASSWORD, LOCAL_DATACENTER)) {
 
             assertThatCode(() ->
                 TestCommon.createSchema(session, this.keyspaceName, this.tableName)
@@ -105,12 +107,12 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
         }
     }
 
-    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOnConnectionException() {
 
         final CoordinatorException coordinatorException = new ServerError(
             new DefaultNode(
-                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINT[0], PORT)),
+                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
                 (InternalDriverContext) this.session.getContext()), "canRetryOnConnectionException");
 
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
@@ -122,14 +124,14 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
         }
     }
 
-    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_NEXT or something else?
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_NEXT);
     }
 
-    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_NEXT or something else?
@@ -145,7 +147,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
         }
     }
 
-    @Test(groups = {"unit", "checkin"}, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
         CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
         this.retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.RETHROW);
@@ -158,23 +160,32 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param hostnames the contact points to use.
-     * @param port      the port to use.
+     * @param contactPoints the contact points to use.
+     * @param port          the port to use.
      */
-    private CqlSession connect(String[] hostnames, int port, String username, String password) {
+    private CqlSession connect(
+        String[] contactPoints, int port, String username, String password, String localDatacenter) {
 
-        final Collection<EndPoint> endpoints = new ArrayList<>(hostnames.length);
+        final Collection<EndPoint> endpoints = new ArrayList<>(contactPoints.length);
 
-        for (String hostname : hostnames) {
-            final InetSocketAddress address = new InetSocketAddress(hostname, port);
+        for (String contactPoint : contactPoints) {
+
+            final int index = contactPoint.lastIndexOf(':');
+
+            final InetSocketAddress address = new InetSocketAddress(
+                index < 0 ? contactPoint : contactPoint.substring(0, index),
+                port);
+
             endpoints.add(new DefaultEndPoint(address));
         }
 
         this.session = CqlSession.builder()
             .withConfigLoader(DriverConfigLoader.programmaticBuilder()
-                .withString(DefaultDriverOption.RETRY_POLICY_CLASS, CosmosRetryPolicy.class.getCanonicalName())
+                .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
+                .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, CosmosRetryPolicy.class)
                 .build())
             .withAuthCredentials(username, password)
+            .withLocalDatacenter(localDatacenter)
             .addContactEndPoints(endpoints)
             .build();
 
@@ -185,11 +196,12 @@ public class CosmosRetryPolicyTest implements AutoCloseable{
     /**
      * Tests a retry operation
      */
-    private void retry(CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryDecision expectedRetryDecision) {
+    private void retry(
+        CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryDecision expectedRetryDecision) {
 
         final CoordinatorException coordinatorException = new OverloadedException(
             new DefaultNode(
-                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINT[0], PORT)),
+                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
                 (InternalDriverContext) this.session.getContext()));
 
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");

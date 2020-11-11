@@ -20,7 +20,6 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
