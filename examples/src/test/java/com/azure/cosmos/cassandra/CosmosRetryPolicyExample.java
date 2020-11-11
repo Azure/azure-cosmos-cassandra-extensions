@@ -145,7 +145,6 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
         final int width4 = 21;
 
         final String format = "%-" + width1 + "s" + "%-" + width2 + "s" + "%-" + width3 + "s" + "%-" + width4 + "s%n";
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
         // headings
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
@@ -158,7 +157,7 @@ public class CosmosRetryPolicyExample implements AutoCloseable {
             System.out.printf(format,
                 row.getUuid("sensor_id"),
                 row.getLocalDate("date"),
-                sdf.format(row.getInstant("timestamp")),
+                row.getInstant("timestamp"),
                 row.getDouble("value"));
         }
     }
