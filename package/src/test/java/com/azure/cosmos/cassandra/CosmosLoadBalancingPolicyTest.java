@@ -11,13 +11,14 @@ import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
+import com.datastax.oss.driver.api.querybuilder.Literal;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
-import com.datastax.oss.driver.api.querybuilder.relation.Relation;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
@@ -38,7 +39,6 @@ import static com.azure.cosmos.cassandra.TestCommon.PORT;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
-import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.tuple;
 import static java.lang.String.format;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
@@ -266,33 +266,40 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             this.keyspaceName,
             this.tableName)));
 
-        // BuiltStatements
+        // Built statements
 
         final LocalDate date = LocalDate.of(2016, 6, 30);
         final Instant timestamp = Instant.now();
         final UUID uuid = UUID.randomUUID();
 
-        Relation relation = Relation.columns("sensor_id", "date", "timestamp").isEqualTo(tuple(
-            literal(uuid), literal(date), literal(timestamp)
-        ));
+        Select select = QueryBuilder.selectFrom(this.keyspaceName, this.tableName)
+            .all()
+            .whereColumn("sensor_id").isEqualTo(literal(uuid))
+            .whereColumn("date").isEqualTo(literal(date))
+            .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        Select select = QueryBuilder.selectFrom(this.keyspaceName, this.tableName).all().where(relation);
         this.session.execute(select.build());
 
         Insert insert = QueryBuilder.insertInto(this.keyspaceName, this.tableName)
-            .value("sensor_data", literal(uuid))
+            .value("sensor_id", literal(uuid))
             .value("date", literal(date))
-            .value("timestamp", literal(1000));
+            .value("timestamp", literal(timestamp));
 
         this.session.execute(insert.build());
 
         Update update = QueryBuilder.update(this.keyspaceName, this.tableName)
             .setColumn("value", literal(1.0))
-            .where(relation);
+            .whereColumn("sensor_id").isEqualTo(literal(uuid))
+            .whereColumn("date").isEqualTo(literal(date))
+            .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
         this.session.execute(update.build());
 
-        Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, this.tableName).where(relation);
+        Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, this.tableName)
+            .whereColumn("sensor_id").isEqualTo(literal(uuid))
+            .whereColumn("date").isEqualTo(literal(date))
+            .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
         this.session.execute(delete.build());
 
         // BoundStatements
@@ -329,13 +336,10 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
         this.session.execute(boundStatement);
 
-        // BatchStatement
+        // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
 
         BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
-            .add(SimpleStatement.newInstance(format(
-                "SELECT * FROM %s.%s WHERE WHERE sensor_id = uuid() and date = toDate(now())",
-                this.keyspaceName,
-                this.tableName)))
+            .add(boundStatement)
             .add(boundStatement);
 
         this.session.execute(batchStatement);
