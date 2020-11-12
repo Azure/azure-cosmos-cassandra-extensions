@@ -28,13 +28,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
-import static com.azure.cosmos.cassandra.TestCommon.LOCAL_DATACENTER;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.PORT;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.display;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 
 /**
@@ -71,14 +69,19 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
 
     // region Fields
 
+    static final String LOCAL_DATACENTER = TestCommon.getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.localDatacenter",
+        "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
+        "localhost");
+
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
-    private static final int FIXED_BACK_OFF_TIME = 5_000;
-    private static final int GROWING_BACK_OFF_TIME = 1_000;
-    private static final int MAX_RETRY_COUNT = 5;
+    private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicy.Option.FIXED_BACKOFF_TIME.getDefaultValue();
+    private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicy.Option.GROWING_BACKOFF_TIME.getDefaultValue();
+    private static final String KEYSPACE_NAME = "downgrading";
+    private static final int MAX_RETRIES = CosmosRetryPolicy.Option.MAX_RETRIES.getDefaultValue();
+    private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT = 30_0000;
 
-    private final String keyspaceName = "downgrading";
-    private final String tableName = "sensor_data";
     private CqlSession session;
 
     // endregion
@@ -90,15 +93,15 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() ->
-            TestCommon.createSchema(session, this.keyspaceName, this.tableName)
+            TestCommon.createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() ->
-            TestCommon.write(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName)
+            TestCommon.write(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, this.keyspaceName, this.tableName);
+            ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
             display(rows);
         }).doesNotThrowAnyException();
     }
@@ -111,10 +114,10 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
                 new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
                 (InternalDriverContext) this.session.getContext()), "canRetryOnConnectionException");
 
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");
 
-        for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
+        for (int retryNumber = 0; retryNumber < MAX_RETRIES; retryNumber++) {
             final RetryDecision retryDecision = retryPolicy.onErrorResponse(request, coordinatorException, retryNumber);
             // TODO (DANOBLE) Is this the expected return value or should it be RETRY_NEXT?
             //  Should we cycle through nodes in response to an error or retry on the same node?
@@ -126,14 +129,14 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
-        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_SAME);
+        this.retry(retryPolicy, 0, MAX_RETRIES, RetryDecision.RETRY_SAME);
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
-        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.RETRY_SAME);
+        this.retry(retryPolicy, 0, MAX_RETRIES, RetryDecision.RETRY_SAME);
     }
 
     /**
@@ -153,8 +156,8 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
-        this.retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.RETHROW);
+        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
+        this.retry(retryPolicy, MAX_RETRIES + 1, MAX_RETRIES + 1, RetryDecision.RETHROW);
     }
 
     // endregion

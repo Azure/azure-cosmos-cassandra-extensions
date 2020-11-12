@@ -27,17 +27,11 @@ public final class TestCommon {
         "localhost") };
 
     // TODO (DANOBLE) what does the cassandra api return for the local datacenter name when it is hosted by the emulator
-
-    static final String LOCAL_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.localDatacenter",
-        "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
-        "localhost");
-
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
-        ""
-    );
+        "");
+
     static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.port",
         "AZURE_COSMOS_CASSANDRA_PORT",
@@ -103,6 +97,21 @@ public final class TestCommon {
         }
     }
 
+    static String getPropertyOrEnvironmentVariable(String property, String variable, String defaultValue) {
+
+        String value = System.getProperty(property);
+
+        if (value == null) {
+            value = System.getenv(variable);
+        }
+
+        if (value == null) {
+            value = defaultValue;
+        }
+
+        return value;
+    }
+
     /**
      * Queries data, retrying if necessary with a downgraded CL.
      *
@@ -132,6 +141,10 @@ public final class TestCommon {
         System.out.println("Read succeeded at " + consistencyLevel);
         return rows;
     }
+
+    // endregion
+
+    // region Privates
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
@@ -169,10 +182,6 @@ public final class TestCommon {
         System.out.println("Write succeeded at " + consistencyLevel);
     }
 
-    // endregion
-
-    // region Privates
-
     /**
      * Draws a line to isolate headings from rows.
      *
@@ -186,24 +195,6 @@ public final class TestCommon {
             System.out.print('+');
         }
         System.out.println();
-    }
-
-    private static String getPropertyOrEnvironmentVariable(
-        String property,
-        String variable,
-        String defaultValue) {
-
-        String value = System.getProperty(property);
-
-        if (value == null) {
-            value = System.getenv(variable);
-        }
-
-        if (value == null) {
-            value = defaultValue;
-        }
-
-        return value;
     }
 
     // endregion

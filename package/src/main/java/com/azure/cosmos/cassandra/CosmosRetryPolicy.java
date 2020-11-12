@@ -211,7 +211,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     private final static String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
 
-    private enum Option implements DriverOption {
+    enum Option implements DriverOption {
 
         FIXED_BACKOFF_TIME("fixed-backoff-time", (option, profile) ->
             profile.getInt(option, option.getDefaultValue()),
