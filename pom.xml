@@ -172,7 +172,7 @@
   <profiles>
     <!-- Skip module-info.java on Java 8 -->
     <profile>
-      <id>java8</id>
+      <id>java-8</id>
       <activation>
         <jdk>[1.8,9)</jdk>
       </activation>
@@ -196,7 +196,7 @@
               <source>1.8</source>
               <target>1.8</target>
               <excludes>
-                <exclude>module-info.java</exclude>
+                <exclude>**/module-info.java</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -206,7 +206,7 @@
             <version>3.1.1</version>
             <configuration>
               <sourceFileExcludes>
-                <sourceFileExclude>module-info.java</sourceFileExclude>
+                <sourceFileExclude>**/module-info.java</sourceFileExclude>
               </sourceFileExcludes>
               <quiet>true</quiet>
             </configuration>
@@ -221,7 +221,7 @@
             <version>3.1.1</version>
             <configuration>
               <sourceFileExcludes>
-                <sourceFileExclude>module-info.java</sourceFileExclude>
+                <sourceFileExclude>**/module-info.java</sourceFileExclude>
               </sourceFileExcludes>
               <quiet>true</quiet>
             </configuration>
@@ -230,7 +230,7 @@
       </reporting>
     </profile>
 
-    <!-- Setup for Java 11+ -->
+    <!-- Setup for Java LTS+, currently JDK 11 and up -->
     <profile>
       <id>java-lts</id>
       <activation>
