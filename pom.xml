@@ -172,7 +172,7 @@
   <profiles>
     <!-- Skip module-info.java on Java 8 -->
     <profile>
-      <id>java8</id>
+      <id>java-8</id>
       <activation>
         <jdk>[1.8,9)</jdk>
       </activation>
@@ -230,7 +230,7 @@
       </reporting>
     </profile>
 
-    <!-- Setup for Java 11+ -->
+    <!-- Setup for Java LTS+, currently JDK 11 and up -->
     <profile>
       <id>java-lts</id>
       <activation>
