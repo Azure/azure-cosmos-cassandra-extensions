@@ -24,12 +24,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.regex.Matcher;
 
-import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.HOSTNAME_AND_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
-import static com.azure.cosmos.cassandra.TestCommon.PORT;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.display;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,6 +67,8 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
 public class CosmosRetryPolicyTest implements AutoCloseable {
+
+    String foo = "cosmos-cassandra-1.cassandra.cosmos.azure.com:10350";
 
     // region Fields
 
@@ -109,10 +112,15 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void canRetryOnConnectionException() {
 
-        final CoordinatorException coordinatorException = new ServerError(
-            new DefaultNode(
-                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
-                (InternalDriverContext) this.session.getContext()), "canRetryOnConnectionException");
+        final Matcher address = HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
+        assertThat(address.matches()).isTrue();
+
+        final CoordinatorException coordinatorException = new ServerError(new DefaultNode(
+            new DefaultEndPoint(
+                new InetSocketAddress(
+                    address.group("hostname"),
+                    Integer.parseUnsignedInt(address.group("port")))),
+            (InternalDriverContext) this.session.getContext()), "canRetryOnConnectionException");
 
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");
@@ -144,14 +152,14 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
      */
     @AfterClass
     public void close() {
-        if (this.session != null) {
+        if (this.session != null && !this.session.isClosed()) {
             this.session.close();
         }
     }
 
     @BeforeClass
     public void connect() {
-        this.session = this.connect(CONTACT_POINTS, PORT, USERNAME, PASSWORD, LOCAL_DATACENTER);
+        this.session = this.connect(GLOBAL_ENDPOINT, USERNAME, PASSWORD, LOCAL_DATACENTER);
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
@@ -167,24 +175,18 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param contactPoints the contact points to use.
-     * @param port          the port to use.
+     * @param globalEndPoint the contact points to use.
+     * @param username the username for authenticating.
+     * @param password the password for authenticating.
      */
-    private CqlSession connect(
-        String[] contactPoints, int port, String username, String password, String localDatacenter) {
+    private CqlSession connect(String globalEndPoint, String username, String password, String localDatacenter) {
 
-        final Collection<EndPoint> endpoints = new ArrayList<>(contactPoints.length);
+        final Matcher address = HOSTNAME_AND_PORT.matcher(globalEndPoint);
+        assertThat(address.matches()).isTrue();
 
-        for (String contactPoint : contactPoints) {
-
-            final int index = contactPoint.lastIndexOf(':');
-
-            final InetSocketAddress address = new InetSocketAddress(
-                index < 0 ? contactPoint : contactPoint.substring(0, index),
-                port);
-
-            endpoints.add(new DefaultEndPoint(address));
-        }
+        final Collection<EndPoint> endPoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
+            address.group("hostname"),
+            Integer.parseUnsignedInt(address.group("port")))));
 
         this.session = CqlSession.builder()
             .withConfigLoader(DriverConfigLoader.programmaticBuilder()
@@ -193,10 +195,9 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
                 .build())
             .withAuthCredentials(username, password)
             .withLocalDatacenter(localDatacenter)
-            .addContactEndPoints(endpoints)
+            .addContactEndPoints(endPoints)
             .build();
 
-        System.out.println("Connected to session: " + this.session.getName());
         return this.session;
     }
 
@@ -206,10 +207,14 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     private void retry(
         CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryDecision expectedRetryDecision) {
 
-        final CoordinatorException coordinatorException = new OverloadedException(
-            new DefaultNode(
-                new DefaultEndPoint(new InetSocketAddress(CONTACT_POINTS[0], PORT)),
-                (InternalDriverContext) this.session.getContext()));
+        final Matcher address = HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
+        assertThat(address.matches()).isTrue();
+
+        final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
+            new DefaultEndPoint(new InetSocketAddress(
+                address.group("hostname"),
+                Integer.parseInt(address.group("port")))),
+            (InternalDriverContext) this.session.getContext()));
 
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");
 

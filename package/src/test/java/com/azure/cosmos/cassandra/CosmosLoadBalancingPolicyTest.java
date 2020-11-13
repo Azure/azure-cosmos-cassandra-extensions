@@ -11,11 +11,9 @@ import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
-import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
-import com.datastax.oss.driver.api.querybuilder.Literal;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
@@ -33,13 +31,14 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.regex.Matcher;
 
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
-import static com.azure.cosmos.cassandra.TestCommon.PORT;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
@@ -66,22 +65,17 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
 
     // region Fields
 
-    private static final int TIMEOUT = 300_000;
-
-    private static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.globalEndpoint",
-        "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "");
-
-    private static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
+    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.readDatacenter",
         "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
         "localhost");
 
-    private static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
+    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.writeDatacenter",
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
+
+    private static final int TIMEOUT = 300_000;
 
     private final String tableName = "sensor_data";
     private String keyspaceName = "downgrading";
@@ -111,12 +105,12 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointAndReadDatacenter() {
 
-        if (GLOBAL_ENDPOINT != null) {
+        if (TestCommon.GLOBAL_ENDPOINT != null) {
 
             this.keyspaceName = "globalAndRead";
 
             DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
                 .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
                 .build();
 
@@ -129,12 +123,12 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
 
-        if (GLOBAL_ENDPOINT != null) {
+        if (TestCommon.GLOBAL_ENDPOINT != null) {
 
             this.keyspaceName = "globalOnly";
 
             final DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
                 .build();
 
             try (CqlSession ignored = this.connect(driverConfigLoader)) {
@@ -174,7 +168,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
                     .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
                     .build(),
                 programmaticArguments),
@@ -184,7 +178,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
                     .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
                     .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
                     .build(),
@@ -200,7 +194,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testReadAndWrite() {
 
-        if (GLOBAL_ENDPOINT != null) {
+        if (TestCommon.GLOBAL_ENDPOINT != null) {
 
             this.keyspaceName = "readWriteDCv2";
 
@@ -215,26 +209,28 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         }
     }
 
-    private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
-        return DriverConfigLoader.programmaticBuilder().withClass(
-            DefaultDriverOption.RETRY_POLICY_CLASS,
-            DefaultRetryPolicy.class);
-    }
-
     private CqlSession connect(DriverConfigLoader configLoader) {
 
-        final Collection<EndPoint> endpoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
-            GLOBAL_ENDPOINT,
-            PORT)));
+        final Matcher address = TestCommon.HOSTNAME_AND_PORT.matcher(TestCommon.GLOBAL_ENDPOINT);
+        assertThat(address.matches()).isTrue();
+
+        final Collection<EndPoint> endPoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
+            address.group("hostname"),
+            Integer.parseUnsignedInt(address.group("port")))));
 
         this.session = CqlSession.builder()
             .withAuthCredentials(USERNAME, PASSWORD)
             .withConfigLoader(configLoader)
-            .addContactEndPoints(endpoints)
+            .addContactEndPoints(endPoints)
             .build();
 
-        System.out.println("Connected to session: " + this.session.getName());
         return this.session;
+    }
+
+    private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
+        return DriverConfigLoader.programmaticBuilder().withClass(
+            DefaultDriverOption.RETRY_POLICY_CLASS,
+            DefaultRetryPolicy.class);
     }
 
     private void testAllStatements() {

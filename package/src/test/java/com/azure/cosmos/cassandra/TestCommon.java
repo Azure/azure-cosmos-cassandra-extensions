@@ -11,6 +11,8 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 
+import java.util.regex.Pattern;
+
 import static java.lang.String.format;
 
 public final class TestCommon {
@@ -21,21 +23,18 @@ public final class TestCommon {
 
     // region Fields
 
-    static final String[] CONTACT_POINTS = { getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.contactPoint",
-        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
-        "localhost") };
+    static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.globalEndpoint",
+        "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
+        "localhost:9042");
+
+    static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
     // TODO (DANOBLE) what does the cassandra api return for the local datacenter name when it is hosted by the emulator
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
         "");
-
-    static final int PORT = Short.parseShort(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.port",
-        "AZURE_COSMOS_CASSANDRA_PORT",
-        "9042"));
 
     static final String USERNAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.username",
