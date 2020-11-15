@@ -24,7 +24,7 @@ public final class TestCommon {
     // region Fields
 
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.globalEndpoint",
+        "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
         "localhost:9042");
 

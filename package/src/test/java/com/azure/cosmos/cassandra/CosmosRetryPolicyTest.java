@@ -73,7 +73,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     // region Fields
 
     static final String LOCAL_DATACENTER = TestCommon.getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.localDatacenter",
+        "azure.cosmos.cassandra.local-datacenter",
         "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
         "localhost");
 
