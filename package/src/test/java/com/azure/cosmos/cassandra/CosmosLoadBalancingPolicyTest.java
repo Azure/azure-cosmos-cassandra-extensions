@@ -66,12 +66,12 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
     // region Fields
 
     static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.readDatacenter",
+        "azure.cosmos.cassandra.read-datacenter",
         "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
         "localhost");
 
     static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.writeDatacenter",
+        "azure.cosmos.cassandra.write-datacenter",
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
 
