@@ -26,6 +26,7 @@ import org.testng.annotations.Test;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.regex.Matcher;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
@@ -33,6 +34,7 @@ import static com.azure.cosmos.cassandra.TestCommon.HOSTNAME_AND_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.display;
+import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 
@@ -78,7 +80,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
     private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicy.Option.FIXED_BACKOFF_TIME.getDefaultValue();
     private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicy.Option.GROWING_BACKOFF_TIME.getDefaultValue();
-    private static final String KEYSPACE_NAME = "downgrading";
+    private static final String KEYSPACE_NAME = "downgrading_" + UUID.randomUUID().toString().replace("-", "");
     private static final int MAX_RETRIES = CosmosRetryPolicy.Option.MAX_RETRIES.getDefaultValue();
     private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT = 30_0000;
@@ -151,6 +153,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     @AfterClass
     public void close() {
         if (this.session != null && !this.session.isClosed()) {
+            this.session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
             this.session.close();
         }
     }
