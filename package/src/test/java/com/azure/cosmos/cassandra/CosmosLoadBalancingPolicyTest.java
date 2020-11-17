@@ -77,10 +77,11 @@ public class CosmosLoadBalancingPolicyTest {
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
 
+    private static final String KEYSPACE_NAME_SUFFIX = "_" + UUID.randomUUID().toString().replace("-", "");
     private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT = 300_000;
 
-    private String keyspaceName = "downgrading";
+    private String keyspaceName;
 
     // endregion
 
@@ -92,7 +93,7 @@ public class CosmosLoadBalancingPolicyTest {
 
         if (GLOBAL_ENDPOINT != null) {
 
-            this.keyspaceName = "globalAndRead";
+            this.keyspaceName = "globalAndRead" + KEYSPACE_NAME_SUFFIX;
 
             DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
                 .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
@@ -101,11 +102,7 @@ public class CosmosLoadBalancingPolicyTest {
                 .build();
 
             try (CqlSession session = this.connect(configLoader)) {
-                try {
-                    this.testAllStatements(session);
-                } finally {
-                    this.cleanUp(session);
-                }
+                this.testAllStatements(session);
             }
         }
     }
@@ -116,7 +113,7 @@ public class CosmosLoadBalancingPolicyTest {
 
         if (GLOBAL_ENDPOINT != null) {
 
-            this.keyspaceName = "globalOnly";
+            this.keyspaceName = "globalOnly" + KEYSPACE_NAME_SUFFIX;
 
             final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
                 .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
@@ -125,11 +122,7 @@ public class CosmosLoadBalancingPolicyTest {
                 .build();
 
             try (CqlSession session = this.connect(configLoader)) {
-                try {
-                    this.testAllStatements(session);
-                } finally {
-                    this.cleanUp(session);
-                }
+                this.testAllStatements(session);
             }
         }
     }
@@ -190,7 +183,7 @@ public class CosmosLoadBalancingPolicyTest {
 
         if (GLOBAL_ENDPOINT != null) {
 
-            this.keyspaceName = "readWriteDCv2";
+            this.keyspaceName = "readWriteDCv2" + KEYSPACE_NAME_SUFFIX;
 
             DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
                 .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, "")
@@ -199,11 +192,7 @@ public class CosmosLoadBalancingPolicyTest {
                 .build();
 
             try (CqlSession session = this.connect(driverConfigLoader)) {
-                try {
-                    this.testAllStatements(session);
-                } finally {
-                    this.cleanUp(session);
-                }
+                this.testAllStatements(session);
             }
         }
     }
@@ -241,110 +230,116 @@ public class CosmosLoadBalancingPolicyTest {
 
     private void testAllStatements(CqlSession session) {
 
-        assertThatCode(() ->
-            TestCommon.createSchema(session, this.keyspaceName, this.TABLE_NAME)
-        ).doesNotThrowAnyException();
+        try {
 
-        // SimpleStatements
+            assertThatCode(() ->
+                TestCommon.createSchema(session, this.keyspaceName, TABLE_NAME)
+            ).doesNotThrowAnyException();
 
-        session.execute(SimpleStatement.newInstance(format(
-            "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
-            this.keyspaceName,
-            this.TABLE_NAME)));
+            // SimpleStatements
 
-        session.execute(SimpleStatement.newInstance(format(
-            "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
-            this.keyspaceName,
-            this.TABLE_NAME)));
+            session.execute(SimpleStatement.newInstance(format(
+                "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
+                this.keyspaceName,
+                TABLE_NAME)));
 
-        session.execute(SimpleStatement.newInstance(format(
-            "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
-                + "toTimestamp(now())",
-            this.keyspaceName,
-            this.TABLE_NAME)));
+            session.execute(SimpleStatement.newInstance(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
+                this.keyspaceName,
+                TABLE_NAME)));
 
-        session.execute(SimpleStatement.newInstance(format(
-            "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
-            this.keyspaceName,
-            this.TABLE_NAME)));
+            session.execute(SimpleStatement.newInstance(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
+                    + "toTimestamp(now())",
+                this.keyspaceName,
+                TABLE_NAME)));
 
-        // Built statements
+            session.execute(SimpleStatement.newInstance(format(
+                "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
+                this.keyspaceName,
+                TABLE_NAME)));
 
-        final LocalDate date = LocalDate.of(2016, 6, 30);
-        final Instant timestamp = Instant.now();
-        final UUID uuid = UUID.randomUUID();
+            // Built statements
 
-        Select select = QueryBuilder.selectFrom(this.keyspaceName, this.TABLE_NAME)
-            .all()
-            .whereColumn("sensor_id").isEqualTo(literal(uuid))
-            .whereColumn("date").isEqualTo(literal(date))
-            .whereColumn("timestamp").isEqualTo(literal(timestamp));
+            final LocalDate date = LocalDate.of(2016, 6, 30);
+            final Instant timestamp = Instant.now();
+            final UUID uuid = UUID.randomUUID();
 
-        session.execute(select.build());
+            Select select = QueryBuilder.selectFrom(this.keyspaceName, TABLE_NAME)
+                .all()
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        Insert insert = QueryBuilder.insertInto(this.keyspaceName, this.TABLE_NAME)
-            .value("sensor_id", literal(uuid))
-            .value("date", literal(date))
-            .value("timestamp", literal(timestamp));
+            session.execute(select.build());
 
-        session.execute(insert.build());
+            Insert insert = QueryBuilder.insertInto(this.keyspaceName, TABLE_NAME)
+                .value("sensor_id", literal(uuid))
+                .value("date", literal(date))
+                .value("timestamp", literal(timestamp));
 
-        Update update = QueryBuilder.update(this.keyspaceName, this.TABLE_NAME)
-            .setColumn("value", literal(1.0))
-            .whereColumn("sensor_id").isEqualTo(literal(uuid))
-            .whereColumn("date").isEqualTo(literal(date))
-            .whereColumn("timestamp").isEqualTo(literal(timestamp));
+            session.execute(insert.build());
 
-        session.execute(update.build());
+            Update update = QueryBuilder.update(this.keyspaceName, TABLE_NAME)
+                .setColumn("value", literal(1.0))
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, this.TABLE_NAME)
-            .whereColumn("sensor_id").isEqualTo(literal(uuid))
-            .whereColumn("date").isEqualTo(literal(date))
-            .whereColumn("timestamp").isEqualTo(literal(timestamp));
+            session.execute(update.build());
 
-        session.execute(delete.build());
+            Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, TABLE_NAME)
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        // BoundStatements
+            session.execute(delete.build());
 
-        PreparedStatement preparedStatement = session.prepare(format(
-            "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
-            this.keyspaceName,
-            this.TABLE_NAME));
+            // BoundStatements
 
-        BoundStatement boundStatement = preparedStatement.bind(uuid, date);
-        session.execute(boundStatement);
+            PreparedStatement preparedStatement = session.prepare(format(
+                "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
+                this.keyspaceName,
+                TABLE_NAME));
 
-        preparedStatement = session.prepare(format(
-            "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
-            this.keyspaceName,
-            this.TABLE_NAME));
+            BoundStatement boundStatement = preparedStatement.bind(uuid, date);
+            session.execute(boundStatement);
 
-        boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        session.execute(boundStatement);
+            preparedStatement = session.prepare(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
+                this.keyspaceName,
+                TABLE_NAME));
 
-        preparedStatement = session.prepare(format(
-            "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-            this.keyspaceName,
-            this.TABLE_NAME));
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
 
-        boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        session.execute(boundStatement);
+            preparedStatement = session.prepare(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                this.keyspaceName,
+                TABLE_NAME));
 
-        preparedStatement = session.prepare(format(
-            "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-            this.keyspaceName,
-            this.TABLE_NAME));
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
 
-        boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        session.execute(boundStatement);
+            preparedStatement = session.prepare(format(
+                "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                this.keyspaceName,
+                TABLE_NAME));
 
-        // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
 
-        BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
-            .add(boundStatement)
-            .add(boundStatement);
+            // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
 
-        session.execute(batchStatement);
+            BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
+                .add(boundStatement)
+                .add(boundStatement);
+
+            session.execute(batchStatement);
+
+        } finally {
+            this.cleanUp(session);
+        }
     }
 
     // endregion
