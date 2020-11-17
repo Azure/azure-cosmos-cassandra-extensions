@@ -1,7 +1,6 @@
-# Maven
-# Build your Java project and run tests with Apache Maven.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+# azure-cosmos-cassandra-extensions build pipeline
+# Builds and runs tests with Apache Maven.
+# Reference: https://docs.microsoft.com/azure/devops/pipelines/languages/java
 
 trigger:
 - main
@@ -34,4 +33,10 @@ jobs:
       jdkArchitectureOption: 'x64'
       publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      goals: 'package'
+    goals: 'help:active-profiles package'
+    options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
+      -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
+      -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
+      -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
+      -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
+      -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
