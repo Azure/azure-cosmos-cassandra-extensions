@@ -22,7 +22,8 @@ import com.datastax.oss.driver.api.querybuilder.update.Update;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
-import org.testng.annotations.AfterTest;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
@@ -62,7 +63,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
+public class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
@@ -76,33 +77,16 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
 
+    private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT = 300_000;
 
-    private final String tableName = "sensor_data";
     private String keyspaceName = "downgrading";
-    private CqlSession session;
 
     // endregion
 
     // region Methods
 
-    @AfterTest
-    public void cleanUp() {
-        if (this.session != null && !this.session.isClosed()) {
-            this.session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
-            this.close();
-        }
-    }
-
-    /**
-     * Closes the session and the cluster.
-     */
-    public void close() {
-        if (this.session != null) {
-            this.session.close();
-        }
-    }
-
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointAndReadDatacenter() {
 
@@ -113,15 +97,20 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
                 .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
                 .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
-                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, null)
+                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, "")
                 .build();
 
-            try (CqlSession ignored = this.connect(configLoader)) {
-                this.testAllStatements();
+            try (CqlSession session = this.connect(configLoader)) {
+                try {
+                    this.testAllStatements(session);
+                } finally {
+                    this.cleanUp(session);
+                }
             }
         }
     }
 
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
 
@@ -131,12 +120,16 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
 
             final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
                 .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
-                .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, null)
-                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, null)
+                .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, "")
+                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, "")
                 .build();
 
-            try (CqlSession ignored = this.connect(configLoader)) {
-                this.testAllStatements();
+            try (CqlSession session = this.connect(configLoader)) {
+                try {
+                    this.testAllStatements(session);
+                } finally {
+                    this.cleanUp(session);
+                }
             }
         }
     }
@@ -191,6 +184,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testReadAndWrite() {
 
@@ -199,13 +193,17 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             this.keyspaceName = "readWriteDCv2";
 
             DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, null)
+                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, "")
                 .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
                 .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
                 .build();
 
-            try (CqlSession ignored = this.connect(driverConfigLoader)) {
-                this.testAllStatements();
+            try (CqlSession session = this.connect(driverConfigLoader)) {
+                try {
+                    this.testAllStatements(session);
+                } finally {
+                    this.cleanUp(session);
+                }
             }
         }
     }
@@ -214,7 +212,12 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
 
     // region Privates
 
-    private CqlSession connect(DriverConfigLoader configLoader) {
+    private void cleanUp(@NonNull CqlSession session) {
+        session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
+    }
+
+    @NonNull
+    private CqlSession connect(@NonNull DriverConfigLoader configLoader) {
 
         final Matcher address = TestCommon.HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
         assertThat(address.matches()).isTrue();
@@ -223,13 +226,11 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             address.group("hostname"),
             Integer.parseUnsignedInt(address.group("port")))));
 
-        this.session = CqlSession.builder()
+        return CqlSession.builder()
             .withAuthCredentials(USERNAME, PASSWORD)
             .withConfigLoader(configLoader)
             .addContactEndPoints(endPoints)
             .build();
-
-        return this.session;
     }
 
     private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
@@ -238,34 +239,34 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             DefaultRetryPolicy.class);
     }
 
-    private void testAllStatements() {
+    private void testAllStatements(CqlSession session) {
 
         assertThatCode(() ->
-            TestCommon.createSchema(this.session, this.keyspaceName, this.tableName)
+            TestCommon.createSchema(session, this.keyspaceName, this.TABLE_NAME)
         ).doesNotThrowAnyException();
 
         // SimpleStatements
 
-        this.session.execute(SimpleStatement.newInstance(format(
+        session.execute(SimpleStatement.newInstance(format(
             "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
             this.keyspaceName,
-            this.tableName)));
+            this.TABLE_NAME)));
 
-        this.session.execute(SimpleStatement.newInstance(format(
+        session.execute(SimpleStatement.newInstance(format(
             "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
             this.keyspaceName,
-            this.tableName)));
+            this.TABLE_NAME)));
 
-        this.session.execute(SimpleStatement.newInstance(format(
+        session.execute(SimpleStatement.newInstance(format(
             "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
                 + "toTimestamp(now())",
             this.keyspaceName,
-            this.tableName)));
+            this.TABLE_NAME)));
 
-        this.session.execute(SimpleStatement.newInstance(format(
+        session.execute(SimpleStatement.newInstance(format(
             "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
             this.keyspaceName,
-            this.tableName)));
+            this.TABLE_NAME)));
 
         // Built statements
 
@@ -273,69 +274,69 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
         final Instant timestamp = Instant.now();
         final UUID uuid = UUID.randomUUID();
 
-        Select select = QueryBuilder.selectFrom(this.keyspaceName, this.tableName)
+        Select select = QueryBuilder.selectFrom(this.keyspaceName, this.TABLE_NAME)
             .all()
             .whereColumn("sensor_id").isEqualTo(literal(uuid))
             .whereColumn("date").isEqualTo(literal(date))
             .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        this.session.execute(select.build());
+        session.execute(select.build());
 
-        Insert insert = QueryBuilder.insertInto(this.keyspaceName, this.tableName)
+        Insert insert = QueryBuilder.insertInto(this.keyspaceName, this.TABLE_NAME)
             .value("sensor_id", literal(uuid))
             .value("date", literal(date))
             .value("timestamp", literal(timestamp));
 
-        this.session.execute(insert.build());
+        session.execute(insert.build());
 
-        Update update = QueryBuilder.update(this.keyspaceName, this.tableName)
+        Update update = QueryBuilder.update(this.keyspaceName, this.TABLE_NAME)
             .setColumn("value", literal(1.0))
             .whereColumn("sensor_id").isEqualTo(literal(uuid))
             .whereColumn("date").isEqualTo(literal(date))
             .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        this.session.execute(update.build());
+        session.execute(update.build());
 
-        Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, this.tableName)
+        Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, this.TABLE_NAME)
             .whereColumn("sensor_id").isEqualTo(literal(uuid))
             .whereColumn("date").isEqualTo(literal(date))
             .whereColumn("timestamp").isEqualTo(literal(timestamp));
 
-        this.session.execute(delete.build());
+        session.execute(delete.build());
 
         // BoundStatements
 
-        PreparedStatement preparedStatement = this.session.prepare(format(
+        PreparedStatement preparedStatement = session.prepare(format(
             "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
             this.keyspaceName,
-            this.tableName));
+            this.TABLE_NAME));
 
         BoundStatement boundStatement = preparedStatement.bind(uuid, date);
-        this.session.execute(boundStatement);
+        session.execute(boundStatement);
 
-        preparedStatement = this.session.prepare(format(
+        preparedStatement = session.prepare(format(
             "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
             this.keyspaceName,
-            this.tableName));
+            this.TABLE_NAME));
 
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        this.session.execute(boundStatement);
+        session.execute(boundStatement);
 
-        preparedStatement = this.session.prepare(format(
+        preparedStatement = session.prepare(format(
             "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
             this.keyspaceName,
-            this.tableName));
+            this.TABLE_NAME));
 
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        this.session.execute(boundStatement);
+        session.execute(boundStatement);
 
-        preparedStatement = this.session.prepare(format(
+        preparedStatement = session.prepare(format(
             "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
             this.keyspaceName,
-            this.tableName));
+            this.TABLE_NAME));
 
         boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        this.session.execute(boundStatement);
+        session.execute(boundStatement);
 
         // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
 
@@ -343,7 +344,7 @@ public class CosmosLoadBalancingPolicyTest implements AutoCloseable {
             .add(boundStatement)
             .add(boundStatement);
 
-        this.session.execute(batchStatement);
+        session.execute(batchStatement);
     }
 
     // endregion

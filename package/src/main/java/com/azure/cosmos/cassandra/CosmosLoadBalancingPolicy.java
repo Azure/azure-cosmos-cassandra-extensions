@@ -25,6 +25,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
@@ -277,7 +278,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private static boolean isReadRequest(String query) {
-        return query.toLowerCase().startsWith("select");
+        return query.toLowerCase(Locale.ROOT).startsWith("select");
     }
 
     private static boolean isReadRequest(Request request) {
@@ -305,31 +306,33 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return;
         }
 
-        CopyOnWriteArrayList<Node> oldLocalDcHosts = this.writeLocalDcNodes;
-        CopyOnWriteArrayList<Node> oldRemoteDcHosts = this.remoteDcNodes;
+        CopyOnWriteArrayList<Node> oldLocalDcNodes = this.writeLocalDcNodes;
+        CopyOnWriteArrayList<Node> oldRemoteDcNodes = this.remoteDcNodes;
 
         List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
-        CopyOnWriteArrayList<Node> localDcHosts = new CopyOnWriteArrayList<>();
-        CopyOnWriteArrayList<Node> remoteDcHosts = new CopyOnWriteArrayList<>();
+        CopyOnWriteArrayList<Node> localDcNodes = new CopyOnWriteArrayList<>();
+        CopyOnWriteArrayList<Node> remoteDcNodes = new CopyOnWriteArrayList<>();
 
-        for (Node node : oldLocalDcHosts) {
-            if (localAddresses.contains(this.getAddress(node))) {
-                localDcHosts.addIfAbsent(node);
-            } else {
-                remoteDcHosts.addIfAbsent(node);
+        if (this.writeLocalDcNodes != null) {
+            for (Node node : oldLocalDcNodes) {
+                if (localAddresses.contains(this.getAddress(node))) {
+                    localDcNodes.addIfAbsent(node);
+                } else {
+                    remoteDcNodes.addIfAbsent(node);
+                }
             }
         }
 
-        for (Node node : oldRemoteDcHosts) {
+        for (Node node : oldRemoteDcNodes) {
             if (localAddresses.contains(this.getAddress(node))) {
-                localDcHosts.addIfAbsent(node);
+                localDcNodes.addIfAbsent(node);
             } else {
-                remoteDcHosts.addIfAbsent(node);
+                remoteDcNodes.addIfAbsent(node);
             }
         }
 
-        this.writeLocalDcNodes = localDcHosts;
-        this.remoteDcNodes = remoteDcHosts;
+        this.writeLocalDcNodes = localDcNodes;
+        this.remoteDcNodes = remoteDcNodes;
     }
 
     // endregion

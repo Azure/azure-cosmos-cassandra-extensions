@@ -68,8 +68,6 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
  */
 public class CosmosRetryPolicyTest implements AutoCloseable {
 
-    String foo = "cosmos-cassandra-1.cassandra.cosmos.azure.com:10350";
-
     // region Fields
 
     static final String LOCAL_DATACENTER = TestCommon.getPropertyOrEnvironmentVariable(

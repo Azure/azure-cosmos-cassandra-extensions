@@ -199,26 +199,39 @@
           </execution>
         </executions>
       </plugin>
+      <!-- This plugin scans reports on bugs in the code -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.1.4</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs</artifactId>
+            <version>4.1.4</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <effort>max</effort>
+          <threshold>Low</threshold>
+          <xmlOutput>true</xmlOutput>
+          <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
+          <!--excludeFilterFile>spotbugs/spotbugs-exclude.xml</excludeFilterFile-->
+          <failOnError>true</failOnError>
+          <includeTests>true</includeTests>
+          <fork>true</fork>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
-
-  <reporting>
-    <plugins>
-      <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
-        <configuration>
-          <effort>Max</effort>
-          <threshold>Low</threshold>
-          <!--includeFilterFile>whizbang/lib-filter.xml</includeFilterFile>-->
-        </configuration>
-      </plugin>
-    </plugins>
-  </reporting>
 
   <profiles>
     <!-- Skip module-info.java on Java 8 -->
