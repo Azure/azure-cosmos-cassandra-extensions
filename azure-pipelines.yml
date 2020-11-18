@@ -1,4 +1,4 @@
-# azure-cosmos-cassandra-extensions build pipeline
+# azure-cosmos-cassandra-driver-4-extensions build pipeline
 # Builds and runs tests with Apache Maven.
 # Reference: https://docs.microsoft.com/azure/devops/pipelines/languages/java
 
