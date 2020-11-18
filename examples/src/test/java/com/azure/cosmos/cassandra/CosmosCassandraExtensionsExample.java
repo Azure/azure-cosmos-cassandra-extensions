@@ -14,23 +14,28 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.session.Session;
 import org.testng.annotations.Test;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import static java.lang.String.format;
 import static org.testng.AssertJUnit.fail;
 
 /**
- * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
+ * This example illustrates use of the Cosmos extensions for the Datastax Java Driver for Apache Cassandra® 4.X.
+ * <p>
+ * TODO (DANOBLE) describe configuration entries for CosmosLoadBalancingPolicy and CosmosRetryPolicy as defined in
+ *   package/src/main/resources/reference.conf and specified in examples/src/test/resources/application.conf.
  * <p>
  * Preconditions:
  * <ul>
- * <li>An Apache Cassandra cluster is running and accessible through the configuration specified by application.conf.
+ * <li>An Apache Cassandra cluster is running and accessible through the configuration specified in application.conf.
  * </ul>
  * <p>
  * Side effects:
  * <ol>
- * <li>Creates a new keyspace {@code downgrading} in the cluster, with replication factor 3. If a
- * keyspace with this name already exists, it will be reused;
- * <li>Creates a new table {@code downgrading.sensor_data}. If a table with that name exists
- * already, it will be reused;
+ * <li>Creates a new keyspace {@code downgrading} in the cluster, with replication factor 3. If a keyspace with this
+ * name already exists, it will be reused;
+ * <li>Creates a new table {@code downgrading.sensor_data}. If a table with that name exists already, it will be reused;
  * <li>Inserts a few rows, downgrading the consistency level if the operation fails;
  * <li>Queries the table, downgrading the consistency level if the operation fails;
  * <li>Displays the results on the console.
@@ -38,15 +43,17 @@ import static org.testng.AssertJUnit.fail;
  * <p>
  * Notes:
  * <ul>
- * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy}
- * does; feel free to adapt it to your application needs;
- * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on
- * idempotence for more information.
+ * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy} does; feel free to adapt
+ * it to your application needs;
+ * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
+ * information.
  * </ul>
  *
- * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
+ * @see <a href="https://docs.datastax.com/en/developer/java-driver/4.9/manual/">DataStax Java Driver manual</a>
+ * @see CosmosLoadBalancingPolicy
+ * @see CosmosRetryPolicy
  */
-public class CosmosLoadBalancingPolicyExample implements AutoCloseable {
+public class CosmosCassandraExtensionsExample implements AutoCloseable {
 
     // region Fields
 
@@ -82,7 +89,16 @@ public class CosmosLoadBalancingPolicyExample implements AutoCloseable {
             }
 
         } catch (Exception error) {
-            fail(format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
+
+            final StringWriter stringWriter = new StringWriter();
+            final PrintWriter printWriter = new PrintWriter(stringWriter);
+
+            error.printStackTrace(printWriter);
+
+            fail(format("connect failed with %s: %s\n%s",
+                error.getClass().getCanonicalName(),
+                error.getMessage(),
+                stringWriter.toString()));
         }
     }
 
