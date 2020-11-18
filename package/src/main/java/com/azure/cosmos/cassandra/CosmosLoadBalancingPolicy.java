@@ -349,6 +349,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         GLOBAL_ENDPOINT("global-endpoint", (option, profile) -> {
                 final String value = profile.getString(option, option.getDefaultValue());
+                assert value != null;
                 final int index = value.lastIndexOf(':');
                 return index < 0 ? value : value.substring(0, index);
             },

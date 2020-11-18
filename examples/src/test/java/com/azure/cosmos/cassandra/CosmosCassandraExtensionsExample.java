@@ -89,16 +89,9 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
             }
 
         } catch (Exception error) {
-
             final StringWriter stringWriter = new StringWriter();
-            final PrintWriter printWriter = new PrintWriter(stringWriter);
-
-            error.printStackTrace(printWriter);
-
-            fail(format("connect failed with %s: %s\n%s",
-                error.getClass().getCanonicalName(),
-                error.getMessage(),
-                stringWriter.toString()));
+            error.printStackTrace(new PrintWriter(stringWriter));
+            fail(format("connect failed with %s", stringWriter));
         }
     }
 
