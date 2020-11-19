@@ -18,7 +18,7 @@ import static java.lang.String.format;
 public final class TestCommon {
 
     private TestCommon() {
-        // this is a static class
+        throw new UnsupportedOperationException();
     }
 
     // region Fields
@@ -30,7 +30,7 @@ public final class TestCommon {
 
     static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
-    // TODO (DANOBLE) what does the cassandra api return for the local datacenter name when it is hosted by the emulator
+    // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the emulator?
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
