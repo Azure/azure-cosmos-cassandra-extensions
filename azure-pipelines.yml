@@ -9,7 +9,7 @@ pr:
 - main
 
 jobs:
-- job: Build for Java 8
+- job: Build_for_Java_8
   strategy:
     matrix:
       Linux:
