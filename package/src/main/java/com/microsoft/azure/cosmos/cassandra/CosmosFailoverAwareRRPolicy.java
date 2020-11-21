@@ -1,21 +1,5 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
@@ -28,7 +12,13 @@ import com.google.common.collect.AbstractIterator;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -44,10 +34,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Deprecated
 public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
+
     private final AtomicInteger index = new AtomicInteger();
     private long lastDnsLookupTime = Long.MIN_VALUE;
-    private String globalContactPoint;
-    private int dnsExpirationInSeconds;
+    private final String globalContactPoint;
+    private final int dnsExpirationInSeconds;
     private Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> hosts;
     private InetAddress[] localAddresses = null;
 
@@ -56,7 +47,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
      * Optionally specify dnsExpirationInSeconds, which defaults to 60 seconds.
      * @param globalContactPoint is the contact point of the account (e.g, *.cassandra.cosmos.azure.com)
      */
-    public CosmosFailoverAwareRRPolicy(String globalContactPoint) {
+    public CosmosFailoverAwareRRPolicy(final String globalContactPoint) {
         this(globalContactPoint, 60);
     }
 
@@ -65,17 +56,17 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
      * @param globalContactPoint is the contact point of the account (e.g, *.cassandra.cosmos.azure.com)
      * @param dnsExpirationInSeconds specifies the dns refresh interval, which is 60 seconds by default.
      */
-    public CosmosFailoverAwareRRPolicy(String globalContactPoint, int dnsExpirationInSeconds) {
+    public CosmosFailoverAwareRRPolicy(final String globalContactPoint, final int dnsExpirationInSeconds) {
         this.globalContactPoint = globalContactPoint;
         this.dnsExpirationInSeconds = dnsExpirationInSeconds;
     }
 
     @Override
-    public void init(Cluster cluster, Collection<Host> hosts) {
-        CopyOnWriteArrayList<Host> localDcAddresses = new CopyOnWriteArrayList<Host>();
-        CopyOnWriteArrayList<Host> remoteDcAddresses = new CopyOnWriteArrayList<Host>();
-        List<InetAddress> localAddressesFromLookup = Arrays.asList(getLocalAddresses());
-        for (Host host : hosts) {
+    public void init(final Cluster cluster, final Collection<Host> hosts) {
+        final CopyOnWriteArrayList<Host> localDcAddresses = new CopyOnWriteArrayList<Host>();
+        final CopyOnWriteArrayList<Host> remoteDcAddresses = new CopyOnWriteArrayList<Host>();
+        final List<InetAddress> localAddressesFromLookup = Arrays.asList(this.getLocalAddresses());
+        for (final Host host : hosts) {
             if (localAddressesFromLookup.contains(host.getAddress())) {
                 localDcAddresses.add(host);
             } else {
@@ -96,8 +87,8 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
      * @return the HostDistance to {@code host}.
      */
     @Override
-    public HostDistance distance(Host host) {
-        if (Arrays.asList(getLocalAddresses()).contains(host.getAddress())) {
+    public HostDistance distance(final Host host) {
+        if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
             return HostDistance.LOCAL;
         }
 
@@ -118,68 +109,49 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
      *     which one to use as failover, etc...
      */
     @Override
-    public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
-        Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = getHosts();
+    public Iterator<Host> newQueryPlan(final String loggedKeyspace, final Statement statement) {
+
+        final Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> allHosts = this.getHosts();
         final List<Host> localHosts = cloneList(allHosts.getKey());
         final List<Host> remoteHosts = cloneList(allHosts.getValue());
-        final int startIdx = index.getAndIncrement();
+        final int startIdx = this.index.getAndIncrement();
 
         // Overflow protection; not theoretically thread safe but should be good enough
         if (startIdx > Integer.MAX_VALUE - 10000) {
-            index.set(0);
+            this.index.set(0);
         }
 
-        return new AbstractIterator<Host>() {
-            private int idx = startIdx;
-            private int remainingLocal = localHosts.size();
-            private int remainingRemote = remoteHosts.size();
-
-            protected Host computeNext() {
-                while (true) {
-                    if (remainingLocal > 0) {
-                        remainingLocal--;
-                        return localHosts.get(idx ++ % localHosts.size());
-                    }
-
-                    if (remainingRemote > 0) {
-                        remainingRemote--;
-                        return remoteHosts.get(idx ++ % remoteHosts.size());
-                    }
-
-                    return endOfData();
-                }
-            }
-        };
+        return new HostIterator(startIdx, localHosts, remoteHosts);
     }
 
     @Override
-    public void onUp(Host host) {
+    public void onUp(final Host host) {
         if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
-            hosts.getKey().addIfAbsent(host);
+            this.hosts.getKey().addIfAbsent(host);
             return;
         }
 
-        hosts.getValue().addIfAbsent(host);
+        this.hosts.getValue().addIfAbsent(host);
     }
 
     @Override
-    public void onDown(Host host) {
+    public void onDown(final Host host) {
         if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
-            hosts.getKey().remove(host);
+            this.hosts.getKey().remove(host);
             return;
         }
 
-        hosts.getValue().remove(host);
+        this.hosts.getValue().remove(host);
     }
 
     @Override
-    public void onAdd(Host host) {
-        onUp(host);
+    public void onAdd(final Host host) {
+        this.onUp(host);
     }
 
     @Override
-    public void onRemove(Host host) {
-        onDown(host);
+    public void onRemove(final Host host) {
+        this.onDown(host);
     }
 
     public void close() {
@@ -187,17 +159,18 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     }
 
     @SuppressWarnings("unchecked")
-    private static CopyOnWriteArrayList<Host> cloneList(CopyOnWriteArrayList<Host> list) {
+    private static CopyOnWriteArrayList<Host> cloneList(final CopyOnWriteArrayList<Host> list) {
         return (CopyOnWriteArrayList<Host>) list.clone();
     }
 
     private InetAddress[] getLocalAddresses() {
-        if (this.localAddresses == null || dnsExpired()) {
+
+        if (this.localAddresses == null || this.dnsExpired()) {
             try {
-                this.localAddresses = InetAddress.getAllByName(globalContactPoint);
+                this.localAddresses = InetAddress.getAllByName(this.globalContactPoint);
                 this.lastDnsLookupTime = System.currentTimeMillis()/1000;
             }
-            catch (UnknownHostException ex) {
+            catch (final UnknownHostException ex) {
                 // dns entry may be temporarily unavailable
                 if (this.localAddresses == null) {
                     throw new IllegalArgumentException("The dns could not resolve the globalContactPoint the first time.");
@@ -209,18 +182,25 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
     }
 
     private Map.Entry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>> getHosts() {
-        if (hosts != null && !dnsExpired()) {
-            return hosts;
+
+        if (this.hosts != null && !this.dnsExpired()) {
+            return this.hosts;
         }
 
-        CopyOnWriteArrayList<Host> oldLocalDcHosts = this.hosts.getKey();
-        CopyOnWriteArrayList<Host> newLocalDcHosts = this.hosts.getValue();
+        if (this.hosts == null) {
+            throw new IllegalStateException("expected non-null "
+                + CosmosFailoverAwareRRPolicy.class.getName()
+                + ".hosts");
+        }
 
-        List<InetAddress> localAddresses = Arrays.asList(getLocalAddresses());
-        CopyOnWriteArrayList<Host> localDcHosts = new CopyOnWriteArrayList<Host>();
-        CopyOnWriteArrayList<Host> remoteDcHosts = new CopyOnWriteArrayList<Host>();
+        final CopyOnWriteArrayList<Host> oldLocalDcHosts = this.hosts.getKey();
+        final CopyOnWriteArrayList<Host> newLocalDcHosts = this.hosts.getValue();
 
-        for (Host host: oldLocalDcHosts) {
+        final List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
+        final CopyOnWriteArrayList<Host> localDcHosts = new CopyOnWriteArrayList<>();
+        final CopyOnWriteArrayList<Host> remoteDcHosts = new CopyOnWriteArrayList<>();
+
+        for (final Host host: oldLocalDcHosts) {
             if (localAddresses.contains(host.getAddress())) {
                 localDcHosts.addIfAbsent(host);
             } else {
@@ -228,7 +208,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
             }
         }
 
-        for (Host host: newLocalDcHosts) {
+        for (final Host host: newLocalDcHosts) {
             if (localAddresses.contains(host.getAddress())) {
                 localDcHosts.addIfAbsent(host);
             } else {
@@ -236,10 +216,47 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
             }
         }
 
-        return hosts = new AbstractMap.SimpleEntry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>>(localDcHosts, remoteDcHosts);
+        return this.hosts = new AbstractMap.SimpleEntry<>(localDcHosts, remoteDcHosts);
     }
 
     private boolean dnsExpired() {
-        return System.currentTimeMillis()/1000 > lastDnsLookupTime + dnsExpirationInSeconds;
+        return System.currentTimeMillis()/1000 > this.lastDnsLookupTime + this.dnsExpirationInSeconds;
+    }
+
+    private static class HostIterator extends AbstractIterator<Host> {
+
+        private final List<? extends Host> localHosts;
+        private final List<? extends Host> remoteHosts;
+        private int idx;
+        private int remainingLocal;
+        private int remainingRemote;
+
+        public HostIterator(
+            final int startIdx, final List<? extends Host> localHosts, final List<? extends Host> remoteHosts) {
+
+            this.localHosts = localHosts;
+            this.remoteHosts = remoteHosts;
+            this.idx = startIdx;
+            this.remainingLocal = localHosts.size();
+            this.remainingRemote = remoteHosts.size();
+        }
+
+        @SuppressWarnings("LoopStatementThatDoesntLoop")
+        protected Host computeNext() {
+
+            while (true) {
+                if (this.remainingLocal > 0) {
+                    this.remainingLocal--;
+                    return this.localHosts.get(this.idx++ % this.localHosts.size());
+                }
+
+                if (this.remainingRemote > 0) {
+                    this.remainingRemote--;
+                    return this.remoteHosts.get(this.idx++ % this.remoteHosts.size());
+                }
+
+                return this.endOfData();
+            }
+        }
     }
 }

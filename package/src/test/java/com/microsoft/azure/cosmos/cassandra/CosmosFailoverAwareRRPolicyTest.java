@@ -1,21 +1,5 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
@@ -25,7 +9,13 @@ import com.datastax.driver.core.Session;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import org.testng.annotations.Test;
 
-import static org.assertj.core.api.Assertions.fail;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.PASSWORD;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.PORT;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.close;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.display;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * This test illustrates use of the {@link CosmosFailoverAwareRRPolicy} class.
@@ -54,67 +44,70 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public class CosmosFailoverAwareRRPolicyTest {
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
-    public void cosmosLBPBasicTest() {
-        LoadBalancingPolicy loadBalancingPolicy = new CosmosFailoverAwareRRPolicy(TestCommon.CONTACT_POINTS[0]);
+    // region Fields
+
+    private static final String KEYSPACE_NAME = "downgrading";
+    private static final String TABLE_NAME = "sensor_data";
+    private static final int TIMEOUT = 30000;
+
+    private Session session;
+
+    // endregion
+
+    // region Methods
+
+    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
+    public void canIntegrateWithCosmos() {
+
+        final LoadBalancingPolicy loadBalancingPolicy = new CosmosFailoverAwareRRPolicy(CONTACT_POINTS[0]);
+
+        assertThatCode(() -> this.connect(loadBalancingPolicy)).doesNotThrowAnyException();
 
         try {
-            this.connect(TestCommon.CONTACT_POINTS, TestCommon.PORT, loadBalancingPolicy);
-        } catch (Exception error) {
-            fail(String.format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
-        }
+            assertThatCode(() ->
+                TestCommon.createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
+            ).doesNotThrowAnyException();
 
-        try {
-            try {
-                TestCommon.createSchema(session, keyspaceName, tableName);
-            } catch (Exception error) {
-                fail(String.format("createSchema failed: %s", error));
-            }
-            try {
-                TestCommon.write(session, keyspaceName, tableName);
+            assertThatCode(() ->
+                TestCommon.write(this.session, KEYSPACE_NAME, TABLE_NAME)
+            ).doesNotThrowAnyException();
 
-            } catch (Exception error) {
-                fail(String.format("write failed: %s", error));
-            }
-            try {
-                ResultSet rows = TestCommon.read(session, keyspaceName, tableName);
-                TestCommon.display(rows);
-
-            } catch (Exception error) {
-                fail(String.format("read failed: %s", error));
-            }
+            assertThatCode(() -> {
+                final ResultSet rows = TestCommon.read(this.session, KEYSPACE_NAME, TABLE_NAME);
+                display(rows);
+            }).doesNotThrowAnyException();
 
         } finally {
-            this.close();
+            close(this.session);
         }
     }
 
-    private static final int TIMEOUT = 30000;
+    // endregion
 
-    private Cluster cluster;
-    private Session session;
-    private String keyspaceName = "downgrading";
-    private String tableName = "sensor_data";
+    // region Privates
 
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param contactPoints the contact points to use.
-     * @param port          the port to use.
      */
-    private void connect(String[] contactPoints, int port, LoadBalancingPolicy loadBalancingPolicy) {
-        cluster = Cluster.builder().addContactPoints(contactPoints).withPort(port).withLoadBalancingPolicy(loadBalancingPolicy).build();
-        System.out.println("Connected to cluster: " + cluster.getClusterName());
-        session = cluster.connect();
-    }
+    private void connect(final LoadBalancingPolicy loadBalancingPolicy) {
 
-    /**
-     * Closes the session and the cluster.
-     */
-    private void close() {
-        if (session != null) {
-            session.close();
+        final Cluster cluster = Cluster.builder()
+            .withLoadBalancingPolicy(loadBalancingPolicy)  // under test
+            .withCredentials(USERNAME, PASSWORD)
+            .addContactPoints(CONTACT_POINTS)
+            .withPort(PORT)
+            .withSSL()
+            .build();
+
+        try {
+            this.session = cluster.connect();
+            System.out.println("Connected to cluster: " + cluster.getClusterName());
+        } catch (final Throwable error) {
             cluster.close();
+            throw error;
         }
     }
+
+    // endregion
 }

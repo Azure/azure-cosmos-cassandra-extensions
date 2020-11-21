@@ -1,37 +1,30 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.Session;
+import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
-import com.datastax.driver.core.policies.RetryPolicy;
 import org.testng.annotations.Test;
-
-import java.net.InetSocketAddress;
 
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.PASSWORD;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.PORT;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.close;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.createSchema;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.write;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
@@ -68,78 +61,7 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public class CosmosRetryPolicyTest {
 
-    private String keyspaceName = "downgrading";
-    private String tableName = "sensor_data";
-
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
-    public void canIntegrateWithCosmos() {
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT, FIXED_BACK_OFF_TIME, GROWING_BACK_OFF_TIME);
-
-        try {
-            this.connect(TestCommon.CONTACT_POINTS, TestCommon.PORT, retryPolicy);
-
-        } catch (Exception error) {
-            fail(String.format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
-        }
-
-        try {
-            try {
-                TestCommon.createSchema(session, keyspaceName, tableName);
-
-            } catch (Exception error) {
-                fail(String.format("createSchema failed: %s", error));
-            }
-            try {
-                TestCommon.write(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
-
-            } catch (Exception error) {
-                fail(String.format("write failed: %s", error));
-            }
-            try {
-                ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
-                TestCommon.display(rows);
-
-            } catch (Exception error) {
-                fail(String.format("read failed: %s", error));
-            }
-
-        } finally {
-            this.close();
-        }
-    }
-
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
-    public void canRetryOverloadedExceptionWithFixedBackOffTime() {
-
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
-        retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
-    }
-
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
-    public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
-
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
-        retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
-    }
-
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
-    public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
-
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
-        retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
-    }
-    
-    @Test(groups = {"unit", "checkintest"}, timeOut = TIMEOUT)
-    public void canRetryOnConnectionException() {
-        DriverException driverException = new ConnectionException (new InetSocketAddress(TestCommon.CONTACT_POINTS[0], TestCommon.PORT), "retry");
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
-        Statement statement = new SimpleStatement("SELECT * FROM retry");
-
-        for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
-            RetryDecision retryDecision = retryPolicy.onRequestError(statement, CONSISTENCY_LEVEL, driverException, retryNumber);
-            assertThat(retryDecision.getType()).isEqualTo(RetryDecision.Type.RETRY);
-        }
-    }
+    // region Fields
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ONE;
     private static final int FIXED_BACK_OFF_TIME = 5000;
@@ -147,52 +69,136 @@ public class CosmosRetryPolicyTest {
     private static final int MAX_RETRY_COUNT = 5;
     private static final int TIMEOUT = 300000;
 
-    private Cluster cluster;
     private Session session;
 
-    /**
-     * Tests a retry operation
-     */
-    private void retry(CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryPolicy.RetryDecision.Type expectedRetryDecisionType) {
+    // endregion
 
-        DriverException driverException = new OverloadedException(new InetSocketAddress(TestCommon.CONTACT_POINTS[0], TestCommon.PORT), "retry");
-        Statement statement = new SimpleStatement("SELECT * FROM retry");
-        ConsistencyLevel consistencyLevel = CONSISTENCY_LEVEL;
+    // region Methods
 
-        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
+    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
+    public void canIntegrateWithCosmos() {
 
-            long expectedDuration = 1000000 * (retryPolicy.getMaxRetryCount() == -1 ? FIXED_BACK_OFF_TIME : retryNumber * GROWING_BACK_OFF_TIME);
-            long startTime = System.nanoTime();
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(
+            MAX_RETRY_COUNT,
+            FIXED_BACK_OFF_TIME,
+            GROWING_BACK_OFF_TIME);
 
-            RetryDecision retryDecision = retryPolicy.onRequestError(statement, consistencyLevel, driverException, retryNumber);
+        assertThatCode(() -> this.connect(retryPolicy)).doesNotThrowAnyException();
 
-            long duration = System.nanoTime() - startTime;
+        try {
 
-            assertThat(retryDecision.getType()).isEqualTo(expectedRetryDecisionType);
-            assertThat((double) duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
+            final String keyspaceName = "downgrading";
+            final String tableName = "sensor_data";
+
+            assertThatCode(() ->
+                createSchema(this.session, keyspaceName, tableName)
+            ).doesNotThrowAnyException();
+
+            assertThatCode(() ->
+                write(this.session, CONSISTENCY_LEVEL, keyspaceName, tableName)
+            ).doesNotThrowAnyException();
+
+            assertThatCode(() -> {
+                final ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, keyspaceName, tableName);
+                TestCommon.display(rows);
+            }).doesNotThrowAnyException();
+
+        } finally {
+            close(this.session);
         }
     }
+
+    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    public void canRetryOnConnectionException() {
+
+        final DriverException driverException = new ConnectionException(null, "retry");
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        final Statement statement = new SimpleStatement("SELECT * FROM retry");
+
+        for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
+            final RetryDecision retryDecision = retryPolicy.onRequestError(statement,
+                CONSISTENCY_LEVEL,
+                driverException,
+                retryNumber);
+            assertThat(retryDecision.getType()).isEqualTo(RetryDecision.Type.RETRY);
+        }
+    }
+
+    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    public void canRetryOverloadedExceptionWithFixedBackOffTime() {
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
+        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
+    }
+
+    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
+    }
+
+    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        this.retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
+    }
+
+    // endregion
+
+    // region Privates
 
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param contactPoints the contact points to use.
-     * @param port          the port to use.
      */
-    private void connect(String[] contactPoints, int port, CosmosRetryPolicy retryPolicy) {
+    private void connect(final CosmosRetryPolicy retryPolicy) {
 
-        cluster = Cluster.builder().addContactPoints(contactPoints).withPort(port).withRetryPolicy(retryPolicy).build();
-        System.out.println("Connected to cluster: " + cluster.getClusterName());
-        session = cluster.connect();
+        final Cluster cluster = Cluster.builder()
+            .withRetryPolicy(retryPolicy)  // under test
+            .withCredentials(USERNAME, PASSWORD)
+            .addContactPoints(CONTACT_POINTS)
+            .withPort(PORT)
+            .withSSL()
+            .build();
+
+        try {
+            this.session = cluster.connect();
+            System.out.println("Connected to cluster: " + cluster.getClusterName());
+        } catch (final Throwable error) {
+            cluster.close();
+            throw error;
+        }
     }
 
     /**
-     * Closes the session and the cluster.
+     * Tests a retry operation
      */
-    private void close() {
-        if (session != null) {
-            session.close();
-            cluster.close();
+    private void retry(
+        final CosmosRetryPolicy retryPolicy,
+        final int retryNumberBegin,
+        final int retryNumberEnd,
+        final RetryDecision.Type expectedRetryDecisionType) {
+
+        final DriverException driverException = new OverloadedException(null, "retry");
+        final Statement statement = new SimpleStatement("SELECT * FROM retry");
+
+        for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
+
+            final long expectedDuration = 1000000 * (retryPolicy.getMaxRetryCount() == -1
+                ? FIXED_BACK_OFF_TIME
+                : (long)retryNumber * GROWING_BACK_OFF_TIME);
+            final long startTime = System.nanoTime();
+
+            final RetryDecision retryDecision = retryPolicy.onRequestError(statement,
+                CONSISTENCY_LEVEL,
+                driverException,
+                retryNumber);
+
+            final long duration = System.nanoTime() - startTime;
+
+            assertThat(retryDecision.getType()).isEqualTo(expectedRetryDecisionType);
+            assertThat((double)duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
         }
     }
+
+    // endregion
 }

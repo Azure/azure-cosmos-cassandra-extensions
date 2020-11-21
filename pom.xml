@@ -1,55 +1,182 @@
 <!--
- The MIT License (MIT)
- Copyright (c) 2018 Microsoft Corporation
-
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
-
- The above copyright notice and this permission notice shall be included in all
- copies or substantial portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- SOFTWARE.
+Copyright (c) Microsoft Corporation. All rights reserved.
+Licensed under the MIT License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
-  <name>Azure Cosmos Cassandra Extensions for Java</name>
-  <description>Extends the Cassandra driver with Azure Cosmos awareness features</description>
+
+  <name>Azure Cosmos Extensions for DataStax Java Driver 3 for Apache Cassandra</name>
+  <description>
+    Extends the DataStax Java Driver 3 for Apache Cassandra client library with Azure Cosmos awareness features.
+  </description>
+  <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
+
   <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
-  <url>https://docs.microsoft.com/en-us/azure/cosmos-db</url>
   <groupId>com.microsoft.azure</groupId>
-  <version>0.12.1</version>
   <packaging>pom</packaging>
+  <version>0.12.2</version>
+
+  <developers>
+    <developer>
+      <name>Azure Cosmos Cassandra API developers</name>
+      <email>azuredocumentdb@service.microsoft.com</email>
+      <organization>Microsoft Azure</organization>
+      <organizationUrl>
+        https://azure.microsoft.com/en-us/blog/dear-cassandra-developers-welcome-to-azure-cosmosdb/
+      </organizationUrl>
+    </developer>
+  </developers>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>http://www.opensource.org/licenses/mit-license.php</url>
+    </license>
+  </licenses>
+
   <modules>
     <module>package</module>
     <module>examples</module>
   </modules>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
     <javadoc.options/>
+    <!-- Main dependency version numbers -->
+    <version.cassandra-driver>3.10.2</version.cassandra-driver>
+    <!-- Test dependency version numbers -->
+    <version.assertj-core>3.18.0</version.assertj-core>
+    <version.log4j>2.13.3</version.log4j>
+    <version.slf4j-api>1.7.30</version.slf4j-api>
+    <version.testng>7.3.0</version.testng>
   </properties>
+
+  <scm>
+    <developerConnection>scm:git:git@github.com:Azure/azure-cosmos-cassandra-extensions.git</developerConnection>
+    <connection>scm:git:git@github.com:Azure/azure-cosmos-cassandra-extensions.git</connection>
+    <url>scm:git:https://github.com/Azure/azure-cosmos-cassandra-extensions</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>azure-cosmos-cassandra-extensions</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.datastax.cassandra</groupId>
+        <artifactId>cassandra-driver-core</artifactId>
+        <version>${version.cassandra-driver}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${version.log4j}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${version.log4j}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-slf4j-impl</artifactId>
+        <version>${version.log4j}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${version.assertj-core}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <scope>test</scope>
+        <version>${version.slf4j-api}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.testng</groupId>
+        <artifactId>testng</artifactId>
+        <version>${version.testng}</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.8.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>3.0.0-M1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-install-plugin</artifactId>
+          <version>3.0.0-M1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.2.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.0.0-M5</version>
+        </plugin>
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs</artifactId>
+          <version>4.1.4</version>
+        </plugin>
+        <plugin>
+          <!-- Documentation: https://spotbugs.github.io/spotbugs-maven-plugin/index.html -->
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>4.1.4</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <skipIfEmpty>true</skipIfEmpty>
+        </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>3.0.1</version>
         <inherited>true</inherited>
         <configuration>
           <quiet>true</quiet>
           <verbose>false</verbose>
           <sourceFileExcludes>
-            <sourceFileExclude>**/internal/**/*.java</sourceFileExclude>
+            <sourceFileExclude>**/implementation/**/*.java</sourceFileExclude>
           </sourceFileExcludes>
         </configuration>
         <executions>
@@ -62,7 +189,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
         <executions>
           <execution>
@@ -73,28 +199,149 @@
           </execution>
         </executions>
       </plugin>
+      <!-- This plugin scans reports on bugs in the code -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.1.4</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs</artifactId>
+            <version>4.1.4</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <effort>max</effort>
+          <threshold>Low</threshold>
+          <xmlOutput>true</xmlOutput>
+          <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
+          <!--excludeFilterFile>spotbugs/spotbugs-exclude.xml</excludeFilterFile-->
+          <failOnError>true</failOnError>
+          <includeTests>true</includeTests>
+          <fork>true</fork>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
-  <dependencyManagement>
-    <dependencies/>
-  </dependencyManagement>
-  <licenses>
-    <license>
-      <name>MIT License</name>
-      <url>http://www.opensource.org/licenses/mit-license.php</url>
-    </license>
-  </licenses>
-  <scm>
-    <connection>scm:githttps://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</connection>
-    <developerConnection>scm:git:https://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</developerConnection>
-    <url>hhttps://msdata.visualstudio.com/DefaultCollection/CosmosDB/_git/azure-cosmos-cassandra-extensions</url>
-  </scm>
-  <developers>
-    <developer>
-      <name>Azure Cosmos Developer Platform developers</name>
-      <email>docdbdevplatdevs@microsoft.com</email>
-      <organization>Microsoft</organization>
-      <organizationUrl>http://www.microsoft.com/</organizationUrl>
-    </developer>
-  </developers>
+
+  <profiles>
+
+    <!-- Setup for Java 8, excludes module-info.java -->
+    <profile>
+      <id>java-8</id>
+      <activation>
+        <jdk>[1.8,9)</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+      </properties>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+            <filtering>true</filtering>
+          </resource>
+        </resources>
+        <plugins>
+          <!-- Don't compile module-info.java, see java-lts profile -->
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.8.1</version>
+            <configuration>
+              <source>1.8</source>
+              <target>1.8</target>
+              <excludes>
+                <exclude>module-info.java</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+          <!-- Avoid errors from module-info -->
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.1.1</version>
+            <configuration>
+              <sourceFileExcludes>
+                <sourceFileExclude>module-info.java</sourceFileExclude>
+              </sourceFileExcludes>
+              <quiet>true</quiet>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+      <reporting>
+        <plugins>
+          <!-- Avoid errors from module-info -->
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.1.1</version>
+            <configuration>
+              <sourceFileExcludes>
+                <sourceFileExclude>module-info.java</sourceFileExclude>
+              </sourceFileExcludes>
+              <quiet>true</quiet>
+            </configuration>
+          </plugin>
+        </plugins>
+      </reporting>
+    </profile>
+
+    <!-- Setup for Java LTS+, currently JDK 11 and up -->
+    <profile>
+      <id>java-lts</id>
+      <activation>
+        <jdk>[11,)</jdk>
+      </activation>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+            <filtering>true</filtering>
+          </resource>
+        </resources>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.8.1</version>
+            <configuration>
+              <source>11</source>
+              <target>11</target>
+            </configuration>
+            <executions>
+              <!-- Compile first with module-info for Java LTS -->
+              <execution>
+                <id>default-compile</id>
+                <configuration>
+                  <release>11</release>
+                </configuration>
+              </execution>
+              <!-- Compile next without module-info for Java 8 -->
+              <execution>
+                <id>base-compile</id>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <release>8</release>
+                  <excludes>
+                    <exclude>module-info.java</exclude>
+                  </excludes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
 </project>
