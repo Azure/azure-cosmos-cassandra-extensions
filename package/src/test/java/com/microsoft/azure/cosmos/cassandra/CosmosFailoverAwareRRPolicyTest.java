@@ -56,6 +56,7 @@ public class CosmosFailoverAwareRRPolicyTest {
 
     // region Methods
 
+    @SuppressWarnings("deprecation")
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 

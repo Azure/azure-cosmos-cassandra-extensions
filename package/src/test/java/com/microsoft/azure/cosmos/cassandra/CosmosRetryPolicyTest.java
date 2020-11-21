@@ -78,10 +78,11 @@ public class CosmosRetryPolicyTest {
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(
-            MAX_RETRY_COUNT,
-            FIXED_BACK_OFF_TIME,
-            GROWING_BACK_OFF_TIME);
+        final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder()
+            .withMaxRetryCount(MAX_RETRY_COUNT)
+            .withFixedBackOffTimeInMillis(FIXED_BACK_OFF_TIME)
+            .withGrowingBackOffTimeInMillis(GROWING_BACK_OFF_TIME)
+            .build();
 
         assertThatCode(() -> this.connect(retryPolicy)).doesNotThrowAnyException();
 
@@ -111,8 +112,8 @@ public class CosmosRetryPolicyTest {
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void canRetryOnConnectionException() {
 
+        final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         final DriverException driverException = new ConnectionException(null, "retry");
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
         final Statement statement = new SimpleStatement("SELECT * FROM retry");
 
         for (int retryNumber = 0; retryNumber < MAX_RETRY_COUNT; retryNumber++) {
@@ -126,19 +127,19 @@ public class CosmosRetryPolicyTest {
 
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
+        final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(-1).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
     }
 
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
     }
 
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRY_COUNT);
+        final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         this.retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
     }
 

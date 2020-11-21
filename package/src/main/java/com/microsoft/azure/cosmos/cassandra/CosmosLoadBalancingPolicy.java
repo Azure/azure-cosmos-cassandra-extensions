@@ -93,7 +93,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (host.getDatacenter().equals(this.writeDC)) {
                 return HostDistance.LOCAL;
             }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
+        } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getEndPoint().resolve().getAddress())) {
             return HostDistance.LOCAL;
         }
 
@@ -120,7 +120,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
 
             if ((!this.writeDC.isEmpty() && host.getDatacenter().equals(this.writeDC))
-                || dnsLookupAddresses.contains(host.getAddress())) {
+                || dnsLookupAddresses.contains(host.getEndPoint().resolve().getAddress())) {
                 writeLocalDCAddresses.add(host);
             } else {
                 remoteDCAddresses.add(host);
@@ -185,7 +185,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (host.getDatacenter().equals(this.writeDC)) {
                 this.writeLocalDcHosts.remove(host);
             }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
+        } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getEndPoint().resolve().getAddress())) {
             this.writeLocalDcHosts.remove(host);
         } else {
             this.remoteDcHosts.remove(host);
@@ -211,7 +211,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (host.getDatacenter().equals(this.writeDC)) {
                 this.writeLocalDcHosts.addIfAbsent(host);
             }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getAddress())) {
+        } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getEndPoint().resolve().getAddress())) {
             this.writeLocalDcHosts.addIfAbsent(host);
         } else {
             this.remoteDcHosts.addIfAbsent(host);
@@ -294,7 +294,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (this.writeLocalDcHosts != null) {
             for (final Host host : oldLocalDcHosts) {
-                if (localAddresses.contains(host.getAddress())) {
+                if (localAddresses.contains(host.getEndPoint().resolve().getAddress())) {
                     localDcHosts.addIfAbsent(host);
                 } else {
                     remoteDcHosts.addIfAbsent(host);
@@ -303,7 +303,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         for (final Host host : oldRemoteDcHosts) {
-            if (localAddresses.contains(host.getAddress())) {
+            if (localAddresses.contains(host.getEndPoint().resolve().getAddress())) {
                 localDcHosts.addIfAbsent(host);
             } else {
                 remoteDcHosts.addIfAbsent(host);

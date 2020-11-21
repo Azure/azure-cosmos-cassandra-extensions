@@ -11,15 +11,17 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
-import org.testng.AssertJUnit;
+import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
 import org.testng.annotations.Test;
 
 import java.text.SimpleDateFormat;
+import java.util.UUID;
 
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
 import static com.datastax.driver.core.ConsistencyLevel.QUORUM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
@@ -32,24 +34,23 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * </ul>
  * <p>
  * Side effects:
- *
  * <ol>
- * <li>Creates a new keyspace {@code downgrading} in the cluster, with replication factor 3. If a
- * keyspace with this name already exists, it will be reused;
- * <li>Creates a new table {@code downgrading.sensor_data}. If a table with that name exists
- * already, it will be reused;
- * <li>Inserts a few rows, downgrading the consistency level if the operation fails;
- * <li>Queries the table, downgrading the consistency level if the operation fails;
+ * <li>Creates a new keyspace {@link #KEYSPACE_NAME} in the cluster, with replication factor 3. If a keyspace with this
+ * name already exists, it will be reused.
+ * <li>Creates a new table {@code KEYSPACE_NAME + ".sensor_data"}. If a table with that name exists already, it will be
+ * reused.
+ * <li>Inserts a few rows, downgrading the consistency level if the operation fails.
+ * <li>Queries the table, downgrading the consistency level if the operation fails.
  * <li>Displays the results on the console.
+ * <li>Drops {@link #KEYSPACE_NAME}.
  * </ol>
  * <p>
  * Notes:
- *
  * <ul>
- * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy}
- * does; feel free to adapt it to your application needs;
- * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on
- * idempotence for more information.
+ * <li>The downgrading logic here is similar to what {@link DowngradingConsistencyRetryPolicy} does; feel free to adapt
+ * it to your application needs;
+ * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
+ * information.
  * </ul>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
@@ -87,6 +88,7 @@ public class CosmosCassandraExtensionsExample {
     private static final String[] CONTACT_POINTS;
     private static final int FIXED_BACK_OFF_TIME = 5000;
     private static final int GROWING_BACK_OFF_TIME = 1000;
+    private static final String KEYSPACE_NAME = "downgrading_" + UUID.randomUUID().toString().replace("-", "");
     private static final int MAX_RETRY_COUNT = 5;
     private static final int PORT;
     private static final int TIMEOUT = 30000;
@@ -104,7 +106,7 @@ public class CosmosCassandraExtensionsExample {
             value = Integer.parseUnsignedInt(port);
             assertThat(value).isGreaterThanOrEqualTo(0).isLessThanOrEqualTo(65535);
         } catch (final Throwable error) {
-            AssertJUnit.fail("expected integer port number in range [0, 65535], not " + port);
+            fail("expected integer port number in range [0, 65535], not " + port);
         }
 
         CONTACT_POINTS = new String[] { hostname };
@@ -144,12 +146,16 @@ public class CosmosCassandraExtensionsExample {
     // Privates
 
     /**
-     * Closes the session and the cluster.
+     * Drops {@link #KEYSPACE_NAME} and closes the {@link #session} and the cluster.
      */
     private void close() {
         if (this.session != null && !this.session.isClosed()) {
-            this.session.close();
-            this.session.getCluster().close();
+            try {
+                this.session.execute("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME);
+            } finally {
+                this.session.close();
+                this.session.getCluster().close();
+            }
         }
     }
 
@@ -190,19 +196,21 @@ public class CosmosCassandraExtensionsExample {
      */
     private void createSchema() {
 
-        this.session.execute(
-            "CREATE KEYSPACE IF NOT EXISTS downgrading WITH replication "
-                + "= {'class':'SimpleStrategy', 'replication_factor':3}");
+        this.session.execute("CREATE KEYSPACE IF NOT EXISTS "
+            + KEYSPACE_NAME
+            + " WITH replication "
+            + "= {'class': 'SimpleStrategy', 'replication_factor': 3}");
 
-        this.session.execute(
-            "CREATE TABLE IF NOT EXISTS downgrading.sensor_data ("
-                + "sensor_id uuid,"
-                + "date date,"
-                + // emulates bucketing by day
-                "timestamp timestamp,"
-                + "value double,"
-                + "PRIMARY KEY ((sensor_id,date),timestamp)"
-                + ")");
+        this.session.execute("CREATE TABLE IF NOT EXISTS "
+            + KEYSPACE_NAME
+            + ".sensor_data ("
+            + "sensor_id uuid,"
+            + "date date,"
+            + // emulates bucketing by day
+            "timestamp timestamp,"
+            + "value double,"
+            + "PRIMARY KEY ((sensor_id,date),timestamp)"
+            + ")");
     }
 
     /**
@@ -274,15 +282,16 @@ public class CosmosCassandraExtensionsExample {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
-        final Statement statement =
-            new SimpleStatement(
-                "SELECT sensor_id, date, timestamp, value "
-                    + "FROM downgrading.sensor_data "
-                    + "WHERE "
-                    + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
-                    + "date = '2018-02-26' AND "
-                    + "timestamp > '2018-02-26+01:00'")
-                .setConsistencyLevel(consistencyLevel);
+        final Statement statement = new SimpleStatement(
+            "SELECT sensor_id, date, timestamp, value "
+                + "FROM "
+                + KEYSPACE_NAME
+                + ".sensor_data "
+                + "WHERE "
+                + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
+                + "date = '2018-02-26' AND "
+                + "timestamp > '2018-02-26+01:00'")
+            .setConsistencyLevel(consistencyLevel);
 
         final ResultSet rows = this.session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
@@ -299,30 +308,33 @@ public class CosmosCassandraExtensionsExample {
         System.out.printf("Writing at %s%n", consistencyLevel);
 
         final BatchStatement batch = new BatchStatement(UNLOGGED)
-            .add(new SimpleStatement(
-                "INSERT INTO downgrading.sensor_data "
-                    + "(sensor_id, date, timestamp, value) "
-                    + "VALUES ("
-                    + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                    + "'2018-02-26',"
-                    + "'2018-02-26T13:53:46.345+01:00',"
-                    + "2.34)"))
-            .add(new SimpleStatement(
-                "INSERT INTO downgrading.sensor_data "
-                    + "(sensor_id, date, timestamp, value) "
-                    + "VALUES ("
-                    + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                    + "'2018-02-26',"
-                    + "'2018-02-26T13:54:27.488+01:00',"
-                    + "2.47)"))
-            .add(new SimpleStatement(
-                "INSERT INTO downgrading.sensor_data "
-                    + "(sensor_id, date, timestamp, value) "
-                    + "VALUES ("
-                    + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                    + "'2018-02-26',"
-                    + "'2018-02-26T13:56:33.739+01:00',"
-                    + "2.52)"));
+            .add(new SimpleStatement("INSERT INTO "
+                + KEYSPACE_NAME
+                + ".sensor_data "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:53:46.345+01:00',"
+                + "2.34)"))
+            .add(new SimpleStatement("INSERT INTO "
+                + KEYSPACE_NAME
+                + ".sensor_data "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:54:27.488+01:00',"
+                + "2.47)"))
+            .add(new SimpleStatement("INSERT INTO "
+                + KEYSPACE_NAME
+                + ".sensor_data "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:56:33.739+01:00',"
+                + "2.52)"));
 
         batch.setConsistencyLevel(consistencyLevel);
         this.session.execute(batch);
