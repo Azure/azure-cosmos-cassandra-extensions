@@ -137,7 +137,7 @@ public class CosmosCassandraExtensionsExample {
             }).doesNotThrowAnyException();
 
         } finally {
-            this.close();
+            this.cleanUp();
         }
     }
 
@@ -146,9 +146,9 @@ public class CosmosCassandraExtensionsExample {
     // Privates
 
     /**
-     * Drops {@link #KEYSPACE_NAME} and closes the {@link #session} and the cluster.
+     * Drops {@link #KEYSPACE_NAME} and closes the {@link #session} and the {@linkplain Cluster cluster} it references.
      */
-    private void close() {
+    private void cleanUp() {
         if (this.session != null && !this.session.isClosed()) {
             try {
                 this.session.execute("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME);

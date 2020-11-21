@@ -14,6 +14,8 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
 import org.testng.annotations.Test;
 
+import java.util.UUID;
+
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
@@ -88,7 +90,7 @@ public class CosmosRetryPolicyTest {
 
         try {
 
-            final String keyspaceName = "downgrading";
+            final String keyspaceName = "downgrading_" + UUID.randomUUID().toString().replace("-", "");
             final String tableName = "sensor_data";
 
             assertThatCode(() ->

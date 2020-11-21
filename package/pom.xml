@@ -10,7 +10,7 @@ Licensed under the MIT License.
 
   <artifactId>azure-cosmos-cassandra-extensions</artifactId>
   <packaging>jar</packaging>
-  <version>${project.parent.version}</version>
+  <version>0.13.0</version>
 
   <parent>
     <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>

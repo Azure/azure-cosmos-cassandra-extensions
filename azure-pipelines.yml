@@ -8,11 +8,8 @@ trigger:
 pr:
 - main
 
-pool:
-  vmImage: 'ubuntu-latest'
-
 jobs:
-- job: Build
+- job: Build for Java 8
   strategy:
     matrix:
       Linux:
@@ -27,16 +24,94 @@ jobs:
   - task: Maven@3
     inputs:
       mavenPomFile: 'pom.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      mavenOptions: '-Xmx3072m'
+      goals: 'help:active-profiles install'
+      options: '-DskipTests'
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'package/pom.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      mavenOptions: '-Xmx3072m'
+      goals: 'verify'
+      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
+        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
+        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
+        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
+        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
+        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'examples/pom.xml'
       mavenOptions: '-Xmx3072m'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
+      goals: 'verify'
+      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
+        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
+        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
+        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
+        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
+        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
       publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
-    goals: 'help:active-profiles package'
-    options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
-      -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
-      -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
-      -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
-      -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
-      -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+- job: Build for Java 11
+  strategy:
+    matrix:
+      Linux:
+        ImageName: 'ubuntu-latest'
+      MacOS:
+        ImageName: 'macos-latest'
+      Windows:
+        ImageName: 'windows-latest'
+  pool:
+    vmImage: $(ImageName)
+  steps:
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'pom.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+      jdkArchitectureOption: 'x64'
+      mavenOptions: '-Xmx3072m'
+      goals: 'help:active-profiles install'
+      options: '-DskipTests'
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'package/pom.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+      jdkArchitectureOption: 'x64'
+      mavenOptions: '-Xmx3072m'
+      goals: 'verify'
+      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
+        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
+        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
+        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
+        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
+        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'examples/pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+      jdkArchitectureOption: 'x64'
+      goals: 'verify'
+      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
+        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
+        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
+        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
+        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
+        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
