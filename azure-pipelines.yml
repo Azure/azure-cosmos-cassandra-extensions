@@ -9,7 +9,7 @@ pr:
 - main
 
 jobs:
-- job: Build_for_Java_8
+- job: Build_with_Java_8
   strategy:
     matrix:
       Linux:
@@ -62,7 +62,7 @@ jobs:
         -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
       publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
-- job: Build for Java 11
+- job: Build_with_Java 11
   strategy:
     matrix:
       Linux:
