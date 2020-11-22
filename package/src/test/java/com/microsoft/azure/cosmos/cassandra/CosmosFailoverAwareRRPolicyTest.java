@@ -6,7 +6,6 @@ package com.microsoft.azure.cosmos.cassandra;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
-import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import org.testng.annotations.Test;
 
