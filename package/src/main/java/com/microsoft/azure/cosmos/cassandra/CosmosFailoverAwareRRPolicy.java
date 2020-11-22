@@ -23,8 +23,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @deprecated Please use CosmosLoadBalancingPolicy instead.
- * CosmosDB failover aware Round-robin load balancing policy.
+ * @deprecated Please use {@link CosmosLoadBalancingPolicy} instead.
+ * @since 0.12
+ * <p>
+ * Cosmos DB failover-aware round-robin load balancing policy.
+ * <p>
  * This policy allows the user to seamlessly failover the default write region.
  * This is very similar to DCAwareRoundRobinPolicy, with a difference that
  * it considers the nodes in the default write region at distance LOCAL.

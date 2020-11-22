@@ -4,7 +4,6 @@
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.driver.core.BatchStatement;
-import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
@@ -13,6 +12,7 @@ import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 
 import java.text.SimpleDateFormat;
+import java.util.UUID;
 
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
 import static java.lang.String.format;
@@ -21,15 +21,18 @@ import static org.testng.AssertJUnit.fail;
 
 public final class TestCommon {
 
-    static final String[] CONTACT_POINTS;
+    private TestCommon() {
+        throw new UnsupportedOperationException();
+    }
 
     // region Fields
+
+    static final String[] CONTACT_POINTS;
 
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
         "localhost:9042");
-
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
@@ -37,9 +40,19 @@ public final class TestCommon {
 
     static final int PORT;
 
+    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.read-datacenter",
+        "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
+        "");
+
     static final String USERNAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.username",
         "AZURE_COSMOS_CASSANDRA_USERNAME",
+        "");
+
+    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.write-datacenter",
+        "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "");
 
     static {
@@ -62,25 +75,20 @@ public final class TestCommon {
         PORT = value;
     }
 
-    private TestCommon() {
-        throw new UnsupportedOperationException();
-    }
-
     // endregion
 
     // region Methods
 
     /**
-     * Closes the given {@link Session}.
+     * Closes the given {@link Session} and its associated cluster after dropping the given {@code keyspaceName}.
      *
-     * @param session
+     * @param session      Session to be closed.
+     * @param keyspaceName Name of keyspace to be dropped.
      */
-    static void close(Session session) {
-
+    static void cleanUp(final Session session, final String keyspaceName) {
         if (session != null && !session.isClosed()) {
-            final Cluster cluster = session.getCluster();
             session.close();
-            cluster.close();
+            session.getCluster().close();
         }
     }
 
@@ -154,6 +162,10 @@ public final class TestCommon {
         return value;
     }
 
+    static ResultSet read(final Session session, final String keyspaceName, final String tableName) {
+        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
+    }
+
     /**
      * Queries data, retrying if necessary with a downgraded CL.
      *
@@ -182,8 +194,12 @@ public final class TestCommon {
         return rows;
     }
 
-    static ResultSet read(final Session session, final String keyspaceName, final String tableName) {
-        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
+    static String uniqueName(final String prefix) {
+        return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    static void write(final Session session, final String keyspaceName, final String tableName) {
+        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
     /**
@@ -238,10 +254,6 @@ public final class TestCommon {
 
         session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
-    }
-
-    static void write(final Session session, final String keyspaceName, final String tableName) {
-        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
     // endregion

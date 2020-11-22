@@ -10,6 +10,7 @@ import com.datastax.driver.core.LocalDate;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.querybuilder.Clause;
 import com.datastax.driver.core.querybuilder.Delete;
@@ -17,7 +18,6 @@ import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Select;
 import com.datastax.driver.core.querybuilder.Update;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
 import java.util.Date;
@@ -28,30 +28,72 @@ import static com.microsoft.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.PORT;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.READ_DATACENTER;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.WRITE_DATACENTER;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.cleanUp;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.createSchema;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
- *
- * <p>Preconditions:
- * <ul>
- * <li> A CosmosDB CassandraAPI account is required. It should have two regions: readDC (e.g, East US 2)
- * and writeDC (e.g, West US 2). globalEndpoint, username, and password fields should be populated.
- * <p>
- * <p>
+ * <h3>
+ * Preconditions:
+ * <ol>
+ * <li>A Cosmos DB Cassandra API account is required.
+ * <li>These system variables or--alternatively--environment variables must be set.
+ * <table>
+ * <thead>
+ * <tr>
+ * <th>System variable</th>
+ * <th>Environment variable</th>
+ * <th>Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>azure.cosmos.cassandra.global-endpoint</td>
+ * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
+ * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.username</td>
+ * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
+ * <td>Username for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.password</td>
+ * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
+ * <td>Password for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.read-datacenter</td>
+ * <td>AZURE_COSMOS_CASSANDRA_READ_DATACENTER</td>
+ * <td>Read datacenter name (e.g., "East US")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.write-datacenter</td>
+ * <td>AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER</td>
+ * <td>Write datacenter name (e.g., "West US")</td>
+ * </tr>
+ * </tbody>
+ * </table>
+ * </ol>
+ * <h3>
  * Side effects:
  * <ol>
- * <li>Creates a new keyspace {@code keyspaceName} in the cluster, with replication factor 3. If a
- * keyspace with this name already exists, it will be reused;
- * <li>Creates a new table {@code keyspaceName.tableName}. If a table with that name exists
- * already, it will be reused.
- * <li>Executes all types of Statement queries.
+ * <li>Creates a number of keyspaces in the cluster, each with replication factor 3. To prevent collisions especially
+ * during CI test runs, we generate keyspace names of the form <i><name></i><b>_</b><i></i><random-uuid></i>. Should a
+ * keyspace by the generated name already exists, it is reused.
+ * <li>Creates a table within each keyspace created or reused. If a table with a given name already exists, it is
+ * reused.
+ * <li>Executes all types of {@link Statement} queries.
+ * </li>The keyspaces created or reused are then dropped. This prevents keyspaces from accumulating with repeated test
+ * runs.
  * </ol>
- * <p>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
@@ -60,11 +102,6 @@ public class CosmosLoadBalancingPolicyTest {
     // region Fields
 
     private static final int TIMEOUT = 300000;
-    public String readDC = "East US 2";
-    public String writeDC = "West US 2";
-    private Cluster cluster;
-    private String keyspaceName;
-    private Session session;
 
     // endregion
 
@@ -72,35 +109,19 @@ public class CosmosLoadBalancingPolicyTest {
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testGlobalAndReadDC() {
-        if (!GLOBAL_ENDPOINT.isEmpty()) {
-            final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(GLOBAL_ENDPOINT)
-                .withReadDC(this.readDC)
-                .build();
-            this.connect(policy);
-            this.keyspaceName = "globalAndRead";
-            this.testAllStatements();
-        }
-    }
-
-    @AfterTest
-    public void cleanUp() {
-        if (this.session != null && !this.session.isClosed()) {
-            this.session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
-            this.close();
-        }
+        final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
+            .withGlobalEndpoint(GLOBAL_ENDPOINT)
+            .withReadDC(READ_DATACENTER)
+            .build();
+        this.testAllStatements(this.connect(policy), uniqueName("globalAndRead"));
     }
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
-        if (!GLOBAL_ENDPOINT.isEmpty()) {
-            this.keyspaceName = "globalOnly";
-            final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(GLOBAL_ENDPOINT)
-                .build();
-            this.connect(policy);
-            this.testAllStatements();
-        }
+        final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
+            .withGlobalEndpoint(GLOBAL_ENDPOINT)
+            .build();
+        this.testAllStatements(this.connect(policy), uniqueName("globalOnly"));
     }
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
@@ -111,22 +132,22 @@ public class CosmosLoadBalancingPolicyTest {
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withReadDC(this.readDC).build()
+            CosmosLoadBalancingPolicy.builder().withReadDC(READ_DATACENTER).build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withWriteDC(this.writeDC).build()
+            CosmosLoadBalancingPolicy.builder().withWriteDC(WRITE_DATACENTER).build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(GLOBAL_ENDPOINT).withWriteDC(this.writeDC).build()
+            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(GLOBAL_ENDPOINT).withWriteDC(WRITE_DATACENTER).build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
             CosmosLoadBalancingPolicy.builder()
                 .withGlobalEndpoint(GLOBAL_ENDPOINT)
-                .withReadDC(this.readDC)
-                .withWriteDC(this.writeDC)
+                .withReadDC(READ_DATACENTER)
+                .withWriteDC(WRITE_DATACENTER)
                 .build()
         ).isInstanceOf(IllegalArgumentException.class);
     }
@@ -134,15 +155,11 @@ public class CosmosLoadBalancingPolicyTest {
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testReadAndWrite() {
         if (!GLOBAL_ENDPOINT.isEmpty()) {
-
             final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-                .withReadDC(this.readDC)
-                .withWriteDC(this.writeDC)
+                .withReadDC(READ_DATACENTER)
+                .withWriteDC(WRITE_DATACENTER)
                 .build();
-
-            this.keyspaceName = "readWriteDCv2";
-            this.connect(policy);
-            this.testAllStatements();
+            this.testAllStatements(this.connect(policy), uniqueName("readWriteDCv2"));
         }
     }
 
@@ -150,128 +167,127 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
-    /**
-     * Closes the session and the cluster.
-     */
-    private void close() {
-        if (this.session != null) {
-            this.session.close();
-            this.cluster.close();
-        }
-    }
+    private Session connect(final LoadBalancingPolicy loadBalancingPolicy) {
 
-    private void connect(final LoadBalancingPolicy loadBalancingPolicy) {
-
-        this.cluster = Cluster.builder()
-            .withLoadBalancingPolicy(loadBalancingPolicy)  // under test
+        final Cluster cluster = Cluster.builder()
+            .withLoadBalancingPolicy(loadBalancingPolicy)
             .withCredentials(USERNAME, PASSWORD)
             .addContactPoints(CONTACT_POINTS)
             .withPort(PORT)
             .withSSL()
             .build();
 
-        System.out.println("Connected to cluster: " + this.cluster.getClusterName());
-        this.session = this.cluster.connect();
+        try {
+            return cluster.connect();
+        } catch (final Throwable error) {
+            cluster.close();
+            throw error;
+        }
     }
 
-    private void testAllStatements() {
+    private void testAllStatements(final Session session, final String keyspaceName) {
 
         final String tableName = "sensor_data";
 
-        assertThatCode(() -> createSchema(this.session, this.keyspaceName, tableName)).doesNotThrowAnyException();
+        try {
+            assertThatCode(() -> createSchema(session, keyspaceName, tableName)).doesNotThrowAnyException();
 
-        // SimpleStatements
+            // SimpleStatements
 
-        SimpleStatement simpleStatement = new SimpleStatement(format(
-            "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
-            this.keyspaceName,
-            tableName));
-        this.session.execute(simpleStatement);
+            SimpleStatement simpleStatement = new SimpleStatement(format(
+                "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
+                keyspaceName,
+                tableName));
+            session.execute(simpleStatement);
 
-        simpleStatement = new SimpleStatement(format(
-            "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
-            this.keyspaceName,
-            tableName));
-        this.session.execute(simpleStatement);
+            simpleStatement = new SimpleStatement(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
+                keyspaceName,
+                tableName));
+            session.execute(simpleStatement);
 
-        simpleStatement = new SimpleStatement(format(
-            "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
-                + "toTimestamp(now())",
-            this.keyspaceName,
-            tableName));
-        this.session.execute(simpleStatement);
+            simpleStatement = new SimpleStatement(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
+                    + "toTimestamp(now())",
+                keyspaceName,
+                tableName));
+            session.execute(simpleStatement);
 
-        simpleStatement = new SimpleStatement(format(
-            "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
-            this.keyspaceName,
-            tableName));
-        this.session.execute(simpleStatement);
+            simpleStatement = new SimpleStatement(format(
+                "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
+                keyspaceName,
+                tableName));
+            session.execute(simpleStatement);
 
-        // BuiltStatements
+            // BuiltStatements
 
-        final UUID uuid = UUID.randomUUID();
-        final LocalDate date = LocalDate.fromYearMonthDay(2016, 06, 30);
-        final Date timestamp = new Date();
+            final UUID uuid = UUID.randomUUID();
+            final LocalDate date = LocalDate.fromYearMonthDay(2016, 06, 30);
+            final Date timestamp = new Date();
 
-        final Clause pk1Clause = QueryBuilder.eq("sensor_id", uuid);
-        final Clause pk2Clause = QueryBuilder.eq("date", date);
-        final Clause ckClause = QueryBuilder.eq("timestamp", 1000);
+            final Clause pk1Clause = QueryBuilder.eq("sensor_id", uuid);
+            final Clause pk2Clause = QueryBuilder.eq("date", date);
+            final Clause ckClause = QueryBuilder.eq("timestamp", 1000);
 
-        final Select select = QueryBuilder.select()
-            .all()
-            .from(this.keyspaceName, tableName);
+            final Select select = QueryBuilder.select()
+                .all()
+                .from(keyspaceName, tableName);
 
-        select.where(pk1Clause).and(pk2Clause).and(ckClause);
-        this.session.execute(select);
+            select.where(pk1Clause).and(pk2Clause).and(ckClause);
+            session.execute(select);
 
-        final Insert insert = QueryBuilder.insertInto(this.keyspaceName, tableName);
-        insert.values(new String[] { "sensor_id", "date", "timestamp" }, new Object[] { uuid, date, 1000 });
-        this.session.execute(insert);
+            final Insert insert = QueryBuilder.insertInto(keyspaceName, tableName);
+            insert.values(new String[] { "sensor_id", "date", "timestamp" }, new Object[] { uuid, date, 1000 });
+            session.execute(insert);
 
-        final Update update = QueryBuilder.update(this.keyspaceName, tableName);
-        update.with(set("value", 1.0)).where(pk1Clause).and(pk2Clause).and(ckClause);
-        this.session.execute(update);
+            final Update update = QueryBuilder.update(keyspaceName, tableName);
+            update.with(set("value", 1.0)).where(pk1Clause).and(pk2Clause).and(ckClause);
+            session.execute(update);
 
-        final Delete delete = QueryBuilder.delete().from(this.keyspaceName, tableName);
-        delete.where(pk1Clause).and(pk2Clause).and(ckClause);
-        this.session.execute(delete);
+            final Delete delete = QueryBuilder.delete().from(keyspaceName, tableName);
+            delete.where(pk1Clause).and(pk2Clause).and(ckClause);
+            session.execute(delete);
 
-        // BoundStatements
+            // BoundStatements
 
-        PreparedStatement preparedStatement = this.session.prepare(format(
-            "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
-            this.keyspaceName,
-            tableName));
-        BoundStatement boundStatement = preparedStatement.bind(uuid, date);
-        this.session.execute(boundStatement);
+            PreparedStatement preparedStatement = session.prepare(format(
+                "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
+                keyspaceName,
+                tableName));
+            BoundStatement boundStatement = preparedStatement.bind(uuid, date);
+            session.execute(boundStatement);
 
-        preparedStatement = this.session.prepare(format(
-            "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
-            this.keyspaceName,
-            tableName));
-        boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        this.session.execute(boundStatement);
+            preparedStatement = session.prepare(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
+                keyspaceName,
+                tableName));
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
 
-        preparedStatement = this.session.prepare(format(
-            "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-            this.keyspaceName,
-            tableName));
-        boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        this.session.execute(boundStatement);
+            preparedStatement = session.prepare(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                keyspaceName,
+                tableName));
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
 
-        preparedStatement = this.session.prepare(format(
-            "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-            this.keyspaceName,
-            tableName));
-        boundStatement = preparedStatement.bind(uuid, date, timestamp);
-        this.session.execute(boundStatement);
+            preparedStatement = session.prepare(format(
+                "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                keyspaceName,
+                tableName));
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
 
-        // BatchStatement
+            // BatchStatement
 
-        final BatchStatement batchStatement = new BatchStatement(BatchStatement.Type.UNLOGGED)
-            .add(simpleStatement)
-            .add(boundStatement);
-        this.session.execute(batchStatement);
+            final BatchStatement batchStatement = new BatchStatement(BatchStatement.Type.UNLOGGED)
+                .add(simpleStatement)
+                .add(boundStatement);
+            session.execute(batchStatement);
+
+        } finally {
+            cleanUp(session, keyspaceName);
+        }
     }
 
     // endregion

@@ -11,7 +11,6 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
 import org.testng.annotations.Test;
 
 import java.text.SimpleDateFormat;
@@ -24,34 +23,60 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * This test illustrates use of the {@link CosmosRetryPolicy} class.
- *
- * <p>Preconditions:
- *
- * <ul>
- * <li>An Apache Cassandra cluster is running and accessible through the contacts points
- * identified by {@link #CONTACT_POINTS} and {@link #PORT}.
- * </ul>
- * <p>
+ * This example illustrates use of the {@link CosmosLoadBalancingPolicy} and {@link CosmosRetryPolicy} classes.
+ * <h3>
+ * Preconditions:
+ * <ol>
+ * <li>A Cosmos DB Cassandra API account is required.
+ * <li>These system variables or--alternatively--environment variables must be set.
+ * <table>
+ * <thead>
+ * <tr>
+ * <th>System variable</th>
+ * <th>Environment variable</th>
+ * <th>Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>azure.cosmos.cassandra.global-endpoint</td>
+ * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
+ * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.username</td>
+ * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
+ * <td>Username for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.password</td>
+ * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
+ * <td>Password for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.read-datacenter</td>
+ * <td>AZURE_COSMOS_CASSANDRA_READ_DATACENTER</td>
+ * <td>Read datacenter name (e.g., "East US")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.write-datacenter</td>
+ * <td>AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER</td>
+ * <td>Write datacenter name (e.g., "West US")</td>
+ * </tr>
+ * </tbody>
+ * </table>
+ * </ol>
+ * <h3>
  * Side effects:
  * <ol>
- * <li>Creates a new keyspace {@link #KEYSPACE_NAME} in the cluster, with replication factor 3. If a keyspace with this
- * name already exists, it will be reused.
- * <li>Creates a new table {@code KEYSPACE_NAME + ".sensor_data"}. If a table with that name exists already, it will be
+ * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
+ * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
+ * name already exists, it is reused.
+ * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
- * <li>Inserts a few rows, downgrading the consistency level if the operation fails.
- * <li>Queries the table, downgrading the consistency level if the operation fails.
- * <li>Displays the results on the console.
- * <li>Drops {@link #KEYSPACE_NAME}.
+ * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
+ * runs.
  * </ol>
- * <p>
- * Notes:
- * <ul>
- * <li>The downgrading logic here is similar to what {@link DowngradingConsistencyRetryPolicy} does; feel free to adapt
- * it to your application needs;
- * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
- * information.
- * </ul>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
@@ -113,8 +138,6 @@ public class CosmosCassandraExtensionsExample {
         PORT = value;
     }
 
-    private Session session;
-
     // endregion
 
     // region Methods
@@ -122,22 +145,22 @@ public class CosmosCassandraExtensionsExample {
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
-        assertThatCode(this::connect).doesNotThrowAnyException();
+        final Session session = connect();
 
         try {
-            assertThatCode(this::createSchema).doesNotThrowAnyException();
+            assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
 
             assertThatCode(() ->
-                this.write(CONSISTENCY_LEVEL)
+                this.write(session, CONSISTENCY_LEVEL)
             ).doesNotThrowAnyException();
 
             assertThatCode(() -> {
-                final ResultSet rows = this.read(CONSISTENCY_LEVEL);
+                final ResultSet rows = this.read(session, CONSISTENCY_LEVEL);
                 this.display(rows);
             }).doesNotThrowAnyException();
 
         } finally {
-            this.cleanUp();
+            cleanUp(session);
         }
     }
 
@@ -146,15 +169,16 @@ public class CosmosCassandraExtensionsExample {
     // Privates
 
     /**
-     * Drops {@link #KEYSPACE_NAME} and closes the {@link #session} and the {@linkplain Cluster cluster} it references.
+     * Drops {@link #KEYSPACE_NAME} and closes the {@link Session session} and the {@linkplain Cluster cluster} it
+     * references.
      */
-    private void cleanUp() {
-        if (this.session != null && !this.session.isClosed()) {
+    private static void cleanUp(final Session session) {
+        if (session != null && !session.isClosed()) {
             try {
-                this.session.execute("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME);
+                session.execute("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME);
             } finally {
-                this.session.close();
-                this.session.getCluster().close();
+                session.close();
+                session.getCluster().close();
             }
         }
     }
@@ -162,11 +186,11 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      */
-    private void connect() {
+    private static Session connect() {
 
         final Cluster cluster = Cluster.builder()
             .withLoadBalancingPolicy(CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(GLOBAL_ENDPOINT)
+                .withGlobalEndpoint(WRITE_DATACENTER.isBlank() ? GLOBAL_ENDPOINT : "")
                 .withReadDC(READ_DATACENTER)
                 .withWriteDC(WRITE_DATACENTER)
                 .build())
@@ -182,26 +206,24 @@ public class CosmosCassandraExtensionsExample {
             .build();
 
         try {
-            this.session = cluster.connect();
+            return cluster.connect();
         } catch (final Throwable error) {
             cluster.close();
             throw error;
         }
-
-        System.out.println("Connected to " + cluster.getClusterName());
     }
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
      */
-    private void createSchema() {
+    private void createSchema(final Session session) {
 
-        this.session.execute("CREATE KEYSPACE IF NOT EXISTS "
+        session.execute("CREATE KEYSPACE IF NOT EXISTS "
             + KEYSPACE_NAME
             + " WITH replication "
             + "= {'class': 'SimpleStrategy', 'replication_factor': 3}");
 
-        this.session.execute("CREATE TABLE IF NOT EXISTS "
+        session.execute("CREATE TABLE IF NOT EXISTS "
             + KEYSPACE_NAME
             + ".sensor_data ("
             + "sensor_id uuid,"
@@ -276,9 +298,10 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Queries data, retrying if necessary with a downgraded CL.
      *
+     * @param session          the session for executing the operation.
      * @param consistencyLevel the consistency level to apply.
      */
-    private ResultSet read(final ConsistencyLevel consistencyLevel) {
+    private ResultSet read(final Session session, final ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
@@ -293,7 +316,7 @@ public class CosmosCassandraExtensionsExample {
                 + "timestamp > '2018-02-26+01:00'")
             .setConsistencyLevel(consistencyLevel);
 
-        final ResultSet rows = this.session.execute(statement);
+        final ResultSet rows = session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
         return rows;
     }
@@ -303,7 +326,7 @@ public class CosmosCassandraExtensionsExample {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    private void write(final ConsistencyLevel consistencyLevel) {
+    private void write(final Session session, final ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
@@ -337,7 +360,7 @@ public class CosmosCassandraExtensionsExample {
                 + "2.52)"));
 
         batch.setConsistencyLevel(consistencyLevel);
-        this.session.execute(batch);
+        session.execute(batch);
 
         System.out.println("Write succeeded at " + consistencyLevel);
     }
