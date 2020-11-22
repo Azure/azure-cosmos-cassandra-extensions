@@ -18,6 +18,7 @@ import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Select;
 import com.datastax.driver.core.querybuilder.Update;
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 
 import java.util.Date;
@@ -109,65 +110,74 @@ public class CosmosLoadBalancingPolicyTest {
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testGlobalAndReadDC() {
-        final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-            .withGlobalEndpoint(GLOBAL_ENDPOINT)
-            .withReadDC(READ_DATACENTER)
-            .build();
-        this.testAllStatements(this.connect(policy), uniqueName("globalAndRead"));
+        testAllStatements(
+            connect(CosmosLoadBalancingPolicy.builder()
+                .withGlobalEndpoint(GLOBAL_ENDPOINT)
+                .withReadDC(READ_DATACENTER)
+                .build()),
+            uniqueName("globalAndRead"));
     }
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
-        final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
-            .withGlobalEndpoint(GLOBAL_ENDPOINT)
-            .build();
-        this.testAllStatements(this.connect(policy), uniqueName("globalOnly"));
+        testAllStatements(
+            connect(CosmosLoadBalancingPolicy.builder()
+                .withGlobalEndpoint(GLOBAL_ENDPOINT)
+                .build()),
+            uniqueName("globalOnly"));
     }
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testInvalid() {
+
+        final String readDatacenter = "East US";
+        final String writeDatacenter = "West US";
 
         assertThatThrownBy(() ->
             CosmosLoadBalancingPolicy.builder().build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withReadDC(READ_DATACENTER).build()
+            CosmosLoadBalancingPolicy.builder().withReadDC(readDatacenter).build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withWriteDC(WRITE_DATACENTER).build()
+            CosmosLoadBalancingPolicy.builder().withWriteDC(writeDatacenter).build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(GLOBAL_ENDPOINT).withWriteDC(WRITE_DATACENTER).build()
+            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(GLOBAL_ENDPOINT).withWriteDC(writeDatacenter).build()
         ).isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() ->
             CosmosLoadBalancingPolicy.builder()
                 .withGlobalEndpoint(GLOBAL_ENDPOINT)
-                .withReadDC(READ_DATACENTER)
-                .withWriteDC(WRITE_DATACENTER)
+                .withReadDC(readDatacenter)
+                .withWriteDC(writeDatacenter)
                 .build()
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
-    public void testReadAndWrite() {
-        if (!GLOBAL_ENDPOINT.isEmpty()) {
-            final LoadBalancingPolicy policy = CosmosLoadBalancingPolicy.builder()
+    public void testReadDCAndWriteDC() {
+
+        if (WRITE_DATACENTER.isEmpty()) {
+            throw new SkipException("WRITE_DATACENTER is empty");
+        }
+
+        testAllStatements(
+            connect(CosmosLoadBalancingPolicy.builder()
                 .withReadDC(READ_DATACENTER)
                 .withWriteDC(WRITE_DATACENTER)
-                .build();
-            this.testAllStatements(this.connect(policy), uniqueName("readWriteDCv2"));
-        }
+                .build()),
+            uniqueName("readWriteDCv2"));
     }
 
     // endregion
 
     // region Privates
 
-    private Session connect(final LoadBalancingPolicy loadBalancingPolicy) {
+    private static Session connect(final LoadBalancingPolicy loadBalancingPolicy) {
 
         final Cluster cluster = Cluster.builder()
             .withLoadBalancingPolicy(loadBalancingPolicy)
@@ -185,7 +195,7 @@ public class CosmosLoadBalancingPolicyTest {
         }
     }
 
-    private void testAllStatements(final Session session, final String keyspaceName) {
+    private static void testAllStatements(final Session session, final String keyspaceName) {
 
         final String tableName = "sensor_data";
 

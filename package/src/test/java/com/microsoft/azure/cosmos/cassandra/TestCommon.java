@@ -4,6 +4,7 @@
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.driver.core.BatchStatement;
+import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
@@ -80,15 +81,21 @@ public final class TestCommon {
     // region Methods
 
     /**
-     * Closes the given {@link Session} and its associated cluster after dropping the given {@code keyspaceName}.
+     * Closes the given {@link Session} and its associated {@link Cluster cluster} after dropping the given
+     * {@code keyspaceName}.
      *
      * @param session      Session to be closed.
-     * @param keyspaceName Name of keyspace to be dropped.
+     * @param keyspaceName Name of keyspace to be dropped before closing {@code session} and its associated
+     *                     {@link Cluster cluster}.
      */
     static void cleanUp(final Session session, final String keyspaceName) {
         if (session != null && !session.isClosed()) {
-            session.close();
-            session.getCluster().close();
+            try {
+                session.execute("DROP KEYSPACE IF EXISTS " + keyspaceName);
+            } finally {
+                session.close();
+                session.getCluster().close();
+            }
         }
     }
 
