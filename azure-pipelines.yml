@@ -18,6 +18,7 @@ jobs:
         ImageName: 'macos-latest'
       Windows:
         ImageName: 'windows-latest'
+    maxParallel: 1
   pool:
     vmImage: $(ImageName)
   steps:
@@ -71,6 +72,7 @@ jobs:
         ImageName: 'macos-latest'
       Windows:
         ImageName: 'windows-latest'
+    maxParallel: 1
   pool:
     vmImage: $(ImageName)
   steps:
