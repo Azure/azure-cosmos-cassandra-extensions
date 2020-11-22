@@ -190,7 +190,7 @@ public class CosmosCassandraExtensionsExample {
 
         final Cluster cluster = Cluster.builder()
             .withLoadBalancingPolicy(CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(WRITE_DATACENTER.isBlank() ? GLOBAL_ENDPOINT : "")
+                .withGlobalEndpoint(WRITE_DATACENTER.isEmpty() ? GLOBAL_ENDPOINT : "")
                 .withReadDC(READ_DATACENTER)
                 .withWriteDC(WRITE_DATACENTER)
                 .build())
