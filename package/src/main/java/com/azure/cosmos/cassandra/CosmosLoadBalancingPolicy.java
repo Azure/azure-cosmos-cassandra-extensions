@@ -60,7 +60,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private CopyOnWriteArrayList<Node> remoteDcNodes;
     private CopyOnWriteArrayList<Node> writeLocalDcNodes;
 
-    public CosmosLoadBalancingPolicy(DriverContext driverContext, String profileName) {
+    public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
@@ -98,7 +98,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * Initializes the list of hosts in read, write, local, and remote categories.
      */
     @Override
-    public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
+    public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
         List<InetAddress> dnsLookupAddresses = new ArrayList<>();
 
@@ -110,7 +110,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.writeLocalDcNodes = new CopyOnWriteArrayList<>();
         this.remoteDcNodes = new CopyOnWriteArrayList<>();
 
-        for (Node node : nodes.values()) {
+        for (final Node node : nodes.values()) {
 
             final String datacenter = node.getDatacenter();
             NodeDistance distance = NodeDistance.IGNORED;
@@ -151,7 +151,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @Override
     @NonNull
-    public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    public Queue<Node> newQueryPlan(@Nullable final Request request, @Nullable final Session session) {
 
         this.refreshHostsIfDnsExpired();
 
@@ -169,12 +169,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @Override
-    public void onAdd(@NonNull Node node) {
+    public void onAdd(@NonNull final Node node) {
         this.onUp(node);
     }
 
     @Override
-    public void onDown(@NonNull Node node) {
+    public void onDown(@NonNull final Node node) {
 
         if (node.getDatacenter() == null) {
             return;
@@ -196,12 +196,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @Override
-    public void onRemove(@NonNull Node node) {
+    public void onRemove(@NonNull final Node node) {
         this.onDown(node);
     }
 
     @Override
-    public void onUp(@NonNull Node node) {
+    public void onUp(@NonNull final Node node) {
 
         if (node.getDatacenter() == null) {
             return;
@@ -237,7 +237,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             try {
                 this.localAddresses = InetAddress.getAllByName(this.globalEndpoint);
                 this.lastDnsLookupTime = System.currentTimeMillis() / 1000;
-            } catch (UnknownHostException error) {
+            } catch (final UnknownHostException error) {
                 // DNS entry may be temporarily unavailable
                 if (this.localAddresses == null) {
                     throw new IllegalArgumentException("The DNS could not resolve "
@@ -252,7 +252,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return this.localAddresses;
     }
 
-    private static void addTo(ArrayDeque<Node> queryPlan, int start, List<Node> nodes) {
+    private static void addTo(final ArrayDeque<Node> queryPlan, final int start, final List<Node> nodes) {
 
         final int length = nodes.size();
         final int end = start + length;
@@ -266,7 +266,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return System.currentTimeMillis() / 1000 > this.lastDnsLookupTime + this.dnsExpiryTimeInSeconds;
     }
 
-    private InetAddress getAddress(Node node) {
+    private InetAddress getAddress(final Node node) {
 
         // TODO (DANOBLE) Under what circumstances might a cast from InetAddress to InetSocketAddress fail?
         //   EndPoint.resolve returns an InetAddress which--in the case of the standard Datastax EndPoint types--
@@ -277,23 +277,23 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return ((InetSocketAddress) node.getEndPoint().resolve()).getAddress();
     }
 
-    private static boolean isReadRequest(String query) {
+    private static boolean isReadRequest(final String query) {
         return query.toLowerCase(Locale.ROOT).startsWith("select");
     }
 
-    private static boolean isReadRequest(Request request) {
+    private static boolean isReadRequest(final Request request) {
 
         if (request instanceof BatchStatement) {
             return false;
         }
 
         if (request instanceof BoundStatement) {
-            BoundStatement boundStatement = (BoundStatement) request;
+            final BoundStatement boundStatement = (BoundStatement) request;
             return isReadRequest(boundStatement.getPreparedStatement().getQuery());
         }
 
         if (request instanceof SimpleStatement) {
-            SimpleStatement simpleStatement = (SimpleStatement) request;
+            final SimpleStatement simpleStatement = (SimpleStatement) request;
             return isReadRequest(simpleStatement.getQuery());
         }
 
@@ -306,15 +306,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return;
         }
 
-        CopyOnWriteArrayList<Node> oldLocalDcNodes = this.writeLocalDcNodes;
-        CopyOnWriteArrayList<Node> oldRemoteDcNodes = this.remoteDcNodes;
+        final CopyOnWriteArrayList<Node> oldLocalDcNodes = this.writeLocalDcNodes;
+        final CopyOnWriteArrayList<Node> oldRemoteDcNodes = this.remoteDcNodes;
 
-        List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
-        CopyOnWriteArrayList<Node> localDcNodes = new CopyOnWriteArrayList<>();
-        CopyOnWriteArrayList<Node> remoteDcNodes = new CopyOnWriteArrayList<>();
+        final List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
+        final CopyOnWriteArrayList<Node> localDcNodes = new CopyOnWriteArrayList<>();
+        final CopyOnWriteArrayList<Node> remoteDcNodes = new CopyOnWriteArrayList<>();
 
         if (this.writeLocalDcNodes != null) {
-            for (Node node : oldLocalDcNodes) {
+            for (final Node node : oldLocalDcNodes) {
                 if (localAddresses.contains(this.getAddress(node))) {
                     localDcNodes.addIfAbsent(node);
                 } else {
@@ -323,7 +323,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        for (Node node : oldRemoteDcNodes) {
+        for (final Node node : oldRemoteDcNodes) {
             if (localAddresses.contains(this.getAddress(node))) {
                 localDcNodes.addIfAbsent(node);
             } else {
@@ -367,7 +367,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         private final BiFunction<Option, DriverExecutionProfile, ?> getter;
         private final String path;
 
-        <T, R> Option(String name, BiFunction<Option, DriverExecutionProfile, R> getter, T defaultValue) {
+        <T, R> Option(final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
             this.defaultValue = defaultValue;
             this.getter = getter;
             this.path = PATH_PREFIX + name;
@@ -385,7 +385,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         @SuppressWarnings("unchecked")
-        public <T> T getValue(@NonNull DriverExecutionProfile profile) {
+        public <T> T getValue(@NonNull final DriverExecutionProfile profile) {
             Objects.requireNonNull(profile, "expected non-null profile");
             return (T) this.getter.apply(this, profile);
         }

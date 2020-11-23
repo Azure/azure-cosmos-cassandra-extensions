@@ -48,7 +48,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Constructors
 
-    public CosmosRetryPolicy(DriverContext driverContext, String profileName) {
+    public CosmosRetryPolicy(final DriverContext driverContext, final String profileName) {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
@@ -57,11 +57,11 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this.growingBackoffTimeInMillis = Option.GROWING_BACKOFF_TIME.getValue(profile);
     }
 
-    CosmosRetryPolicy(int maxRetryCount) {
+    CosmosRetryPolicy(final int maxRetryCount) {
         this(maxRetryCount, Option.FIXED_BACKOFF_TIME.getDefaultValue(), Option.GROWING_BACKOFF_TIME.getDefaultValue());
     }
 
-    CosmosRetryPolicy(int maxRetryCount, int fixedBackOffTimeInMillis, int growingBackoffTimeInMillis) {
+    CosmosRetryPolicy(final int maxRetryCount, final int fixedBackOffTimeInMillis, final int growingBackoffTimeInMillis) {
         this.maxRetryCount = maxRetryCount;
         this.fixedBackoffTimeInMillis = fixedBackOffTimeInMillis;
         this.growingBackoffTimeInMillis = growingBackoffTimeInMillis;
@@ -93,9 +93,9 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     @Override
     public RetryDecision onErrorResponse(
-        @NonNull Request request,
-        @NonNull CoordinatorException error,
-        int retryCount) {
+        @NonNull final Request request,
+        @NonNull final CoordinatorException error,
+        final int retryCount) {
 
         RetryDecision retryDecision;
 
@@ -123,7 +123,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
                 retryDecision = RetryDecision.RETHROW;
             }
 
-        } catch (InterruptedException exception) {
+        } catch (final InterruptedException exception) {
             retryDecision = RetryDecision.RETHROW;
         }
 
@@ -132,41 +132,41 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     @Override
     public RetryDecision onReadTimeout(
-        @NonNull Request request,
-        @NonNull ConsistencyLevel consistencyLevel,
-        int blockFor,
-        int received,
-        boolean dataPresent,
-        int retryCount) {
+        @NonNull final Request request,
+        @NonNull final ConsistencyLevel consistencyLevel,
+        final int blockFor,
+        final int received,
+        final boolean dataPresent,
+        final int retryCount) {
 
         return this.retryManyTimesOrThrow(retryCount);
     }
 
     @Override
-    public RetryDecision onRequestAborted(@NonNull Request request, @NonNull Throwable error, int retryCount) {
+    public RetryDecision onRequestAborted(@NonNull final Request request, @NonNull final Throwable error, final int retryCount) {
         // TODO (DANOBLE) Implement CosmosRetryPolicy.onRequestAborted
         return null;
     }
 
     @Override
     public RetryDecision onUnavailable(
-        @NonNull Request request,
-        @NonNull ConsistencyLevel consistencyLevel,
-        int required,
-        int alive,
-        int retryCount) {
+        @NonNull final Request request,
+        @NonNull final ConsistencyLevel consistencyLevel,
+        final int required,
+        final int alive,
+        final int retryCount) {
 
         return this.retryManyTimesOrThrow(retryCount);
     }
 
     @Override
     public RetryDecision onWriteTimeout(
-        @NonNull Request request,
-        @NonNull ConsistencyLevel consistencyLevel,
-        @NonNull WriteType writeType,
-        int blockFor,
-        int received,
-        int retryCount) {
+        @NonNull final Request request,
+        @NonNull final ConsistencyLevel consistencyLevel,
+        @NonNull final WriteType writeType,
+        final int blockFor,
+        final int received,
+        final int retryCount) {
 
         return this.retryManyTimesOrThrow(retryCount);
     }
@@ -180,11 +180,11 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // .65.106.154:10350)
     // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10,
     // Additional details='
-    private static int getRetryAfterMillis(String exceptionString) {
+    private static int getRetryAfterMillis(final String exceptionString) {
 
         final String[] tokens = exceptionString.split(",");
 
-        for (String token : tokens) {
+        for (final String token : tokens) {
 
             final String[] kvp = token.split("=");
 
@@ -199,7 +199,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return -1;
     }
 
-    private RetryDecision retryManyTimesOrThrow(int retryCount) {
+    private RetryDecision retryManyTimesOrThrow(final int retryCount) {
         return this.maxRetryCount == -1 || retryCount < this.maxRetryCount
             ? RetryDecision.RETRY_SAME
             : RetryDecision.RETHROW;
@@ -229,7 +229,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         private final BiFunction<Option, DriverExecutionProfile, ?> getter;
         private final String path;
 
-        <T, R> Option(String name, BiFunction<Option, DriverExecutionProfile, R> getter, T defaultValue) {
+        <T, R> Option(final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
             this.defaultValue = defaultValue;
             this.getter = getter;
             this.path = PATH_PREFIX + name;
@@ -247,7 +247,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         }
 
         @SuppressWarnings("unchecked")
-        public <T> T getValue(@NonNull DriverExecutionProfile profile) {
+        public <T> T getValue(@NonNull final DriverExecutionProfile profile) {
             Objects.requireNonNull(profile, "expected non-null profile");
             return (T) this.getter.apply(this, profile);
         }

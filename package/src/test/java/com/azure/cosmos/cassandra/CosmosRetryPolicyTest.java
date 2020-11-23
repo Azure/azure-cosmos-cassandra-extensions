@@ -68,7 +68,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosRetryPolicyTest implements AutoCloseable {
+public class CosmosRetryPolicyTest {
 
     // region Fields
 
@@ -92,7 +92,6 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
     // region Methods
 
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
-    @SuppressWarnings("CatchMayIgnoreException")
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() ->
@@ -104,7 +103,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
         ).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
+            final ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
             display(rows);
         }).doesNotThrowAnyException();
     }
@@ -151,10 +150,13 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
      * Closes the session, if it's been instantiated.
      */
     @AfterClass
-    public void close() {
+    public void cleanUp() {
         if (this.session != null && !this.session.isClosed()) {
-            this.session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
-            this.session.close();
+            try {
+                this.session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
+            } finally {
+                this.session.close();
+            }
         }
     }
 
@@ -165,7 +167,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
-        CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
+        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         this.retry(retryPolicy, MAX_RETRIES + 1, MAX_RETRIES + 1, RetryDecision.RETHROW);
     }
 
@@ -180,7 +182,9 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
      * @param username the username for authenticating.
      * @param password the password for authenticating.
      */
-    private CqlSession connect(String globalEndPoint, String username, String password, String localDatacenter) {
+    @SuppressWarnings("SameParameterValue")
+    private CqlSession connect(
+        final String globalEndPoint, final String username, final String password, final String localDatacenter) {
 
         final Matcher address = HOSTNAME_AND_PORT.matcher(globalEndPoint);
         assertThat(address.matches()).isTrue();
@@ -206,7 +210,10 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
      * Tests a retry operation
      */
     private void retry(
-        CosmosRetryPolicy retryPolicy, int retryNumberBegin, int retryNumberEnd, RetryDecision expectedRetryDecision) {
+        final CosmosRetryPolicy retryPolicy,
+        final int retryNumberBegin,
+        final int retryNumberEnd,
+        final RetryDecision expectedRetryDecision) {
 
         final Matcher address = HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
         assertThat(address.matches()).isTrue();
@@ -227,7 +234,7 @@ public class CosmosRetryPolicyTest implements AutoCloseable {
 
             final long startTime = System.nanoTime();
 
-            RetryDecision retryDecision = retryPolicy.onErrorResponse(request, coordinatorException, retryNumber);
+            final RetryDecision retryDecision = retryPolicy.onErrorResponse(request, coordinatorException, retryNumber);
 
             final long duration = System.nanoTime() - startTime;
 

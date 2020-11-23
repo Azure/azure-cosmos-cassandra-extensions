@@ -3,6 +3,7 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicy.Option;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -24,6 +25,7 @@ import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 
 import java.net.InetSocketAddress;
@@ -41,8 +43,8 @@ import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVari
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
@@ -91,19 +93,16 @@ public class CosmosLoadBalancingPolicyTest {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointAndReadDatacenter() {
 
-        if (GLOBAL_ENDPOINT != null) {
+        this.keyspaceName = "globalAndRead" + KEYSPACE_NAME_SUFFIX;
 
-            this.keyspaceName = "globalAndRead" + KEYSPACE_NAME_SUFFIX;
+        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
+            .withString(Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+            .withString(Option.READ_DATACENTER, READ_DATACENTER)
+            .withString(Option.WRITE_DATACENTER, "")
+            .build();
 
-            DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
-                .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
-                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, "")
-                .build();
-
-            try (CqlSession session = this.connect(configLoader)) {
-                this.testAllStatements(session);
-            }
+        try (final CqlSession session = this.connect(configLoader)) {
+            this.testAllStatements(session);
         }
     }
 
@@ -111,19 +110,16 @@ public class CosmosLoadBalancingPolicyTest {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
 
-        if (GLOBAL_ENDPOINT != null) {
+        this.keyspaceName = "globalOnly" + KEYSPACE_NAME_SUFFIX;
 
-            this.keyspaceName = "globalOnly" + KEYSPACE_NAME_SUFFIX;
+        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
+            .withString(Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+            .withString(Option.READ_DATACENTER, "")
+            .withString(Option.WRITE_DATACENTER, "")
+            .build();
 
-            final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
-                .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, "")
-                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, "")
-                .build();
-
-            try (CqlSession session = this.connect(configLoader)) {
-                this.testAllStatements(session);
-            }
+        try (final CqlSession session = this.connect(configLoader)) {
+            this.testAllStatements(session);
         }
     }
 
@@ -131,6 +127,8 @@ public class CosmosLoadBalancingPolicyTest {
     public void testInvalidConfiguration() {
 
         final ProgrammaticArguments programmaticArguments = ProgrammaticArguments.builder().build();
+        final String readDatacenter = "East US";
+        final String writeDatacenter = "West US";
 
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(newProgrammaticDriverConfigLoaderBuilder().build(), programmaticArguments),
@@ -140,7 +138,7 @@ public class CosmosLoadBalancingPolicyTest {
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
+                    .withString(Option.READ_DATACENTER, readDatacenter)
                     .build(),
                 programmaticArguments),
             "default")
@@ -149,7 +147,7 @@ public class CosmosLoadBalancingPolicyTest {
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
+                    .withString(Option.WRITE_DATACENTER, writeDatacenter)
                     .build(),
                 programmaticArguments),
             "default")
@@ -158,8 +156,8 @@ public class CosmosLoadBalancingPolicyTest {
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
-                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
+                    .withString(Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+                    .withString(Option.WRITE_DATACENTER, writeDatacenter)
                     .build(),
                 programmaticArguments),
             "default")
@@ -168,9 +166,9 @@ public class CosmosLoadBalancingPolicyTest {
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
-                    .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
-                    .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
+                    .withString(Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
+                    .withString(Option.READ_DATACENTER, readDatacenter)
+                    .withString(Option.WRITE_DATACENTER, writeDatacenter)
                     .build(),
                 programmaticArguments),
             "default")
@@ -181,19 +179,20 @@ public class CosmosLoadBalancingPolicyTest {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testReadAndWrite() {
 
-        if (GLOBAL_ENDPOINT != null) {
+        if (WRITE_DATACENTER.isEmpty()) {
+            throw new SkipException("WRITE_DATACENTER is empty");
+        }
 
-            this.keyspaceName = "readWriteDCv2" + KEYSPACE_NAME_SUFFIX;
+        this.keyspaceName = "readWriteDCv2" + KEYSPACE_NAME_SUFFIX;
 
-            DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
-                .withString(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT, "")
-                .withString(CosmosLoadBalancingPolicy.Option.READ_DATACENTER, READ_DATACENTER)
-                .withString(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER, WRITE_DATACENTER)
-                .build();
+        final DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
+            .withString(Option.GLOBAL_ENDPOINT, "")
+            .withString(Option.READ_DATACENTER, READ_DATACENTER)
+            .withString(Option.WRITE_DATACENTER, WRITE_DATACENTER)
+            .build();
 
-            try (CqlSession session = this.connect(driverConfigLoader)) {
-                this.testAllStatements(session);
-            }
+        try (final CqlSession session = this.connect(driverConfigLoader)) {
+            this.testAllStatements(session);
         }
     }
 
@@ -201,12 +200,12 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
-    private void cleanUp(@NonNull CqlSession session) {
+    private void cleanUp(@NonNull final CqlSession session) {
         session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
     }
 
     @NonNull
-    private CqlSession connect(@NonNull DriverConfigLoader configLoader) {
+    private CqlSession connect(@NonNull final DriverConfigLoader configLoader) {
 
         final Matcher address = TestCommon.HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
         assertThat(address.matches()).isTrue();
@@ -228,7 +227,7 @@ public class CosmosLoadBalancingPolicyTest {
             DefaultRetryPolicy.class);
     }
 
-    private void testAllStatements(CqlSession session) {
+    private void testAllStatements(final CqlSession session) {
 
         try {
 
@@ -265,7 +264,7 @@ public class CosmosLoadBalancingPolicyTest {
             final Instant timestamp = Instant.now();
             final UUID uuid = UUID.randomUUID();
 
-            Select select = QueryBuilder.selectFrom(this.keyspaceName, TABLE_NAME)
+            final Select select = QueryBuilder.selectFrom(this.keyspaceName, TABLE_NAME)
                 .all()
                 .whereColumn("sensor_id").isEqualTo(literal(uuid))
                 .whereColumn("date").isEqualTo(literal(date))
@@ -273,14 +272,14 @@ public class CosmosLoadBalancingPolicyTest {
 
             session.execute(select.build());
 
-            Insert insert = QueryBuilder.insertInto(this.keyspaceName, TABLE_NAME)
+            final Insert insert = QueryBuilder.insertInto(this.keyspaceName, TABLE_NAME)
                 .value("sensor_id", literal(uuid))
                 .value("date", literal(date))
                 .value("timestamp", literal(timestamp));
 
             session.execute(insert.build());
 
-            Update update = QueryBuilder.update(this.keyspaceName, TABLE_NAME)
+            final Update update = QueryBuilder.update(this.keyspaceName, TABLE_NAME)
                 .setColumn("value", literal(1.0))
                 .whereColumn("sensor_id").isEqualTo(literal(uuid))
                 .whereColumn("date").isEqualTo(literal(date))
@@ -288,7 +287,7 @@ public class CosmosLoadBalancingPolicyTest {
 
             session.execute(update.build());
 
-            Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, TABLE_NAME)
+            final Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, TABLE_NAME)
                 .whereColumn("sensor_id").isEqualTo(literal(uuid))
                 .whereColumn("date").isEqualTo(literal(date))
                 .whereColumn("timestamp").isEqualTo(literal(timestamp));
@@ -331,7 +330,7 @@ public class CosmosLoadBalancingPolicyTest {
 
             // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
 
-            BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
+            final BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
                 .add(boundStatement)
                 .add(boundStatement);
 

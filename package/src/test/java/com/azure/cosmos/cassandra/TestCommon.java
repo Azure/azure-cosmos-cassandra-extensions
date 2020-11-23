@@ -48,7 +48,7 @@ public final class TestCommon {
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
      */
-    static void createSchema(CqlSession session, String keyspaceName, String tableName) throws InterruptedException {
+    static void createSchema(final CqlSession session, final String keyspaceName, final String tableName) throws InterruptedException {
 
         session.execute(format(
             "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}",
@@ -76,7 +76,7 @@ public final class TestCommon {
      *
      * @param rows the results to display.
      */
-    static void display(ResultSet rows) {
+    static void display(final ResultSet rows) {
 
         final int width1 = 38;
         final int width2 = 12;
@@ -87,7 +87,7 @@ public final class TestCommon {
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
         drawLine(width1, width2, width3, width4);
 
-        for (Row row : rows) {
+        for (final Row row : rows) {
             System.out.printf(format,
                 row.getUuid("sensor_id"),
                 row.getLocalDate("date"),
@@ -96,7 +96,7 @@ public final class TestCommon {
         }
     }
 
-    static String getPropertyOrEnvironmentVariable(String property, String variable, String defaultValue) {
+    static String getPropertyOrEnvironmentVariable(final String property, final String variable, final String defaultValue) {
 
         String value = System.getProperty(property);
 
@@ -117,14 +117,14 @@ public final class TestCommon {
      * @param consistencyLevel the consistency level to apply.
      */
     static ResultSet read(
-        CqlSession session,
-        ConsistencyLevel consistencyLevel,
-        String keyspaceName,
-        String tableName) {
+        final CqlSession session,
+        final ConsistencyLevel consistencyLevel,
+        final String keyspaceName,
+        final String tableName) {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
-        SimpleStatement statement = SimpleStatement.newInstance(format(
+        final SimpleStatement statement = SimpleStatement.newInstance(format(
             "SELECT sensor_id, date, timestamp, value "
                 + "FROM %s.%s "
                 + "WHERE "
@@ -135,26 +135,27 @@ public final class TestCommon {
             tableName)
         ).setConsistencyLevel(consistencyLevel);
 
-        ResultSet rows = session.execute(statement);
+        final ResultSet rows = session.execute(statement);
 
         System.out.println("Read succeeded at " + consistencyLevel);
         return rows;
     }
-
-    // endregion
-
-    // region Privates
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    static void write(CqlSession session, ConsistencyLevel consistencyLevel, String keyspaceName, String tableName) {
+    @SuppressWarnings("SameParameterValue")
+    static void write(
+        final CqlSession session,
+        final ConsistencyLevel consistencyLevel,
+        final String keyspaceName,
+        final String tableName) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
-        BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
+        final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
             .add(SimpleStatement.newInstance(format("INSERT INTO %s.%s "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
@@ -181,13 +182,17 @@ public final class TestCommon {
         System.out.println("Write succeeded at " + consistencyLevel);
     }
 
+    // endregion
+
+    // region Privates
+
     /**
      * Draws a line to isolate headings from rows.
      *
      * @param widths the column widths.
      */
-    private static void drawLine(int... widths) {
-        for (int width : widths) {
+    private static void drawLine(final int... widths) {
+        for (final int width : widths) {
             for (int i = 1; i < width; i++) {
                 System.out.print('-');
             }

@@ -18,6 +18,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import static java.lang.String.format;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.testng.AssertJUnit.fail;
 
 /**
@@ -69,26 +70,20 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
-        try (Session ignored = this.connect()) {
+        try (final Session ignored = this.connect()) {
 
-            try {
-                this.createSchema();
-            } catch (Exception error) {
-                fail(format("createSchema failed: %s", error));
-            }
-            try {
-                this.write(CONSISTENCY_LEVEL);
-            } catch (Exception error) {
-                fail(format("write failed: %s", error));
-            }
-            try {
-                ResultSet rows = this.read(CONSISTENCY_LEVEL);
+            assertThatCode(this::createSchema).doesNotThrowAnyException();
+
+            assertThatCode(() ->
+                this.write(CONSISTENCY_LEVEL)
+            ).doesNotThrowAnyException();
+
+            assertThatCode(() -> {
+                final ResultSet rows = this.read(CONSISTENCY_LEVEL);
                 this.display(rows);
-            } catch (Exception error) {
-                fail(format("read failed: %s", error));
-            }
+            }).doesNotThrowAnyException();
 
-        } catch (Exception error) {
+        } catch (final Exception error) {
             final StringWriter stringWriter = new StringWriter();
             error.printStackTrace(new PrintWriter(stringWriter));
             fail(format("connect failed with %s", stringWriter));
@@ -142,7 +137,7 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
      *
      * @param rows the results to display.
      */
-    private void display(ResultSet rows) {
+    private void display(final ResultSet rows) {
 
         final int width1 = 38;
         final int width2 = 12;
@@ -153,7 +148,7 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
         drawLine(width1, width2, width3, width4);
 
-        for (Row row : rows) {
+        for (final Row row : rows) {
             System.out.printf(format,
                 row.getUuid("sensor_id"),
                 row.getLocalDate("date"),
@@ -167,8 +162,8 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
      *
      * @param widths the column widths.
      */
-    private static void drawLine(int... widths) {
-        for (int width : widths) {
+    private static void drawLine(final int... widths) {
+        for (final int width : widths) {
             for (int i = 1; i < width; i++) {
                 System.out.print('-');
             }
@@ -182,11 +177,11 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    private ResultSet read(ConsistencyLevel consistencyLevel) {
+    private ResultSet read(final ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
-        Statement statement = SimpleStatement.newInstance(
+        final Statement statement = SimpleStatement.newInstance(
             "SELECT sensor_id, date, timestamp, value "
                 + "FROM downgrading.sensor_data "
                 + "WHERE "
@@ -195,7 +190,7 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
                 + "timestamp > '2018-02-26+01:00'")
             .setConsistencyLevel(consistencyLevel);
 
-        ResultSet rows = this.session.execute(statement);
+        final ResultSet rows = this.session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
 
         return rows;
@@ -206,11 +201,11 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    private void write(ConsistencyLevel consistencyLevel) {
+    private void write(final ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
-        BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
+        final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
             .add(SimpleStatement.newInstance(
                 "INSERT INTO downgrading.sensor_data "
                     + "(sensor_id, date, timestamp, value) "
