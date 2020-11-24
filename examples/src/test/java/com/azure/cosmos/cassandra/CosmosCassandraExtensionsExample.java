@@ -21,17 +21,17 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.testng.AssertJUnit.fail;
 
 /**
- * This example illustrates use of the Cosmos extensions to Datastax Java Driver 4 for Apache Cassandra®.
+ * Illustrates use of the Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra®.
  * <p>
- * Best practices for connecting to a Cosmos DB Cassandra API instance are also encapsulated in configuration. See the
- * settings in <a href="file:///../../../../../../resources/application.conf">{@code application.conf}</a> and
- * <a href="file:///../../../../../../../../package/src/main/resources/reference.conf">{@code reference.conf}</a>.
+ * Best practices for configuring DataStax Java Driver 4 to access a Cosmos DB Cassandra API instance are also
+ * demonstrated. See the settings in <a href="../../../../doc-files/application.conf.html">{@code application.conf}</a> and
+ * <a href="../../../../doc-files/reference.conf.html">{@code reference.conf}</a>.
  * <h3>
- * Preconditions:
+ * Preconditions</h3>
  * <ol>
- * <li>A Cosmos DB Cassandra API account is required.1
+ * <li>A Cosmos DB Cassandra API account is required.
  * <li>These system variables or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>
@@ -63,17 +63,17 @@ import static org.testng.AssertJUnit.fail;
  * </table>
  * </ol>
  * <h3>
- * Side effects:
+ * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
- * runs, we generate a keyspace name of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
- * name already exist, it is reused.
+ * runs, we generate a keyspace name of the form <b>downgrading_</b><i>&gt;random-uuid&lt;</i>. Should a keyspace by
+ * this name already exist, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
- * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
+ * <li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
  * runs.</ol>
  * <h3>
- * Notes:
+ * Notes</h3>
  * <ul>
  * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
  * information.</ul>
@@ -83,10 +83,10 @@ import static org.testng.AssertJUnit.fail;
  * configuration</a>
  * @see CosmosLoadBalancingPolicy
  * @see CosmosRetryPolicy
- * @see <a href="file:///../../../../../../resources/application.conf">application.conf</a>
- * @see <a href="file:///../../../../../../../../../package/src/main/resources/reference.conf">reference.conf</a>
+ * @see <a href="file:///./doc-files/application.conf">application.conf</a>
+ * @see <a href="file:///./doc-files/reference.conf">reference.conf</a>
  */
-public class CosmosCassandraExtensionsExample implements AutoCloseable {
+public class CosmosCassandraExtensionsExample {
 
     // region Fields
 
@@ -119,16 +119,6 @@ public class CosmosCassandraExtensionsExample implements AutoCloseable {
             final StringWriter stringWriter = new StringWriter();
             error.printStackTrace(new PrintWriter(stringWriter));
             fail(format("connect failed with %s", stringWriter));
-        }
-    }
-
-    /**
-     * Closes the session and the cluster.
-     */
-    @Override
-    public void close() {
-        if (this.session != null) {
-            this.session.close();
         }
     }
 
