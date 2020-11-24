@@ -6,11 +6,15 @@ package com.microsoft.azure.cosmos.cassandra;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.PoolingOptions;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.SocketOptions;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
+import com.datastax.driver.core.policies.ExponentialReconnectionPolicy;
 import org.testng.annotations.Test;
 
 import java.text.SimpleDateFormat;
@@ -23,51 +27,48 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * This example illustrates use of the {@link CosmosLoadBalancingPolicy} and {@link CosmosRetryPolicy} classes.
+ * Illustrates use of the Cosmos Extensions for DataStax Java Driver 3 for Apache Cassandra®.
+ * <p>
+ * Best practices for configuring DataStax Java Driver 3 to access a Cosmos DB Cassandra API instance are also
+ * demonstrated. See {@link #connect}.
  * <h3>
- * Preconditions:
+ * Preconditions</h3>
  * <ol>
  * <li>A Cosmos DB Cassandra API account is required.
  * <li>These system variables or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>
  * <th>Environment variable</th>
- * <th>Description</th>
- * </tr>
+ * <th>Description</th></tr>
  * </thead>
  * <tbody>
  * <tr>
  * <td>azure.cosmos.cassandra.global-endpoint</td>
  * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
- * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
- * </tr>
- * <tr>
- * <td>azure.cosmos.cassandra.username</td>
- * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
- * <td>Username for authentication</td>
- * </tr>
- * <tr>
- * <td>azure.cosmos.cassandra.password</td>
- * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
- * <td>Password for authentication</td>
- * </tr>
+ * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td></tr>
  * <tr>
  * <td>azure.cosmos.cassandra.read-datacenter</td>
  * <td>AZURE_COSMOS_CASSANDRA_READ_DATACENTER</td>
- * <td>Read datacenter name (e.g., "East US")</td>
- * </tr>
+ * <td>Read datacenter name. Example: {@code "East US"}</td></tr>
  * <tr>
  * <td>azure.cosmos.cassandra.write-datacenter</td>
  * <td>AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER</td>
- * <td>Write datacenter name (e.g., "West US")</td>
- * </tr>
+ * <td>Write datacenter name. Example: {@code "West US"}.</td></tr>
+ * <tr>
+ * <td>datastax-java-driver.advanced.auth-provider.username</td>
+ * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
+ * <td>Username for authentication.</td></tr>
+ * <tr>
+ * <td>datastax-java-driver.advanced.auth-provider.password</td>
+ * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
+ * <td>Password for authentication.</td></tr>
  * </tbody>
  * </table>
  * </ol>
  * <h3>
- * Side effects:
+ * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
  * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
@@ -75,8 +76,7 @@ import static org.assertj.core.api.Assertions.fail;
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
  * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
- * runs.
- * </ol>
+ * runs.</ol>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
@@ -199,6 +199,17 @@ public class CosmosCassandraExtensionsExample {
                 .withGrowingBackOffTimeInMillis(GROWING_BACK_OFF_TIME)
                 .withMaxRetryCount(MAX_RETRY_COUNT)
                 .build())
+            .withPoolingOptions(new PoolingOptions()
+                .setIdleTimeoutSeconds(PoolingOptions.DEFAULT_IDLE_TIMEOUT_SECONDS)
+                .setHeartbeatIntervalSeconds(PoolingOptions.DEFAULT_HEARTBEAT_INTERVAL_SECONDS)
+                .setPoolTimeoutMillis(PoolingOptions.DEFAULT_POOL_TIMEOUT_MILLIS))
+            .withSocketOptions(new SocketOptions()
+                .setConnectTimeoutMillis(SocketOptions.DEFAULT_CONNECT_TIMEOUT_MILLIS)
+                .setReadTimeoutMillis(SocketOptions.DEFAULT_READ_TIMEOUT_MILLIS))
+            .withReconnectionPolicy(new ConstantReconnectionPolicy(600_000))
+                // TODO (DANOBLE) Do we want ExponentialReconnectionPolicy or a custom ReconnectionPolicy instead?
+                //  See https://docs.datastax.com/en/developer/java-driver/3.10/manual/reconnection/
+                //  The default policy is new ExponentialReconnectionPolicy(1_000, 10 * 60 * 1000)
             .withCredentials(USERNAME, PASSWORD)
             .addContactPoints(CONTACT_POINTS)
             .withPort(PORT)
