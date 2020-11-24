@@ -185,6 +185,9 @@ public class CosmosCassandraExtensionsExample {
 
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
+     * <p>
+     * Default options that are relevant to performance and reliability when accessing a Cosmos DB Cassandra API
+     * instance are called out explicitly here.
      */
     private static Session connect() {
 
