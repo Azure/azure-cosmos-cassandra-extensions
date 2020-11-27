@@ -119,6 +119,11 @@ Licensed under the MIT License.
     <pluginManagement>
       <plugins>
         <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>3.3.0</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
         </plugin>
@@ -137,6 +142,18 @@ Licensed under the MIT License.
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-project-info-reports-plugin</artifactId>
+          <version>3.1.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>3.9.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-source-plugin</artifactId>
@@ -161,15 +178,6 @@ Licensed under the MIT License.
     </pluginManagement>
     <plugins>
       <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-deploy-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-install-plugin</artifactId>
-      </plugin>
-      <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
           <skipIfEmpty>true</skipIfEmpty>
@@ -179,6 +187,8 @@ Licensed under the MIT License.
         <artifactId>maven-javadoc-plugin</artifactId>
         <inherited>true</inherited>
         <configuration>
+          <docfilessubdirs>false</docfilessubdirs>
+          <doclint>all,-html</doclint>
           <quiet>true</quiet>
           <verbose>false</verbose>
           <sourceFileExcludes>
@@ -205,7 +215,6 @@ Licensed under the MIT License.
           </execution>
         </executions>
       </plugin>
-      <!-- This plugin scans reports on bugs in the code -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
@@ -222,7 +231,6 @@ Licensed under the MIT License.
           <threshold>Low</threshold>
           <xmlOutput>true</xmlOutput>
           <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
-          <!--excludeFilterFile>spotbugs/spotbugs-exclude.xml</excludeFilterFile-->
           <failOnError>true</failOnError>
           <includeTests>true</includeTests>
           <fork>true</fork>
