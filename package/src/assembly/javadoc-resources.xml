@@ -1,7 +1,7 @@
 <assembly xmlns="http://maven.apache.org/ASSEMBLY/2.1.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.1.0 http://maven.apache.org/xsd/assembly-2.1.0.xsd">
-  <id>/../site</id>
+  <id>/../apidocs</id>
   <formats>
     <format>dir</format>
   </formats>
@@ -9,13 +9,13 @@
   <files>
     <file>
       <source>src/main/javadoc/doc-files/reference.conf.html</source>
-      <outputDirectory>apidocs/doc-files</outputDirectory>
+      <outputDirectory>doc-files</outputDirectory>
       <destName>reference.conf.html</destName>
       <filtered>true</filtered>
     </file>
     <file>
       <source>src/main/resources/reference.conf</source>
-      <outputDirectory>apidocs/doc-files</outputDirectory>
+      <outputDirectory>doc-files</outputDirectory>
       <destName>reference.conf.text</destName>
       <filtered>false</filtered>
     </file>
