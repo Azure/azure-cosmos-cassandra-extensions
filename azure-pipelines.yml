@@ -62,10 +62,11 @@ jobs:
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
-  - task: PublishPipelineArtifacts@1
+  - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: $(Pipeline.Workspace)
-      ArtifactName: 'drop'
+      targetPath: '$(Pipeline.Workspace)'
+      artifact: 'java-8'
+      publishLocation: 'pipeline'
 
 - job: Build_with_Java_11
   strategy:
@@ -119,7 +120,8 @@ jobs:
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
-  - task: PublishPipelineArtifacts@1
+  - task: PublishPipelineArtifact@1
     inputs:
-      PathtoPublish: '$(Pipeline.Workspace)'
-      ArtifactName: 'drop'
+      targetPath: '$(Pipeline.Workspace)'
+      artifact: 'java-11'
+      publishLocation: 'pipeline'
