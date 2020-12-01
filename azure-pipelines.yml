@@ -64,7 +64,12 @@ jobs:
       publishJUnitResults: true
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Build.Repository.LocalPath)/package/target'
+      targetPath: '$(Build.Repository.LocalPath)/package/target/*.jar'
+      artifact: 'driver-4.java-8.$(ImageName)'
+      publishLocation: 'pipeline'
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.Repository.LocalPath)/pom.xml'
       artifact: 'driver-4.java-8.$(ImageName)'
       publishLocation: 'pipeline'
 
