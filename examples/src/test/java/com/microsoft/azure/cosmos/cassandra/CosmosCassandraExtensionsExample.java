@@ -14,7 +14,6 @@ import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.SocketOptions;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
-import com.datastax.driver.core.policies.ExponentialReconnectionPolicy;
 import org.testng.annotations.Test;
 
 import java.text.SimpleDateFormat;
