@@ -109,7 +109,7 @@ public final class TestCommon {
             "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy','replication_factor':3}",
             keyspaceName));
 
-        Thread.sleep(5000);
+        Thread.sleep(5_000);
 
         session.execute(format(
             "CREATE TABLE IF NOT EXISTS %s.%s ("
@@ -122,7 +122,7 @@ public final class TestCommon {
             keyspaceName,
             tableName));
 
-        Thread.sleep(5000);
+        Thread.sleep(5_000);
     }
 
     /**
@@ -154,7 +154,21 @@ public final class TestCommon {
         }
     }
 
-    static String getPropertyOrEnvironmentVariable(final String property, final String variable, final String defaultValue) {
+    /**
+     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
+     * <p>
+     * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
+     *
+     * @param property     a system property name.
+     * @param variable     an environment variable name.
+     * @param defaultValue the default value--which may be {@code null}--to be used if neither {@code property} or
+     *                     {@code variable} is set.
+     *
+     * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
+     * {@code defaultValue}.
+     */
+    static String getPropertyOrEnvironmentVariable(
+        final String property, final String variable, final String defaultValue) {
 
         String value = System.getProperty(property);
 
@@ -169,14 +183,13 @@ public final class TestCommon {
         return value;
     }
 
-    static ResultSet read(final Session session, final String keyspaceName, final String tableName) {
-        return read(session, ConsistencyLevel.ONE, keyspaceName, tableName);
-    }
-
     /**
-     * Queries data, retrying if necessary with a downgraded CL.
+     * Queries data, retrying if necessary with a downgraded consistency level.
      *
-     * @param consistencyLevel the consistency level to apply.
+     * @param session          the session for executing requests.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
+     * @param keyspaceName     name of the keyspace to query.
+     * @param tableName        name of the table to query.
      */
     static ResultSet read(
         final Session session,
@@ -197,22 +210,31 @@ public final class TestCommon {
                 .setConsistencyLevel(consistencyLevel);
 
         final ResultSet rows = session.execute(statement);
+
         System.out.println("Read succeeded at " + consistencyLevel);
         return rows;
     }
 
+    /**
+     * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
+     * <p>
+     * Hyphens are removed from the generated {@link UUID} before it is joined to the {@code prefix} with an underscore.
+     *
+     * @param prefix a string that starts the unique name.
+     *
+     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;.
+     */
     static String uniqueName(final String prefix) {
         return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
-    }
-
-    static void write(final Session session, final String keyspaceName, final String tableName) {
-        write(session, ConsistencyLevel.ONE, keyspaceName, tableName);
     }
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *
-     * @param consistencyLevel the consistency level to apply.
+     * @param session          the session for executing requests.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
+     * @param keyspaceName     name of the keyspace to query.
+     * @param tableName        name of the table to query.
      */
     static void write(
         final Session session,

@@ -23,6 +23,7 @@ import static com.microsoft.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.cleanUp;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.display;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.read;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.write;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,6 +74,13 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
  * runs.
  * </ol>
+ * <h3>
+ * Notes:
+ * <ul>
+ * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy} does; feel free to adapt it to your application needs;
+ * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on
+ * idempotence for more information.
+ * </ul>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
@@ -113,7 +121,7 @@ public class CosmosRetryPolicyTest {
             ).doesNotThrowAnyException();
 
             assertThatCode(() -> {
-                final ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
+                final ResultSet rows = read(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
                 display(rows);
             }).doesNotThrowAnyException();
 

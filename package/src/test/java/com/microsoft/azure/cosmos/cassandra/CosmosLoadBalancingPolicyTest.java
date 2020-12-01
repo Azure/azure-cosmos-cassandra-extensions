@@ -44,8 +44,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <h3>
  * Preconditions:
  * <ol>
- * <li>A Cosmos DB Cassandra API account is required.
- * <li>These system variables or--alternatively--environment variables must be set.
+ * <li> A Cosmos DB Cassandra API account is required. It should have two regions, one used as a read datacenter (e.g,
+ * East US) and another used as a write datacenter (e.g., West US).
+ * <li> These system or--alternatively--environment variables must be set.
  * <table>
  * <thead>
  * <tr>
@@ -102,14 +103,14 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
-    private static final int TIMEOUT = 300000;
+    private static final int TIMEOUT = 300_000;
 
     // endregion
 
     // region Methods
 
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
-    public void testGlobalAndReadDC() {
+    public void testGlobalEndpointAndReadDatacenter() {
         testAllStatements(
             connect(CosmosLoadBalancingPolicy.builder()
                 .withGlobalEndpoint(GLOBAL_ENDPOINT)

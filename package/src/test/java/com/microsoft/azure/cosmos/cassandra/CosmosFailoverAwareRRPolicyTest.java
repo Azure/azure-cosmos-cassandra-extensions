@@ -4,6 +4,7 @@
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
@@ -16,6 +17,7 @@ import static com.microsoft.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.cleanUp;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.display;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.read;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.microsoft.azure.cosmos.cassandra.TestCommon.write;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -92,11 +94,11 @@ public class CosmosFailoverAwareRRPolicyTest {
             ).doesNotThrowAnyException();
 
             assertThatCode(() ->
-                write(session, KEYSPACE_NAME, TABLE_NAME)
+                write(session, ConsistencyLevel.ONE, KEYSPACE_NAME, TABLE_NAME)
             ).doesNotThrowAnyException();
 
             assertThatCode(() -> {
-                final ResultSet rows = TestCommon.read(session, KEYSPACE_NAME, TABLE_NAME);
+                final ResultSet rows = read(session, ConsistencyLevel.ONE, KEYSPACE_NAME, TABLE_NAME);
                 display(rows);
             }).doesNotThrowAnyException();
 

@@ -71,11 +71,11 @@ import static org.assertj.core.api.Assertions.fail;
  * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
- * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
+ * runs, we generate a keyspace names of the form <b>downgrading_</b><i>&lt;random-uuid&gt;</i>. Should a keyspace by this
  * name already exists, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
- * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
+ * <li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
  * runs.</ol>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
@@ -187,7 +187,8 @@ public class CosmosCassandraExtensionsExample {
      * Initiates a connection to the cluster specified by the given contact points and port.
      * <p>
      * Default options that are relevant to performance and reliability when accessing a Cosmos DB Cassandra API
-     * instance are called out explicitly here.
+     * instance are called out explicitly here. Recommendation: Use the defaults for the options that are specified
+     * here.
      */
     private static Session connect() {
 

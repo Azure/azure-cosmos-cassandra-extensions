@@ -133,6 +133,10 @@ Licensed under the MIT License.
           <version>3.2.0</version>
         </plugin>
         <plugin>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-source-plugin</artifactId>
           <version>3.2.1</version>
         </plugin>
@@ -173,6 +177,7 @@ Licensed under the MIT License.
         <artifactId>maven-javadoc-plugin</artifactId>
         <inherited>true</inherited>
         <configuration>
+          <doclint>all,-html</doclint>
           <quiet>true</quiet>
           <verbose>false</verbose>
           <sourceFileExcludes>
@@ -199,7 +204,6 @@ Licensed under the MIT License.
           </execution>
         </executions>
       </plugin>
-      <!-- This plugin scans reports on bugs in the code -->
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
@@ -216,7 +220,6 @@ Licensed under the MIT License.
           <threshold>Low</threshold>
           <xmlOutput>true</xmlOutput>
           <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
-          <!--excludeFilterFile>spotbugs/spotbugs-exclude.xml</excludeFilterFile-->
           <failOnError>true</failOnError>
           <includeTests>true</includeTests>
           <fork>true</fork>
