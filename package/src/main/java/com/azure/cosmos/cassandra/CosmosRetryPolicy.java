@@ -7,6 +7,8 @@ import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
+import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
+import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
@@ -143,9 +145,12 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     }
 
     @Override
-    public RetryDecision onRequestAborted(@NonNull final Request request, @NonNull final Throwable error, final int retryCount) {
-        // TODO (DANOBLE) Implement CosmosRetryPolicy.onRequestAborted
-        return null;
+    public RetryDecision onRequestAborted(
+        @NonNull final Request request, @NonNull final Throwable error, final int retryCount) {
+
+        return error instanceof ClosedConnectionException || error instanceof HeartbeatException
+            ? this.retryManyTimesOrThrow(retryCount)
+            : null;
     }
 
     @Override

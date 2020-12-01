@@ -20,6 +20,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -227,9 +228,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Privates
 
     /**
-     * DNS lookup based on the globalContactPoint and update localAddresses.
+     * DNS lookup based on the {@link #globalEndpoint} address.
+     * <p>
+     * If {@link #dnsExpiryTimeInSeconds} has elapsed, the array of local addresses is also updated.
      *
-     * @return updated array of local addresses corresponding to the globalContactPoint.
+     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpiryTimeInSeconds}
+     * has elapsed.
+     *
+     * @throws IllegalStateException if the DNS could not resolve the {@link #globalEndpoint} and local addresses have
+     * not yet been enumerated.
      */
     private InetAddress[] getLocalAddresses() {
 
@@ -240,7 +247,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } catch (final UnknownHostException error) {
                 // DNS entry may be temporarily unavailable
                 if (this.localAddresses == null) {
-                    throw new IllegalArgumentException("The DNS could not resolve "
+                    throw new IllegalStateException("The DNS could not resolve "
                         + Option.GLOBAL_ENDPOINT.getPath()
                         + " = "
                         + this.globalEndpoint
@@ -268,13 +275,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private InetAddress getAddress(final Node node) {
 
-        // TODO (DANOBLE) Under what circumstances might a cast from InetAddress to InetSocketAddress fail?
-        //   EndPoint.resolve returns an InetAddress which--in the case of the standard Datastax EndPoint types--
-        //   can safely be be cast to an InetSocketAddress. Derived types--e.g., test types--might not return an
-        //   InetSocketAddress. The question therefore becomes: What should we do when we find that the InetAddress
-        //   cannot be cast to an InetSocketAddress?
+        final SocketAddress address = node.getEndPoint().resolve();
 
-        return ((InetSocketAddress) node.getEndPoint().resolve()).getAddress();
+        if (address instanceof InetSocketAddress) {
+            return ((InetSocketAddress) address).getAddress();
+        }
+
+        throw new IllegalArgumentException("expected node endpoint address to resolve to InetSocketAddress, not "
+            + address.getClass());
     }
 
     private static boolean isReadRequest(final String query) {
