@@ -64,8 +64,8 @@ jobs:
       publishJUnitResults: true
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Pipeline.Workspace)'
-      artifact: 'java-8'
+      targetPath: '$(Build.Repository.LocalPath)/package/target'
+      artifact: 'driver-4.java-8.$(ImageName)'
       publishLocation: 'pipeline'
 
 - job: Build_with_Java_11
@@ -122,6 +122,6 @@ jobs:
       publishJUnitResults: true
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Pipeline.Workspace)'
-      artifact: 'java-11'
+      targetPath: '$(Build.Repository.LocalPath)/package/target'
+      artifact: 'driver-4.java-11.$(ImageName)'
       publishLocation: 'pipeline'
