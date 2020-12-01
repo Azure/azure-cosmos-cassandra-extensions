@@ -10,7 +10,9 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static java.lang.String.format;
@@ -47,6 +49,10 @@ public final class TestCommon {
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
+     *
+     * @param session      the session for executing requests.
+     * @param keyspaceName name of the keyspace to query.
+     * @param tableName    name of the table to query.
      */
     static void createSchema(final CqlSession session, final String keyspaceName, final String tableName) throws InterruptedException {
 
@@ -60,8 +66,7 @@ public final class TestCommon {
             "CREATE TABLE IF NOT EXISTS %s.%s ("
                 + "sensor_id uuid,"
                 + "date date,"
-                + // emulates bucketing by day
-                "timestamp timestamp,"
+                + "timestamp timestamp,"  // emulates bucketing by day
                 + "value double,"
                 + "PRIMARY KEY ((sensor_id,date),timestamp)"
                 + ")",
@@ -76,7 +81,7 @@ public final class TestCommon {
      *
      * @param rows the results to display.
      */
-    static void display(final ResultSet rows) {
+    static void display(@NonNull final ResultSet rows) {
 
         final int width1 = 38;
         final int width2 = 12;
@@ -96,7 +101,21 @@ public final class TestCommon {
         }
     }
 
-    static String getPropertyOrEnvironmentVariable(final String property, final String variable, final String defaultValue) {
+    /**
+     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
+     * <p>
+     * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
+     *
+     * @param property     a system property name.
+     * @param variable     an environment variable name.
+     * @param defaultValue the default value--which may be {@code null}--to be used if neither {@code property} or
+     *                     {@code variable} is set.
+     *
+     * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
+     * {@code defaultValue}.
+     */
+    static String getPropertyOrEnvironmentVariable(
+        @NonNull final String property, @NonNull final String variable, final String defaultValue) {
 
         String value = System.getProperty(property);
 
@@ -112,15 +131,20 @@ public final class TestCommon {
     }
 
     /**
-     * Queries data, retrying if necessary with a downgraded CL.
+     * Queries data, retrying if necessary with a downgraded consistency level.
      *
-     * @param consistencyLevel the consistency level to apply.
+     * @param session          the session for executing requests.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
+     * @param keyspaceName     name of the keyspace to query.
+     * @param tableName        name of the table to query.
      */
+    @SuppressWarnings("SameParameterValue")
+    @NonNull
     static ResultSet read(
-        final CqlSession session,
+        @NonNull final CqlSession session,
         final ConsistencyLevel consistencyLevel,
-        final String keyspaceName,
-        final String tableName) {
+        @NonNull final String keyspaceName,
+        @NonNull final String tableName) {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
@@ -142,16 +166,33 @@ public final class TestCommon {
     }
 
     /**
+     * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
+     * <p>
+     * Hyphens are removed from the generated {@link UUID} before it is joined to the {@code prefix} with an underscore.
+     *
+     * @param prefix a string that starts the unique name.
+     *
+     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;.
+     */
+    @NonNull
+    static String uniqueName(@NonNull final String prefix) {
+        return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *
-     * @param consistencyLevel the consistency level to apply.
+     * @param session          the session for executing requests.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
+     * @param keyspaceName     name of the keyspace to query.
+     * @param tableName        name of the table to query.
      */
     @SuppressWarnings("SameParameterValue")
     static void write(
-        final CqlSession session,
+        @NonNull final CqlSession session,
         final ConsistencyLevel consistencyLevel,
-        final String keyspaceName,
-        final String tableName) {
+        @NonNull final String keyspaceName,
+        @NonNull final String tableName) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 

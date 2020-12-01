@@ -13,6 +13,7 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
@@ -39,7 +40,9 @@ import java.util.regex.Matcher;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
+import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,19 +51,60 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
- * <p>
+ * <h3>
  * Preconditions:
- * <ul>
- * <li> A CosmosDB CassandraAPI account is required. It should have two regions: readDC (e.g, East US 2)
- * and writeDC (e.g, West US 2). globalEndpoint, username, and password fields should be populated.
- * <p>
+ * <ol>
+ * <li> A Cosmos DB Cassandra API account is required. It should have two regions, one used as a read datacenter (e.g,
+ * East US) and another used as a write datacenter (e.g., West US).
+ * <li> These system or--alternatively--environment variables must be set.
+ * <table>
+ * <thead>
+ * <tr>
+ * <th>System variable</th>
+ * <th>Environment variable</th>
+ * <th>Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>azure.cosmos.cassandra.global-endpoint</td>
+ * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
+ * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.username</td>
+ * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
+ * <td>Username for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.password</td>
+ * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
+ * <td>Password for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.read-datacenter</td>
+ * <td>AZURE_COSMOS_CASSANDRA_READ_DATACENTER</td>
+ * <td>Read datacenter name (e.g., "East US")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.write-datacenter</td>
+ * <td>AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER</td>
+ * <td>Write datacenter name (e.g., "West US")</td>
+ * </tr>
+ * </tbody>
+ * </table>
+ * </ol>
+ * <h3>
  * Side effects:
  * <ol>
- * <li>Creates a new keyspace {@code keyspaceName} in the cluster, with replication factor 3. If a
- * keyspace with this name already exists, it will be reused;
- * <li>Creates a new table {@code keyspaceName.tableName}. If a table with that name exists
- * already, it will be reused.
- * <li>Executes all types of Statement queries.
+ * <li>Creates a number of keyspaces in the cluster, each with replication factor 3. To prevent collisions especially
+ * during CI test runs, we generate keyspace names of the form <i><name></i><b>_</b><i></i><random-uuid></i>. Should a
+ * keyspace by the generated name already exists, it is reused.
+ * <li>Creates a table within each keyspace created or reused. If a table with a given name already exists, it is
+ * reused.
+ * <li>Executes all types of {@link Statement} queries.
+ * </li>The keyspaces created or reused are then dropped. This prevents keyspaces from accumulating with repeated test
+ * runs.
  * </ol>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
@@ -79,11 +123,7 @@ public class CosmosLoadBalancingPolicyTest {
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
 
-    private static final String KEYSPACE_NAME_SUFFIX = "_" + UUID.randomUUID().toString().replace("-", "");
-    private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT = 300_000;
-
-    private String keyspaceName;
 
     // endregion
 
@@ -93,8 +133,6 @@ public class CosmosLoadBalancingPolicyTest {
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointAndReadDatacenter() {
 
-        this.keyspaceName = "globalAndRead" + KEYSPACE_NAME_SUFFIX;
-
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
             .withString(Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
             .withString(Option.READ_DATACENTER, READ_DATACENTER)
@@ -102,15 +140,13 @@ public class CosmosLoadBalancingPolicyTest {
             .build();
 
         try (final CqlSession session = this.connect(configLoader)) {
-            this.testAllStatements(session);
+            this.testAllStatements(session, uniqueName("globalAndRead"));
         }
     }
 
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
-
-        this.keyspaceName = "globalOnly" + KEYSPACE_NAME_SUFFIX;
 
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
             .withString(Option.GLOBAL_ENDPOINT, GLOBAL_ENDPOINT)
@@ -119,7 +155,7 @@ public class CosmosLoadBalancingPolicyTest {
             .build();
 
         try (final CqlSession session = this.connect(configLoader)) {
-            this.testAllStatements(session);
+            this.testAllStatements(session, uniqueName("globalOnly"));
         }
     }
 
@@ -183,8 +219,6 @@ public class CosmosLoadBalancingPolicyTest {
             throw new SkipException("WRITE_DATACENTER is empty");
         }
 
-        this.keyspaceName = "readWriteDCv2" + KEYSPACE_NAME_SUFFIX;
-
         final DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
             .withString(Option.GLOBAL_ENDPOINT, "")
             .withString(Option.READ_DATACENTER, READ_DATACENTER)
@@ -192,7 +226,7 @@ public class CosmosLoadBalancingPolicyTest {
             .build();
 
         try (final CqlSession session = this.connect(driverConfigLoader)) {
-            this.testAllStatements(session);
+            this.testAllStatements(session, uniqueName("readWriteDCv2"));
         }
     }
 
@@ -200,8 +234,8 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
-    private void cleanUp(@NonNull final CqlSession session) {
-        session.execute(format("DROP KEYSPACE IF EXISTS %s", this.keyspaceName));
+    private void cleanUp(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
+        session.execute(format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
     }
 
     @NonNull
@@ -227,36 +261,38 @@ public class CosmosLoadBalancingPolicyTest {
             DefaultRetryPolicy.class);
     }
 
-    private void testAllStatements(final CqlSession session) {
+    private void testAllStatements(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
+
+        final String tableName = "sensor_data";
 
         try {
 
             assertThatCode(() ->
-                TestCommon.createSchema(session, this.keyspaceName, TABLE_NAME)
+                createSchema(session, keyspaceName, tableName)
             ).doesNotThrowAnyException();
 
             // SimpleStatements
 
             session.execute(SimpleStatement.newInstance(format(
                 "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
-                this.keyspaceName,
-                TABLE_NAME)));
+                keyspaceName,
+                tableName)));
 
             session.execute(SimpleStatement.newInstance(format(
                 "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
-                this.keyspaceName,
-                TABLE_NAME)));
+                keyspaceName,
+                tableName)));
 
             session.execute(SimpleStatement.newInstance(format(
                 "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
                     + "toTimestamp(now())",
-                this.keyspaceName,
-                TABLE_NAME)));
+                keyspaceName,
+                tableName)));
 
             session.execute(SimpleStatement.newInstance(format(
                 "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
-                this.keyspaceName,
-                TABLE_NAME)));
+                keyspaceName,
+                tableName)));
 
             // Built statements
 
@@ -264,7 +300,7 @@ public class CosmosLoadBalancingPolicyTest {
             final Instant timestamp = Instant.now();
             final UUID uuid = UUID.randomUUID();
 
-            final Select select = QueryBuilder.selectFrom(this.keyspaceName, TABLE_NAME)
+            final Select select = QueryBuilder.selectFrom(keyspaceName, tableName)
                 .all()
                 .whereColumn("sensor_id").isEqualTo(literal(uuid))
                 .whereColumn("date").isEqualTo(literal(date))
@@ -272,14 +308,14 @@ public class CosmosLoadBalancingPolicyTest {
 
             session.execute(select.build());
 
-            final Insert insert = QueryBuilder.insertInto(this.keyspaceName, TABLE_NAME)
+            final Insert insert = QueryBuilder.insertInto(keyspaceName, tableName)
                 .value("sensor_id", literal(uuid))
                 .value("date", literal(date))
                 .value("timestamp", literal(timestamp));
 
             session.execute(insert.build());
 
-            final Update update = QueryBuilder.update(this.keyspaceName, TABLE_NAME)
+            final Update update = QueryBuilder.update(keyspaceName, tableName)
                 .setColumn("value", literal(1.0))
                 .whereColumn("sensor_id").isEqualTo(literal(uuid))
                 .whereColumn("date").isEqualTo(literal(date))
@@ -287,7 +323,7 @@ public class CosmosLoadBalancingPolicyTest {
 
             session.execute(update.build());
 
-            final Delete delete = QueryBuilder.deleteFrom(this.keyspaceName, TABLE_NAME)
+            final Delete delete = QueryBuilder.deleteFrom(keyspaceName, tableName)
                 .whereColumn("sensor_id").isEqualTo(literal(uuid))
                 .whereColumn("date").isEqualTo(literal(date))
                 .whereColumn("timestamp").isEqualTo(literal(timestamp));
@@ -298,32 +334,32 @@ public class CosmosLoadBalancingPolicyTest {
 
             PreparedStatement preparedStatement = session.prepare(format(
                 "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
-                this.keyspaceName,
-                TABLE_NAME));
+                keyspaceName,
+                tableName));
 
             BoundStatement boundStatement = preparedStatement.bind(uuid, date);
             session.execute(boundStatement);
 
             preparedStatement = session.prepare(format(
                 "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
-                this.keyspaceName,
-                TABLE_NAME));
+                keyspaceName,
+                tableName));
 
             boundStatement = preparedStatement.bind(uuid, date, timestamp);
             session.execute(boundStatement);
 
             preparedStatement = session.prepare(format(
                 "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-                this.keyspaceName,
-                TABLE_NAME));
+                keyspaceName,
+                tableName));
 
             boundStatement = preparedStatement.bind(uuid, date, timestamp);
             session.execute(boundStatement);
 
             preparedStatement = session.prepare(format(
                 "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-                this.keyspaceName,
-                TABLE_NAME));
+                keyspaceName,
+                tableName));
 
             boundStatement = preparedStatement.bind(uuid, date, timestamp);
             session.execute(boundStatement);
@@ -337,7 +373,7 @@ public class CosmosLoadBalancingPolicyTest {
             session.execute(batchStatement);
 
         } finally {
-            this.cleanUp(session);
+            this.cleanUp(session, keyspaceName);
         }
     }
 

@@ -19,6 +19,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -26,45 +27,66 @@ import org.testng.annotations.Test;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.UUID;
 import java.util.regex.Matcher;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.azure.cosmos.cassandra.TestCommon.HOSTNAME_AND_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.display;
+import static com.azure.cosmos.cassandra.TestCommon.read;
+import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
+import static com.azure.cosmos.cassandra.TestCommon.write;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
- * <p>
- * Preconditions:
- * <ul>
- * <li>An Apache Cassandra cluster is running and accessible through the contacts points
- * identified by #CONTACT_POINTS and #PORT.
- * </ul>
- * <p>
- * Side effects:
+ * <h3>
+ * Preconditions
  * <ol>
- * <li>Creates a new keyspace {@code downgrading} in the cluster, with replication factor 3. If a
- * keyspace with this name already exists, it will be reused;
- * <li>Creates a new table {@code downgrading.sensor_data}. If a table with that name exists
- * already, it will be reused;
- * <li>Inserts a few rows, downgrading the consistency level if the operation fails;
- * <li>Queries the table, downgrading the consistency level if the operation fails;
- * <li>Displays the results on the console.
+ * <li>A Cosmos DB Cassandra API account is required.
+ * <li>These system variables or--alternatively--environment variables must be set.
+ * <table>
+ * <thead>
+ * <tr>
+ * <th>System variable</th>
+ * <th>Environment variable</th>
+ * <th>Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>azure.cosmos.cassandra.global-endpoint</td>
+ * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
+ * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.username</td>
+ * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
+ * <td>Username for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.password</td>
+ * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
+ * <td>Password for authentication</td>
+ * </tr>
+ * </tbody>
+ * </table>
  * </ol>
- * <p>
- * Notes:
- * <ul>
- * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy}
- * does; feel free to adapt it to your application needs;
- * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on
- * idempotence for more information.
- * </ul>
+ * <h3>
+ * Side effects
+ * <ol>
+ * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
+ * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
+ * name already exists, it is reused.
+ * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
+ * reused.
+ * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
+ * runs.
+ * </ol>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
@@ -80,12 +102,12 @@ public class CosmosRetryPolicyTest {
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
     private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicy.Option.FIXED_BACKOFF_TIME.getDefaultValue();
     private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicy.Option.GROWING_BACKOFF_TIME.getDefaultValue();
-    private static final String KEYSPACE_NAME = "downgrading_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String KEYSPACE_NAME = uniqueName("downgrading");
     private static final int MAX_RETRIES = CosmosRetryPolicy.Option.MAX_RETRIES.getDefaultValue();
     private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT = 30_0000;
 
-    private CqlSession session;
+    private CqlSession session = null;
 
     // endregion
 
@@ -95,15 +117,15 @@ public class CosmosRetryPolicyTest {
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() ->
-            TestCommon.createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
+            createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() ->
-            TestCommon.write(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
+            write(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            final ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
+            final ResultSet rows = read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
             display(rows);
         }).doesNotThrowAnyException();
     }
@@ -147,7 +169,8 @@ public class CosmosRetryPolicyTest {
     }
 
     /**
-     * Closes the session, if it's been instantiated.
+     * Closes the {@link #session} for testing {@link CosmosRetryPolicy} after dropping {@link #KEYSPACE_NAME}, if it
+     * exists.
      */
     @AfterClass
     public void cleanUp() {
@@ -160,9 +183,12 @@ public class CosmosRetryPolicyTest {
         }
     }
 
+    /**
+     * Opens the {@link #session} for testing {@link CosmosRetryPolicy}.
+     */
     @BeforeClass
     public void connect() {
-        this.session = this.connect(GLOBAL_ENDPOINT, USERNAME, PASSWORD, LOCAL_DATACENTER);
+        this.session = connect(GLOBAL_ENDPOINT, USERNAME, PASSWORD, LOCAL_DATACENTER);
     }
 
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
@@ -178,13 +204,18 @@ public class CosmosRetryPolicyTest {
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param globalEndPoint the contact points to use.
-     * @param username the username for authenticating.
-     * @param password the password for authenticating.
+     * @param globalEndPoint  the contact points to use.
+     * @param username        the username for authenticating.
+     * @param password        the password for authenticating.
+     * @param localDatacenter the local datacenter.
      */
     @SuppressWarnings("SameParameterValue")
-    private CqlSession connect(
-        final String globalEndPoint, final String username, final String password, final String localDatacenter) {
+    @NonNull
+    private static CqlSession connect(
+        @NonNull final String globalEndPoint,
+        @NonNull final String username,
+        @NonNull final String password,
+        @NonNull final String localDatacenter) {
 
         final Matcher address = HOSTNAME_AND_PORT.matcher(globalEndPoint);
         assertThat(address.matches()).isTrue();
@@ -193,7 +224,7 @@ public class CosmosRetryPolicyTest {
             address.group("hostname"),
             Integer.parseUnsignedInt(address.group("port")))));
 
-        this.session = CqlSession.builder()
+        return CqlSession.builder()
             .withConfigLoader(DriverConfigLoader.programmaticBuilder()
                 .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
                 .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, CosmosRetryPolicy.class)
@@ -202,8 +233,6 @@ public class CosmosRetryPolicyTest {
             .withLocalDatacenter(localDatacenter)
             .addContactEndPoints(endPoints)
             .build();
-
-        return this.session;
     }
 
     /**
