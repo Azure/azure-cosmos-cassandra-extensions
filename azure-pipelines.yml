@@ -30,6 +30,7 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'help:active-profiles install'
+      findBugsRunAnalysis: 'true'
       options: '-DskipTests'
   - task: Maven@3
     inputs:
@@ -45,8 +46,8 @@ jobs:
         -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
         -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
         -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
-      publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
   - task: Maven@3
     inputs:
       mavenPomFile: 'examples/pom.xml'
@@ -59,13 +60,12 @@ jobs:
         -Ddatastax-java-driver.advanced.auth-provider.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
         -Ddatastax-java-driver.basic.load-balancing-policy.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
-      publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
-  - task: PublishBuildArtifacts@1
+      publishJUnitResults: true
+  - task: PublishPipelineArtifacts@1
     inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      targetPath: $(Pipeline.Workspace)
       ArtifactName: 'drop'
-      publishLocation: 'Container'
 
 - job: Build_with_Java_11
   strategy:
@@ -103,8 +103,8 @@ jobs:
         -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
         -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
         -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
-      publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
   - task: Maven@3
     inputs:
       mavenPomFile: 'examples/pom.xml'
@@ -117,10 +117,9 @@ jobs:
         -Ddatastax-java-driver.advanced.auth-provider.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
         -Ddatastax-java-driver.basic.load-balancing-policy.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
-      publishJUnitResults: true
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
-  - task: PublishBuildArtifacts@1
+      publishJUnitResults: true
+  - task: PublishPipelineArtifacts@1
     inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      PathtoPublish: '$(Pipeline.Workspace)'
       ArtifactName: 'drop'
-      publishLocation: 'Container'
