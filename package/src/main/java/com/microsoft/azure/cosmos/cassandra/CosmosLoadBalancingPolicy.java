@@ -223,10 +223,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Privates
 
     /**
-     * DNS lookup based on the globalContactPoint and update localAddresses.
+     * DNS lookup based on the {@link #globalContactPoint}.
+     * <p>
+     * If {@link #dnsExpirationInSeconds} has elapsed, the array of local addresses is also updated.
      *
-     * @return
+     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpirationInSeconds}
+     * has elapsed.
      */
+    @SuppressWarnings("DuplicatedCode")
     private InetAddress[] getLocalAddresses() {
         if (this.localAddresses == null || this.dnsExpired()) {
             try {

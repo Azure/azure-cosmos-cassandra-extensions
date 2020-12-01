@@ -166,6 +166,15 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         return (CopyOnWriteArrayList<Host>) list.clone();
     }
 
+    /**
+     * DNS lookup based on the {@link #globalContactPoint}.
+     * <p>
+     * If {@link #dnsExpirationInSeconds} has elapsed, the array of local addresses is also updated.
+     *
+     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpirationInSeconds}
+     * has elapsed.
+     */
+    @SuppressWarnings("DuplicatedCode")
     private InetAddress[] getLocalAddresses() {
 
         if (this.localAddresses == null || this.dnsExpired()) {
