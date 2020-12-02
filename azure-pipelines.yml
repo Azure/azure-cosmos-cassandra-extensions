@@ -66,7 +66,7 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: PowerShell@2
-    displayName: 'Copy package artifacts to Build.ArtifactsStagingDirectory'
+    displayName: 'Stage artifacts'
     inputs:
       targetType: 'inline'
       script: |
@@ -83,7 +83,7 @@ jobs:
       pwsh: true
       workingDirectory: '$(Build.Repository.LocalPath)/package/target'
   - task: PublishPipelineArtifact@1
-    displayName: 'Publish contents of Build.ArtifactsStagingDirectory'
+    displayName: 'Publish staged artifacts'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'driver-4.java-8.$(ImageName)'
@@ -146,7 +146,7 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: PowerShell@2
-    displayName: 'Copy package artifacts to Build.ArtifactsStagingDirectory'
+    displayName: 'Stage artifacts'
     inputs:
       targetType: 'inline'
       script: |
@@ -163,7 +163,7 @@ jobs:
       pwsh: true
       workingDirectory: '$(Build.Repository.LocalPath)/package/target'
   - task: PublishPipelineArtifact@1
-    displayName: 'Publish contents of Build.ArtifactsStagingDirectory'
+    displayName: 'Publish staged artifacts'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'driver-4.java-11.$(ImageName)'
