@@ -141,7 +141,7 @@ jobs:
       targetType: 'inline'
       script: |
         $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
-        $targetDirectory = New-Item -ItemType Directory $BUILD_ARTIFACTSTAGINGDIRECTORY }}/$packageName
+        $targetDirectory = New-Item -ItemType Directory $BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
         
         Copy-Item *.jar $targetDirectory
         Copy-Item ../pom.xml $targetDirectory/$packageName.pom
