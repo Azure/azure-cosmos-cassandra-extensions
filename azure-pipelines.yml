@@ -3,10 +3,12 @@
 # Reference: https://docs.microsoft.com/azure/devops/pipelines/languages/java
 
 trigger:
-- main
+- develop/java-driver-4
+- release/java-driver-4/*
 
 pr:
-- main
+- develop/java-driver-4
+- release/java-driver-4/*
 
 jobs:
 - job: Build_with_Java_8
