@@ -151,7 +151,7 @@ jobs:
         
         Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
       pwsh: true
-      workingDirectory: '$(Build.Repository.LocalPath/package/target'
+      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
   - task: PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
