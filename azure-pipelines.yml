@@ -3,10 +3,12 @@
 # Reference: https://docs.microsoft.com/azure/devops/pipelines/languages/java
 
 trigger:
-- main
+- master
+- release/java-driver-3/*
 
 pr:
-- main
+- master
+- release/java-driver-3/*
 
 jobs:
 - job: Build_with_Java_8
