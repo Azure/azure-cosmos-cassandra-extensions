@@ -67,11 +67,6 @@ jobs:
       targetPath: '$(Build.Repository.LocalPath)/package/target'
       artifact: 'driver-4.java-8.$(ImageName)'
       publishLocation: 'pipeline'
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: '$(Build.Repository.LocalPath)/pom.xml'
-      artifact: 'driver-4.java-8.$(ImageName)'
-      publishLocation: 'pipeline'
 
 - job: Build_with_Java_11
   strategy:
