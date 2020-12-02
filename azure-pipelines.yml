@@ -23,6 +23,7 @@ jobs:
     vmImage: $(ImageName)
   steps:
   - task: Maven@3
+    displayName: 'Build'
     inputs:
       mavenPomFile: 'pom.xml'
       javaHomeOption: 'JDKVersion'
@@ -33,6 +34,7 @@ jobs:
       findBugsRunAnalysis: true
       options: '-DskipTests'
   - task: Maven@3
+    displayName: 'Verify package'
     inputs:
       mavenPomFile: 'package/pom.xml'
       javaHomeOption: 'JDKVersion'
@@ -49,6 +51,7 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: Maven@3
+    displayName: 'Verify examples'
     inputs:
       mavenPomFile: 'examples/pom.xml'
       mavenOptions: '-Xmx3072m'
@@ -62,22 +65,25 @@ jobs:
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
-  - task: CopyFiles@2
+  - task: PowerShell@2
+    displayName: 'Copy package artifacts to Build.ArtifactsStagingDirectory'
     inputs:
-      SourceFolder: '.'
-      Contents: 'pom.xml'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4'
-  - task: CopyFiles@2
-    inputs:
-      SourceFolder: 'package'
-      Contents: 'pom.xml'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4-extensions'
-  - task: CopyFiles@2
-    inputs:
-      SourceFolder: 'package/target'
-      Contents: '*.jar'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4-extensions'
+      targetType: 'inline'
+      script: |
+        $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
+        $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+        
+        Copy-Item *.jar $targetDirectory
+        Copy-Item ../pom.xml $targetDirectory/$packageName.pom
+        
+        $packageName = $packageName.Split("-extensions-") -join "-"
+        $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+        
+        Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
+      pwsh: true
+      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
   - task: PublishPipelineArtifact@1
+    displayName: 'Publish contents of Build.ArtifactsStagingDirectory'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'driver-4.java-8.$(ImageName)'
@@ -97,6 +103,7 @@ jobs:
     vmImage: $(ImageName)
   steps:
   - task: Maven@3
+    displayName: 'Build'
     inputs:
       mavenPomFile: 'pom.xml'
       javaHomeOption: 'JDKVersion'
@@ -107,6 +114,7 @@ jobs:
       findBugsRunAnalysis: true
       options: '-DskipTests'
   - task: Maven@3
+    displayName: 'Verify package'
     inputs:
       mavenPomFile: 'package/pom.xml'
       javaHomeOption: 'JDKVersion'
@@ -123,6 +131,7 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: Maven@3
+    displayName: 'Verify examples'
     inputs:
       mavenPomFile: 'examples/pom.xml'
       mavenOptions: '-Xmx3072m'
@@ -137,6 +146,7 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: PowerShell@2
+    displayName: 'Copy package artifacts to Build.ArtifactsStagingDirectory'
     inputs:
       targetType: 'inline'
       script: |
@@ -153,6 +163,7 @@ jobs:
       pwsh: true
       workingDirectory: '$(Build.Repository.LocalPath)/package/target'
   - task: PublishPipelineArtifact@1
+    displayName: 'Publish contents of Build.ArtifactsStagingDirectory'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'driver-4.java-11.$(ImageName)'
