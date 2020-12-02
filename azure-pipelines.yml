@@ -136,8 +136,24 @@ jobs:
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
+        $targetDirectory = New-Item -ItemType Directory $(Build.ArtifactStagingDirectory)/$packageName
+        
+        Copy-Item *.jar $targetDirectory
+        Copy-Item ../pom.xml $targetDirectory/$packageName.pom
+        
+        $packageName = $packageName.Split("-extensions-") -join "-"
+        $targetDirectory = New-Item -ItemType Directory $(Build.ArtifactStagingDirectory)/$packageName
+        
+        Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
+      pwsh: true
+      workingDirectory: '$(Build.Repository.LocalPath/package/target'
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Build.Repository.LocalPath)/package/target'
+      targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'driver-4.java-11.$(ImageName)'
       publishLocation: 'pipeline'
