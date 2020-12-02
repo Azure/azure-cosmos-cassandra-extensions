@@ -79,14 +79,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
             if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
                 throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is not specified, "
-                    + "you must specify both " + Option.READ_DATACENTER.getPath() + " and " + Option.WRITE_DATACENTER.getPath()
-                    + ".");
+                    + "you must specify both " + Option.READ_DATACENTER.getPath() + " and "
+                    + Option.WRITE_DATACENTER.getPath() + ".");
             }
 
         } else if (!this.writeDatacenter.isEmpty()) {
             throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is specified, you must "
-                + "not specify " + Option.WRITE_DATACENTER.getPath() + ". Writes will go to the default write region when "
-                + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
+                + "not specify " + Option.WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
+                + "when " + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
         }
     }
 
