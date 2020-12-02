@@ -62,6 +62,7 @@ jobs:
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+  
   - task: PublishPipelineArtifact@1
     inputs:
       targetPath: '$(Build.Repository.LocalPath)/package/target'
