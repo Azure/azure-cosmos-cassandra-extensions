@@ -62,10 +62,24 @@ jobs:
         -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
-  
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '.'
+      Contents: 'pom.xml'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4'
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: 'package'
+      Contents: 'pom.xml'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4-extensions'
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: 'package/target'
+      Contents: '*.jar'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4-extensions'
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Build.Repository.LocalPath)/package/target'
+      targetPath: '$(Build.ArtifactStagingDirectory)'
       artifact: 'driver-4.java-8.$(ImageName)'
       publishLocation: 'pipeline'
 
