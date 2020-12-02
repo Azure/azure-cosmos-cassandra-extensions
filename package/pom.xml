@@ -1,65 +1,58 @@
 <!--
- The MIT License (MIT)
- Copyright (c) 2018 Microsoft Corporation
- 
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- 
- The above copyright notice and this permission notice shall be included in all
- copies or substantial portions of the Software.
- 
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- SOFTWARE.
+Copyright (c) Microsoft Corporation. All rights reserved.
+Licensed under the MIT License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
+
+  <artifactId>azure-cosmos-cassandra-extensions</artifactId>
+  <packaging>jar</packaging>
+  <version>0.13.0</version>
+
   <parent>
     <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
     <groupId>com.microsoft.azure</groupId>
-    <version>0.12.1</version>
+    <version>0.13.0</version>
   </parent>
-  <artifactId>azure-cosmos-cassandra-extensions</artifactId>
-  <name>Azure Cosmos Cassandra Extensions for Java</name>
-  <packaging>jar</packaging>
-  <properties>
-    <version.assertj-core>3.11.1</version.assertj-core>
-    <version.cassandra-driver-core>3.6.0</version.cassandra-driver-core>
-    <version.org.apache.commons.io>2.4</version.org.apache.commons.io>
-    <version.testng>6.14.3</version.testng>
-  </properties>
-  <dependencyManagement/>
+
   <dependencies>
     <dependency>
       <artifactId>cassandra-driver-core</artifactId>
       <groupId>com.datastax.cassandra</groupId>
-      <version>${version.cassandra-driver-core}</version>
     </dependency>
     <dependency>
-      <artifactId>org.apache.commons.io</artifactId>
-      <groupId>org.apache.directory.studio</groupId>
-      <version>${version.org.apache.commons.io}</version>
-    </dependency>
-    <dependency>
-      <artifactId>assertj-core</artifactId>
-      <groupId>org.assertj</groupId>
-      <version>${version.assertj-core}</version>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <artifactId>testng</artifactId>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.testng</groupId>
-      <version>${version.testng}</version>
+      <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
 </project>

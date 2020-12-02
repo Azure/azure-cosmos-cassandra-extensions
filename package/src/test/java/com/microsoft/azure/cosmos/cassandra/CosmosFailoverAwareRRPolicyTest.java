@@ -1,120 +1,138 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) Microsoft. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
 
 package com.microsoft.azure.cosmos.cassandra;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import org.testng.annotations.Test;
 
-import static org.assertj.core.api.Assertions.fail;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.PASSWORD;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.PORT;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.cleanUp;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.createSchema;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.display;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.read;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.uniqueName;
+import static com.microsoft.azure.cosmos.cassandra.TestCommon.write;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * This test illustrates use of the {@link CosmosFailoverAwareRRPolicy} class.
- *
- * <p>Preconditions:
- *
- * <ul>
- * <li> CosmosDB Cassandra account must be created.
- * <li> TestCommon.CONTACT_POINTS is the the global endpoint (e.g *.cassandra.cosmos.azure.com).
- * <li> TestCommon.PORT is 10350.
- * <p>
- * Side effects:
- *
+ * <h3>
+ * Preconditions:
  * <ol>
- * <li>Creates a new keyspace {@code downgrading} in the cluster, with replication factor 3. If a
- * keyspace with this name already exists, it will be reused;
- * <li>Creates a new table {@code downgrading.sensor_data}. If a table with that name exists
- * already, it will be reused;
- * <li>Inserts a few rows, downgrading the consistency level if the operation fails;
- * <li>Queries the table, downgrading the consistency level if the operation fails;
- * <li>Displays the results on the console.
+ * <li>A Cosmos DB Cassandra API account is required.
+ * <li>These system variables or--alternatively--environment variables must be set.
+ * <table>
+ * <thead>
+ * <tr>
+ * <th>System variable</th>
+ * <th>Environment variable</th>
+ * <th>Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>azure.cosmos.cassandra.global-endpoint</td>
+ * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
+ * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.username</td>
+ * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
+ * <td>Username for authentication</td>
+ * </tr>
+ * <tr>
+ * <td>azure.cosmos.cassandra.password</td>
+ * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
+ * <td>Password for authentication</td>
+ * </tr>
+ * </tbody>
+ * </table>
  * </ol>
- * <p>
+ * <h3>
+ * Side effects:
+ * <ol>
+ * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
+ * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
+ * name already exists, it is reused.
+ * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
+ * reused.
+ * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
+ * runs.
+ * </ol>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
 public class CosmosFailoverAwareRRPolicyTest {
 
-    @Test(groups = {"integration", "checkintest"}, timeOut = TIMEOUT)
-    public void cosmosLBPBasicTest() {
-        LoadBalancingPolicy loadBalancingPolicy = new CosmosFailoverAwareRRPolicy(TestCommon.CONTACT_POINTS[0]);
+    // region Fields
+
+    private static final String KEYSPACE_NAME = uniqueName("downgrading");
+    private static final String TABLE_NAME = "sensor_data";
+    private static final int TIMEOUT = 30000;
+
+    // endregion
+
+    // region Methods
+
+    @SuppressWarnings("deprecation")
+    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
+    public void canIntegrateWithCosmos() {
+
+        final Session session = connect(new CosmosFailoverAwareRRPolicy(CONTACT_POINTS[0]));
 
         try {
-            this.connect(TestCommon.CONTACT_POINTS, TestCommon.PORT, loadBalancingPolicy);
-        } catch (Exception error) {
-            fail(String.format("connect failed with %s: %s", error.getClass().getCanonicalName(), error));
-        }
+            assertThatCode(() ->
+                createSchema(session, KEYSPACE_NAME, TABLE_NAME)
+            ).doesNotThrowAnyException();
 
-        try {
-            try {
-                TestCommon.createSchema(session, keyspaceName, tableName);
-            } catch (Exception error) {
-                fail(String.format("createSchema failed: %s", error));
-            }
-            try {
-                TestCommon.write(session, keyspaceName, tableName);
+            assertThatCode(() ->
+                write(session, ConsistencyLevel.ONE, KEYSPACE_NAME, TABLE_NAME)
+            ).doesNotThrowAnyException();
 
-            } catch (Exception error) {
-                fail(String.format("write failed: %s", error));
-            }
-            try {
-                ResultSet rows = TestCommon.read(session, keyspaceName, tableName);
-                TestCommon.display(rows);
-
-            } catch (Exception error) {
-                fail(String.format("read failed: %s", error));
-            }
+            assertThatCode(() -> {
+                final ResultSet rows = read(session, ConsistencyLevel.ONE, KEYSPACE_NAME, TABLE_NAME);
+                display(rows);
+            }).doesNotThrowAnyException();
 
         } finally {
-            this.close();
+            cleanUp(session, KEYSPACE_NAME);
         }
     }
 
-    private static final int TIMEOUT = 30000;
+    // endregion
 
-    private Cluster cluster;
-    private Session session;
-    private String keyspaceName = "downgrading";
-    private String tableName = "sensor_data";
+    // region Privates
 
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
      *
-     * @param contactPoints the contact points to use.
-     * @param port          the port to use.
+     * @param loadBalancingPolicy the load balancing policy under test.
      */
-    private void connect(String[] contactPoints, int port, LoadBalancingPolicy loadBalancingPolicy) {
-        cluster = Cluster.builder().addContactPoints(contactPoints).withPort(port).withLoadBalancingPolicy(loadBalancingPolicy).build();
-        System.out.println("Connected to cluster: " + cluster.getClusterName());
-        session = cluster.connect();
-    }
+    private static Session connect(final LoadBalancingPolicy loadBalancingPolicy) {
 
-    /**
-     * Closes the session and the cluster.
-     */
-    private void close() {
-        if (session != null) {
-            session.close();
+        final Cluster cluster = Cluster.builder()
+            .withLoadBalancingPolicy(loadBalancingPolicy)
+            .withCredentials(USERNAME, PASSWORD)
+            .addContactPoints(CONTACT_POINTS)
+            .withPort(PORT)
+            .withSSL()
+            .build();
+
+        try {
+            return cluster.connect();
+        } catch (final Throwable error) {
             cluster.close();
+            throw error;
         }
     }
+
+    // endregion
 }
