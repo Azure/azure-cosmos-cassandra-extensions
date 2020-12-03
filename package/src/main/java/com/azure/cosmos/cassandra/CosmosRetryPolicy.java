@@ -25,15 +25,30 @@ import java.util.Random;
 import java.util.function.BiFunction;
 
 /**
- * Implements a Cassandra {@link RetryPolicy} with back-offs for {@link OverloadedException} failures.
+ * A {@link RetryPolicy} implementation with back-offs for {@link CoordinatorException} failures.
  * <p>
- * {@link #maxRetryCount} specifies the number of retries that should be attempted. A value of -1 specifies that an
- * indefinite number of retries should be attempted. For {@link #onReadTimeout}, {@link #onWriteTimeout}, and {@link
- * #onUnavailable}, we retry immediately. For onRequestErrors such as OverLoadedError, we try to parse the exception
- * message and use RetryAfterMs field provided from the server as the back-off duration. If RetryAfterMs is not
- * available, we default to exponential growing back-off scheme. In this case the time between retries is increased by
- * {@link #growingBackoffTimeInMillis} milliseconds (default: 1000 ms) on each retry, unless maxRetryCount is -1, in
- * which case we back-off with fixed {@link #fixedBackoffTimeInMillis} duration.
+ * This is the default retry policy when you take a dependency on this package. It provides a good out-of-box
+ * experience for communicating with Cosmos Cassandra API instances. Its behavior is specified in configuration:
+ * <pre>{@code
+ * datastax-java-driver.advanced.retry-policy {
+ *   class = DefaultRetryPolicy
+ *   max-retries = 5              # Maximum number of retries
+ *   fixed-backoff-time = 5000    # Fixed backoff time in milliseconds
+ *   growing-backoff-time = 1000  # Growing backoff time in milliseconds
+ * }
+ * }</pre>
+ * The number of retries that should be attempted is specified by {@code max-retries}. A value of {@code -1} specifies
+ * that an indefinite number of retries should be attempted. For {@link #onReadTimeout onReadTimout},
+ * {@link #onWriteTimeout onWriteTimeout}, and {@link #onUnavailable onUnavailable}, retries are immediate. For
+ * {@link #onErrorResponse onResponse}, the exception message is parsed to obtain the value of the {@code RetryAfterMs}
+ * field provided by the server as the back-off duration. If {@code RetryAfterMs} is not available, the default
+ * exponential growing back-off scheme is used. In this case the time between retries is increased by
+ * {@code growing-backoff-time} on each retry, unless {@code max-retries} is {@code -1}. In this case back-off occurs
+ * with fixed {@code fixed-backoff-time} duration.
+ *
+ * @see <a href="../../../../../doc-files/reference.conf.html">reference.conf</a>
+ * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/retries/">DataStax Java
+ * Driver Retries</a>
  */
 public final class CosmosRetryPolicy implements RetryPolicy {
 
