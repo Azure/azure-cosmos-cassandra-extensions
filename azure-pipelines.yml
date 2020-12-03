@@ -17,7 +17,7 @@ variables:
   readonly: true
 
 - name: Package.ArgLine
-  value: '-Dazure.cosmos.cassandra.logFile=''$(Log.Filename)''
+  value: '-Dazure.cosmos.cassandra.log-file=''$(Log.Filename)''
     -Dazure.cosmos.cassandra.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
     -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
     -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
@@ -27,7 +27,7 @@ variables:
   readonly: true
 
 - name: Examples.ArgLine
-  value: '-Dazure.cosmos.cassandra.logFile=''$(Log.Filename)''
+  value: '-Dazure.cosmos.cassandra.log-file=''$(Log.Filename)''
     -Ddatastax-java-driver.advanced.auth-provider.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
     -Ddatastax-java-driver.advanced.auth-provider.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
     -Ddatastax-java-driver.basic.load-balancing-policy.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
