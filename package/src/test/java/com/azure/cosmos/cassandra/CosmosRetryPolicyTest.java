@@ -257,14 +257,12 @@ public class CosmosRetryPolicyTest {
 
         for (int retryNumber = retryNumberBegin; retryNumber < retryNumberEnd; retryNumber++) {
 
-            final long expectedDuration = 1000000 * (retryPolicy.getMaxRetryCount() == -1
+            final long expectedDuration = 1_000_000 * (retryPolicy.getMaxRetryCount() == -1
                 ? FIXED_BACK_OFF_TIME
                 : (long) retryNumber * GROWING_BACK_OFF_TIME);
 
             final long startTime = System.nanoTime();
-
             final RetryDecision retryDecision = retryPolicy.onErrorResponse(request, coordinatorException, retryNumber);
-
             final long duration = System.nanoTime() - startTime;
 
             assertThat(retryDecision).isEqualTo(expectedRetryDecision);
