@@ -37,16 +37,31 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
 /**
- * Implements a Cassandra {@link LoadBalancingPolicy} with an option to specify a {@link #readDatacenter} and a
- * {@link #writeDatacenter} to route read and write requests to their corresponding datacenters.
+ * Implements a {@link LoadBalancingPolicy} with an option to specify read and write datacenters to route requests.
  * <p>
- * If {@link #readDatacenter} is specified, we prioritize {@linkplain Node nodes} in the {@link #readDatacenter} for
- * read requests. Either one of {@link #writeDatacenter} or {@link #globalEndpoint} needs to be specified in order to
- * determine the datacenter for write requests. If {@link #writeDatacenter} is specified, writes will be prioritized for
- * that region. When a {@link #globalEndpoint} is specified, the write requests will be prioritized for the default
- * write region. {@link #globalEndpoint} allows the client to gracefully failover by changing the default write region
- * addresses. {@link #dnsExpiryTimeInSeconds} is essentially the max duration to recover from the failover. By default,
- * it is 60 seconds.
+ * This load balancing policy is used by default when you take a dependency on {@code azure-cosmos-cassandra-driver-4-extensions}.
+ * It provides a good out-of-box experience for communicating with Cosmos Cassandra API instances. Its behavior is
+ * specified in configuration:
+ * <pre>{@code
+ * datastax-java-driver.basic.load-balancing-policy {
+ *   class = com.azure.cosmos.cassandra.CosmosLoadBalancingPolicy
+ *   dns-expiry-time = <time-in-seconds>
+ *   global-endpoint = <socket-address>
+ *   read-datacenter = <datacenter-name>
+ *   write-datacenter = <datacenter-name>
+ * }
+ * }</pre>
+ * If a {@code read-datacenter} is specified, {@linkplain Node nodes} in that datacenter are prioritized for read
+ * requests. In this case a value for either {@code global-endpoint} or {@code write-datacenter} must also be provided
+ * in order to determine the datacenter for write requests. If {@code write-datacenter} is specified, writes will be
+ * prioritized for that location. When a {@code global-endpoint} is specified, the write requests will be prioritized
+ * for the default write location. Specifying a {@code global-endpoint} allows the client to gracefully failover by
+ * changing the default write location based on availability. In this case the {@code dns-expiry-time} is essentially
+ * the maximum time required to recover from the failover. By default, it is {@code 60} seconds.
+ *
+ * @see <a href="/apidocs/doc-files/reference.conf.html">reference.conf</a>
+ * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/load_balancing/">DataStax Java
+ * Driver Load balancing</a>
  */
 public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
