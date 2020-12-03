@@ -273,6 +273,7 @@ Licensed under the MIT License.
             <artifactId>maven-checkstyle-plugin</artifactId>
             <configuration>
               <configLocation>azure-cosmos-style.xml</configLocation>
+              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
               <encoding>UTF-8</encoding>
               <consoleOutput>true</consoleOutput>
               <failsOnError>true</failsOnError>
