@@ -66,6 +66,10 @@ import java.util.function.BiFunction;
  */
 public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
+    // region Fields
+
+    private static final String PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
+
     private final int dnsExpiryTimeInSeconds;
     private final String globalEndpoint;
     private final AtomicInteger index = new AtomicInteger();
@@ -77,6 +81,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private CopyOnWriteArrayList<Node> remoteDcNodes;
     private CopyOnWriteArrayList<Node> writeLocalDcNodes;
 
+    // endregion
+
+    // region Constructors
+
+    /**
+     * Initializes a newly created {@link CosmosLoadBalancingPolicy} object from configuration.
+     *
+     * @param driverContext an object holding the context of the current driver instance.
+     * @param profileName   name of the configuration profile to apply.
+     */
     public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
@@ -89,23 +103,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.validate();
     }
 
-    private void validate() {
+    // endregion
 
-        if (this.globalEndpoint.isEmpty()) {
+    // region Methods
 
-            if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
-                throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is not specified, "
-                    + "you must specify both " + Option.READ_DATACENTER.getPath() + " and "
-                    + Option.WRITE_DATACENTER.getPath() + ".");
-            }
-
-        } else if (!this.writeDatacenter.isEmpty()) {
-            throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is specified, you must "
-                + "not specify " + Option.WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
-                + "when " + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
-        }
-    }
-
+    /**
+     * Closes the current {@link CosmosLoadBalancingPolicy} instance.
+     */
     @Override
     public void close() {
         // nothing to do
@@ -113,6 +117,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     /**
      * Initializes the list of hosts in read, write, local, and remote categories.
+     *
+     * @param nodes the nodes to be examined.
+     * @param distanceReporter an object that the policy uses to signal decisions it makes about node distances.
      */
     @Override
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
@@ -363,7 +370,22 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Types
 
-    private final static String PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
+    private void validate() {
+
+        if (this.globalEndpoint.isEmpty()) {
+
+            if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
+                throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is not specified, "
+                    + "you must specify both " + Option.READ_DATACENTER.getPath() + " and "
+                    + Option.WRITE_DATACENTER.getPath() + ".");
+            }
+
+        } else if (!this.writeDatacenter.isEmpty()) {
+            throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is specified, you must "
+                + "not specify " + Option.WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
+                + "when " + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
+        }
+    }
 
     enum Option implements DriverOption {
 
@@ -372,12 +394,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             60),
 
         GLOBAL_ENDPOINT("global-endpoint", (option, profile) -> {
-                final String value = profile.getString(option, option.getDefaultValue());
-                assert value != null;
-                final int index = value.lastIndexOf(':');
-                return index < 0 ? value : value.substring(0, index);
-            },
-            ""),
+            final String value = profile.getString(option, option.getDefaultValue());
+            assert value != null;
+            final int index = value.lastIndexOf(':');
+            return index < 0 ? value : value.substring(0, index);
+        }, ""),
 
         READ_DATACENTER("read-datacenter", (option, profile) ->
             profile.getString(option, option.getDefaultValue()),
@@ -391,7 +412,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         private final BiFunction<Option, DriverExecutionProfile, ?> getter;
         private final String path;
 
-        <T, R> Option(final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
+        <T, R> Option(
+            final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
+
             this.defaultValue = defaultValue;
             this.getter = getter;
             this.path = PATH_PREFIX + name;

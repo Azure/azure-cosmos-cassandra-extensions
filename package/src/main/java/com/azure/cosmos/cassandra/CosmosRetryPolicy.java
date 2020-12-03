@@ -55,6 +55,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // region Fields
 
     private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 2_000;
+    private static final String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
     private static final Random RANDOM = new Random();
 
     private final int fixedBackoffTimeInMillis;
@@ -65,6 +66,12 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Constructors
 
+    /**
+     * Initializes a newly created {@link CosmosRetryPolicy} object from configuration.
+     *
+     * @param driverContext an object holding the context of the current driver instance.
+     * @param profileName   name of the configuration profile to apply.
+     */
     public CosmosRetryPolicy(final DriverContext driverContext, final String profileName) {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
@@ -78,41 +85,60 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this(maxRetryCount, Option.FIXED_BACKOFF_TIME.getDefaultValue(), Option.GROWING_BACKOFF_TIME.getDefaultValue());
     }
 
-    CosmosRetryPolicy(final int maxRetryCount, final int fixedBackOffTimeInMillis, final int growingBackoffTimeInMillis) {
+    // endregion
+
+    // region Accessors
+
+    CosmosRetryPolicy(
+        final int maxRetryCount, final int fixedBackOffTimeInMillis, final int growingBackoffTimeInMillis) {
+
         this.maxRetryCount = maxRetryCount;
         this.fixedBackoffTimeInMillis = fixedBackOffTimeInMillis;
         this.growingBackoffTimeInMillis = growingBackoffTimeInMillis;
     }
 
-    // endregion
-
-    // region Accessors
-
+    /**
+     * Gets the {@code fixed-backoff-time} specified by this {@link CosmosRetryPolicy} object.
+     *
+     * @return the {@code fixed-backoff-time} specified by this {@link CosmosRetryPolicy} object.
+     */
     public int getFixedBackoffTimeInMillis() {
         return this.fixedBackoffTimeInMillis;
     }
 
+    /**
+     * Gets the {@code growing-backoff-time} specified by this {@link CosmosRetryPolicy} object.
+     *
+     * @return the {@code growing-backoff-time} specified by this {@link CosmosRetryPolicy} object.
+     */
     public int getGrowingBackoffTimeInMillis() {
         return this.growingBackoffTimeInMillis;
-    }
-
-    public int getMaxRetryCount() {
-        return this.maxRetryCount;
     }
 
     // endregion
 
     // region Methods
 
+    /**
+     * Gets the {@code max-retries} specified by this {@link CosmosRetryPolicy} object.
+     *
+     * @return the {@code max-retries} specified by this {@link CosmosRetryPolicy} object.
+     */
+    public int getMaxRetryCount() {
+        return this.maxRetryCount;
+    }
+
+    /**
+     * Closes the current {@link CosmosRetryPolicy}.
+     */
     @Override
     public void close() {
+        // nothing to do
     }
 
     @Override
     public RetryDecision onErrorResponse(
-        @NonNull final Request request,
-        @NonNull final CoordinatorException error,
-        final int retryCount) {
+        @NonNull final Request request, @NonNull final CoordinatorException error, final int retryCount) {
 
         RetryDecision retryDecision;
 
@@ -129,7 +155,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
                     if (retryAfterMillis == -1) {
                         retryAfterMillis = this.maxRetryCount == -1
                             ? this.fixedBackoffTimeInMillis
-                            : this.growingBackoffTimeInMillis * retryCount + RANDOM.nextInt(GROWING_BACKOFF_SALT_IN_MILLIS);
+                            : this.growingBackoffTimeInMillis * retryCount + RANDOM.nextInt(
+                                GROWING_BACKOFF_SALT_IN_MILLIS);
                     }
                     Thread.sleep(retryAfterMillis);
                     retryDecision = RetryDecision.RETRY_SAME;
@@ -179,6 +206,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return this.retryManyTimesOrThrow(retryCount);
     }
 
+    // endregion
+
+    // region Privates
+
     @Override
     public RetryDecision onWriteTimeout(
         @NonNull final Request request,
@@ -190,10 +221,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         return this.retryManyTimesOrThrow(retryCount);
     }
-
-    // endregion
-
-    // region Privates
 
     // Example exceptionString:
     // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babas.cassandra.cosmos.azure.com/40
@@ -219,17 +246,15 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return -1;
     }
 
+    // endregion
+
+    // region Types
+
     private RetryDecision retryManyTimesOrThrow(final int retryCount) {
         return this.maxRetryCount == -1 || retryCount < this.maxRetryCount
             ? RetryDecision.RETRY_SAME
             : RetryDecision.RETHROW;
     }
-
-    // endregion
-
-    // region Types
-
-    private final static String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
 
     enum Option implements DriverOption {
 
@@ -249,7 +274,9 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         private final BiFunction<Option, DriverExecutionProfile, ?> getter;
         private final String path;
 
-        <T, R> Option(final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
+        <T, R> Option(
+            final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
+
             this.defaultValue = defaultValue;
             this.getter = getter;
             this.path = PATH_PREFIX + name;

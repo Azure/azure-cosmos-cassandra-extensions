@@ -17,6 +17,9 @@ import java.util.regex.Pattern;
 
 import static java.lang.String.format;
 
+/**
+ * A utility class that implements common static methods useful for writing tests.
+ */
 public final class TestCommon {
 
     private TestCommon() {
@@ -32,7 +35,8 @@ public final class TestCommon {
 
     static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
-    // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the emulator?
+    // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the
+    //  emulator?
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
@@ -54,7 +58,8 @@ public final class TestCommon {
      * @param keyspaceName name of the keyspace to query.
      * @param tableName    name of the table to query.
      */
-    static void createSchema(final CqlSession session, final String keyspaceName, final String tableName) throws InterruptedException {
+    static void createSchema(final CqlSession session, final String keyspaceName, final String tableName)
+        throws InterruptedException {
 
         session.execute(format(
             "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}",
@@ -172,7 +177,7 @@ public final class TestCommon {
      *
      * @param prefix a string that starts the unique name.
      *
-     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;.
+     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;</i>.
      */
     @NonNull
     static String uniqueName(@NonNull final String prefix) {
@@ -196,7 +201,7 @@ public final class TestCommon {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
-        final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
+        final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED)
             .add(SimpleStatement.newInstance(format("INSERT INTO %s.%s "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
@@ -217,7 +222,8 @@ public final class TestCommon {
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:56:33.739+01:00',"
-                + "2.52)", keyspaceName, tableName)));
+                + "2.52)", keyspaceName, tableName)))
+            .setConsistencyLevel(consistencyLevel);
 
         session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);

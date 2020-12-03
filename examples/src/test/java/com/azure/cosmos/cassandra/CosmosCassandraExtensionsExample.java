@@ -99,6 +99,9 @@ public class CosmosCassandraExtensionsExample {
 
     // region Methods
 
+    /**
+     * Verifies that this example can integrate with a Cosmos Cassandra API instance.
+     */
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
@@ -227,31 +230,29 @@ public class CosmosCassandraExtensionsExample {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
-        final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED).setConsistencyLevel(consistencyLevel)
-            .add(SimpleStatement.newInstance(
-                "INSERT INTO downgrading.sensor_data "
-                    + "(sensor_id, date, timestamp, value) "
-                    + "VALUES ("
-                    + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                    + "'2018-02-26',"
-                    + "'2018-02-26T13:53:46.345+01:00',"
-                    + "2.34)"))
-            .add(SimpleStatement.newInstance(
-                "INSERT INTO downgrading.sensor_data "
-                    + "(sensor_id, date, timestamp, value) "
-                    + "VALUES ("
-                    + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                    + "'2018-02-26',"
-                    + "'2018-02-26T13:54:27.488+01:00',"
-                    + "2.47)"))
-            .add(SimpleStatement.newInstance(
-                "INSERT INTO downgrading.sensor_data "
-                    + "(sensor_id, date, timestamp, value) "
-                    + "VALUES ("
-                    + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                    + "'2018-02-26',"
-                    + "'2018-02-26T13:56:33.739+01:00',"
-                    + "2.52)"));
+        final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED)
+            .add(SimpleStatement.newInstance("INSERT INTO downgrading.sensor_data "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:53:46.345+01:00',"
+                + "2.34)"))
+            .add(SimpleStatement.newInstance("INSERT INTO downgrading.sensor_data "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:54:27.488+01:00',"
+                + "2.47)"))
+            .add(SimpleStatement.newInstance("INSERT INTO downgrading.sensor_data "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:56:33.739+01:00',"
+                + "2.52)"))
+            .setConsistencyLevel(consistencyLevel);
 
         this.session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
