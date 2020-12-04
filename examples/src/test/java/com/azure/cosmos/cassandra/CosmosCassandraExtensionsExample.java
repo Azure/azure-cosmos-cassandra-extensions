@@ -21,11 +21,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.testng.AssertJUnit.fail;
 
 /**
- * Illustrates use of the Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra®.
+ * Shows how to use the Cosmos extensions for DataStax Java Driver 4 for Apache Cassandra.
  * <p>
  * Best practices for configuring DataStax Java Driver 4 to access a Cosmos DB Cassandra API instance are also
- * demonstrated. See the settings in <a href="../../../../doc-files/application.conf.html">{@code application.conf}</a> and
- * <a href="../../../../doc-files/reference.conf.html">{@code reference.conf}</a>.
+ * demonstrated. See the settings in <a href="../../../../doc-files/application.conf.html">{@code application.conf}</a>
+ * and <a href="../../../../doc-files/reference.conf.html">{@code reference.conf}</a>.
  * <h3>
  * Preconditions</h3>
  * <ol>
@@ -78,13 +78,13 @@ import static org.testng.AssertJUnit.fail;
  * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
  * information.</ul>
  *
+ * @see CosmosLoadBalancingPolicy
+ * @see CosmosRetryPolicy
+ * @see <a href="../../../../doc-files/application.conf.html">application.conf</a>
+ * @see <a href="../../../../doc-files/reference.conf.html">reference.conf</a>
  * @see <a href="https://docs.datastax.com/en/developer/java-driver/4.9/manual/">DataStax Java Driver manual</a>
  * @see <a href="https://docs.datastax.com/en/developer/java-driver/4.9/manual/core/configuration/">DataStax Java Driver
  * configuration</a>
- * @see CosmosLoadBalancingPolicy
- * @see CosmosRetryPolicy
- * @see <a href="file:///./doc-files/application.conf">application.conf</a>
- * @see <a href="file:///./doc-files/reference.conf">reference.conf</a>
  */
 public class CosmosCassandraExtensionsExample {
 
