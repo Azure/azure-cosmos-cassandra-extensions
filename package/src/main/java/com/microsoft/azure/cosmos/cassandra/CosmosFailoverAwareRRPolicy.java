@@ -77,7 +77,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
             }
         }
 
-        this.hosts = new AbstractMap.SimpleEntry<CopyOnWriteArrayList<Host>, CopyOnWriteArrayList<Host>>(localDcAddresses, remoteDcAddresses);
+        this.hosts = new AbstractMap.SimpleEntry<>(localDcAddresses, remoteDcAddresses);
         this.index.set(new Random().nextInt(Math.max(hosts.size(), 1)));
     }
 
@@ -157,6 +157,10 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         this.onDown(host);
     }
 
+    /**
+     * Closes the current {@link CosmosFailoverAwareRRPolicy} object.
+     */
+    @Override
     public void close() {
         // nothing to do
     }
@@ -180,12 +184,12 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         if (this.localAddresses == null || this.dnsExpired()) {
             try {
                 this.localAddresses = InetAddress.getAllByName(this.globalContactPoint);
-                this.lastDnsLookupTime = System.currentTimeMillis()/1000;
-            }
-            catch (final UnknownHostException ex) {
+                this.lastDnsLookupTime = System.currentTimeMillis() / 1000;
+            } catch (final UnknownHostException ex) {
                 // dns entry may be temporarily unavailable
                 if (this.localAddresses == null) {
-                    throw new IllegalArgumentException("The dns could not resolve the globalContactPoint the first time.");
+                    throw new IllegalArgumentException(
+                        "The DNS could not resolve the globalContactPoint the first time.");
                 }
             }
         }
@@ -228,11 +232,12 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
             }
         }
 
-        return this.hosts = new AbstractMap.SimpleEntry<>(localDcHosts, remoteDcHosts);
+        this.hosts = new AbstractMap.SimpleEntry<>(localDcHosts, remoteDcHosts);
+        return this.hosts;
     }
 
     private boolean dnsExpired() {
-        return System.currentTimeMillis()/1000 > this.lastDnsLookupTime + this.dnsExpirationInSeconds;
+        return System.currentTimeMillis() / 1000 > this.lastDnsLookupTime + this.dnsExpirationInSeconds;
     }
 
     private static class HostIterator extends AbstractIterator<Host> {
@@ -243,7 +248,7 @@ public class CosmosFailoverAwareRRPolicy implements LoadBalancingPolicy {
         private int remainingLocal;
         private int remainingRemote;
 
-        public HostIterator(
+        HostIterator(
             final int startIdx, final List<? extends Host> localHosts, final List<? extends Host> remoteHosts) {
 
             this.localHosts = localHosts;

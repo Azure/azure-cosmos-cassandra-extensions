@@ -20,6 +20,9 @@ import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.AssertJUnit.fail;
 
+/**
+ * A utility class that implements common static methods useful for writing tests.
+ */
 public final class TestCommon {
 
     private TestCommon() {
@@ -222,7 +225,7 @@ public final class TestCommon {
      *
      * @param prefix a string that starts the unique name.
      *
-     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;.
+     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;</i>.
      */
     static String uniqueName(final String prefix) {
         return prefix + "_" + UUID.randomUUID().toString().replace("-", "");

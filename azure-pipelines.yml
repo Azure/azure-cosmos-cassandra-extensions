@@ -7,10 +7,31 @@ trigger:
 - release/java-driver-3/*
 
 pr:
-- master
-- release/java-driver-3/*
+- develop/java-driver-4
+- release/java-driver-4/*
+
+variables:
+
+- name: Log.Filename
+  value: $(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra.log
+  readonly: true
+
+- name: Package.ArgLine
+  value: '-Dazure.cosmos.cassandra.log-file=''$(Log.Filename)''
+    -Dazure.cosmos.cassandra.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
+    -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
+    -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
+    -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
+    -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
+    -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)'''
+  readonly: true
+
+- name: Examples.ArgLine
+  value: '$(Package.ArgLine)'
+  readonly: true
 
 jobs:
+
 - job: Build_with_Java_8
   strategy:
     matrix:
@@ -44,12 +65,7 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
-        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
-        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
-        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
-        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
-        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      options: '-DargLine="$(Package.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: Maven@3
@@ -61,12 +77,7 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
-        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
-        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
-        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
-        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
-        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      options: '-DargLine="$(Examples.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: PowerShell@2
@@ -126,12 +137,7 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
-        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
-        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
-        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
-        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
-        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      options: '-DargLine="$(Package.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: Maven@3
@@ -143,11 +149,29 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-DargLine="-Dazure.cosmos.cassandra.global-endpoint=''$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)''
-        -Dazure.cosmos.cassandra.username=''$(AZURE_COSMOS_CASSANDRA_USERNAME)''
-        -Dazure.cosmos.cassandra.password=''$(AZURE_COSMOS_CASSANDRA_PASSWORD)''
-        -Dazure.cosmos.cassandra.local-datacenter=''$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)''
-        -Dazure.cosmos.cassandra.read-datacenter=''$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)''
-        -Dazure.cosmos.cassandra.write-datacenter=''$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)''"'
+      options: '-DargLine="$(Examples.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+  - task: PowerShell@2
+    displayName: 'Stage artifacts'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
+        $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+        
+        Copy-Item *.jar $targetDirectory
+        Copy-Item ../pom.xml $targetDirectory/$packageName.pom
+        
+        $packageName = $packageName.Split("-extensions-") -join "-"
+        $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+        
+        Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
+      pwsh: true
+      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish staged artifacts'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'driver-4.java-11.$(ImageName)'
+      publishLocation: 'pipeline'
