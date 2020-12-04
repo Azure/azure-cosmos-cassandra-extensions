@@ -2,6 +2,6 @@
 // Licensed under the MIT License.
 
 /**
- * Illustrates use of the Azure Cosmos Cassandra API extensions for DataStax Java Driver 4.
+ * Shows how to usethe Azure Cosmos Cassandra API extensions for DataStax Java Driver 4.
  */
 package com.azure.cosmos.cassandra;

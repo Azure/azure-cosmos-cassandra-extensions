@@ -130,7 +130,8 @@ public class CosmosLoadBalancingPolicyTest {
     // region Methods
 
     /**
-     * Verifies that the combination of a read-datacenter and a global-endpoint routes requests correctly.
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying the combination of a {@code read-datacenter} and a 
+     * {@code global-endpoint} (with no {@code write-datacenter) routes requests correctly.
      *
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
@@ -150,7 +151,8 @@ public class CosmosLoadBalancingPolicyTest {
     }
 
     /**
-     * Verifies that a global-endpoint (without a read datacenter or a write datacenter) routes requests correctly.
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a {@code global-endpoint} (with no
+     * {@code read-datacenter} or {@code write-datacenter}) routes requests correctly.
      *
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
@@ -170,9 +172,8 @@ public class CosmosLoadBalancingPolicyTest {
     }
 
     /**
-     * Verifies that invalid configurations produce IllegalArgumentException errors.
-     *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     * Verifies that invalid {@link CosmosLoadBalancingPolicy} configurations produce {@link IllegalArgumentException}
+     * errors.
      */
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
     public void testInvalidConfiguration() {
@@ -227,11 +228,14 @@ public class CosmosLoadBalancingPolicyTest {
     }
 
     /**
-     * Verifies that read and write requests work.
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a {@code read-datacenter} and a 
+     * {@code write-datacenter} (with no {@code global-endpoint}) routes requests correctly.
+     *
+     * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
-    public void testReadAndWrite() {
+    public void testReadDatacenterAndWriteDatacenter() {
 
         if (WRITE_DATACENTER.isEmpty()) {
             throw new SkipException("WRITE_DATACENTER is empty");

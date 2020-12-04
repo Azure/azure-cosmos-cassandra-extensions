@@ -100,7 +100,7 @@ public class CosmosCassandraExtensionsExample {
     // region Methods
 
     /**
-     * Verifies that this example can integrate with a Cosmos Cassandra API instance.
+     * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-driver-4-extensions.
      */
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
