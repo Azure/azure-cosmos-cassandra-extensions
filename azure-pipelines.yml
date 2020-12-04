@@ -7,8 +7,8 @@ trigger:
 - release/java-driver-3/*
 
 pr:
-- develop/java-driver-4
-- release/java-driver-4/*
+- master
+- release/java-driver-3/*
 
 variables:
 
