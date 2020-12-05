@@ -50,6 +50,7 @@ Licensed under the MIT License.
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.log4j>2.13.3</version.log4j>
     <version.slf4j-api>1.7.30</version.slf4j-api>
+    <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
   </properties>
 
@@ -157,14 +158,8 @@ Licensed under the MIT License.
         </plugin>
         <plugin>
           <groupId>com.github.spotbugs</groupId>
-          <artifactId>spotbugs</artifactId>
-          <version>4.1.4</version>
-        </plugin>
-        <plugin>
-          <!-- Documentation: https://spotbugs.github.io/spotbugs-maven-plugin/index.html -->
-          <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
-          <version>4.1.4</version>
+          <version>${version.spotbugs}</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -209,12 +204,11 @@ Licensed under the MIT License.
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
-        <version>4.1.4</version>
         <dependencies>
           <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs</artifactId>
-            <version>4.1.4</version>
+            <version>${version.spotbugs}</version>
           </dependency>
         </dependencies>
         <configuration>
@@ -292,12 +286,10 @@ Licensed under the MIT License.
           <!-- Avoid errors from module-info -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.1.1</version>
             <configuration>
               <sourceFileExcludes>
                 <sourceFileExclude>module-info.java</sourceFileExclude>
               </sourceFileExcludes>
-              <quiet>true</quiet>
             </configuration>
           </plugin>
         </plugins>
@@ -305,24 +297,11 @@ Licensed under the MIT License.
       <reporting>
         <plugins>
           <plugin>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <reportSets>
-              <reportSet>
-                <reports>
-                  <report>checkstyle</report>
-                </reports>
-              </reportSet>
-            </reportSets>
-          </plugin>
-          <!-- Avoid errors from module-info -->
-          <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.1.1</version>
             <configuration>
               <sourceFileExcludes>
                 <sourceFileExclude>module-info.java</sourceFileExclude>
               </sourceFileExcludes>
-              <quiet>true</quiet>
             </configuration>
           </plugin>
         </plugins>
@@ -395,21 +374,23 @@ Licensed under the MIT License.
           </plugin>
         </plugins>
       </build>
-      <reporting>
-        <plugins>
-          <plugin>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <reportSets>
-              <reportSet>
-                <reports>
-                  <report>checkstyle</report>
-                </reports>
-              </reportSet>
-            </reportSets>
-          </plugin>
-        </plugins>
-      </reporting>
     </profile>
+
   </profiles>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>checkstyle</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
 
 </project>

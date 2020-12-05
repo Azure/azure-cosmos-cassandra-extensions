@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * <ol>
  * <li>A Cosmos DB Cassandra API account is required.
  * <li>These system variables or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>

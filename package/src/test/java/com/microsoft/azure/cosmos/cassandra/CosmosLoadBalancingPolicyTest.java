@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <li> A Cosmos DB Cassandra API account is required. It should have two regions, one used as a read datacenter (e.g,
  * East US) and another used as a write datacenter (e.g., West US).
  * <li> These system or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>
