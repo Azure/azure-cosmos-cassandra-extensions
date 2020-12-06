@@ -31,13 +31,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Implements a {@link LoadBalancingPolicy} with an option to specify read datacenter and write datacenter to route read
  * and write requests to their corresponding data centers.
  * <p>
- * If a {@code readDC} is specified, we prioritize nodes in the read datacenter for read requests. Either one of
- * {@code writeDC} or {@code globalEndpoint} must be specified to determine where write requests are routed.
- * If {@code writeDC} is specified, writes will be prioritized for that region. When {@code globalEndpoint} is
- * specified, write requests will be prioritized for the default write region. The {@code globalEndpoint} allows the
- * client to gracefully fail over by updating the default write region addresses. In this case
- * {@code dnsExpirationInSeconds} specifies the time to take to recover from the failover. By default, it is {@code 60}
- * seconds.
+ * If a {@code readDC} is specified, we prioritize nodes in the read datacenter for read requests. Either one of {@code
+ * writeDC} or {@code globalEndpoint} must be specified to determine where write requests are routed. If {@code writeDC}
+ * is specified, writes will be prioritized for that region. When {@code globalEndpoint} is specified, write requests
+ * will be prioritized for the default write region. The {@code globalEndpoint} allows the client to gracefully fail
+ * over by updating the default write region addresses. In this case {@code dnsExpirationInSeconds} specifies the time
+ * to take to recover from the failover. By default, it is {@code 60} seconds.
  */
 public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
@@ -71,20 +70,30 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Methods
 
+    /**
+     * Gets a newly created {@link CosmosLoadBalancingPolicy.Builder builder} object for constructing a {@link
+     * CosmosLoadBalancingPolicy}.
+     *
+     * @return a newly created {@link CosmosLoadBalancingPolicy} builder instance.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Closes the current {@link CosmosLoadBalancingPolicy} object.
+     */
+    @Override
     public void close() {
         // nothing to do
     }
 
     /**
      * Return the HostDistance for the provided host.
-     *
      * <p>This policy considers the nodes for the writeDC and the default write region at distance {@code LOCAL}.
      *
      * @param host the host of which to return the distance of.
+     *
      * @return the HostDistance to {@code host}.
      */
     @Override
@@ -135,17 +144,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     /**
      * Returns the hosts to use for a new query.
-     *
      * <p>For read requests, the returned plan will always try each known host in the readDC first.
-     * if none of the host is reachable, it will try all other hosts.
-     * For writes and all other requests, the returned plan will always try each known host in the writeDC or the
-     * default write region (looked up and cached from the globalEndpoint) first.
-     * If none of the host is reachable, it will try all other hosts.
+     * if none of the host is reachable, it will try all other hosts. For writes and all other requests, the returned
+     * plan will always try each known host in the writeDC or the default write region (looked up and cached from the
+     * globalEndpoint) first. If none of the host is reachable, it will try all other hosts.
      *
      * @param loggedKeyspace the keyspace currently logged in on for this query.
      * @param statement      the query for which to build the plan.
-     * @return a new query plan, i.e. an iterator indicating which host to try first for querying,
-     * which one to use as failover, etc...
+     *
+     * @return a new query plan, i.e. an iterator indicating which host to try first for querying, which one to use as
+     * failover, etc...
      */
     @Override
     public Iterator<Host> newQueryPlan(final String loggedKeyspace, final Statement statement) {
@@ -227,8 +235,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * <p>
      * If {@link #dnsExpirationInSeconds} has elapsed, the array of local addresses is also updated.
      *
-     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpirationInSeconds}
-     * has elapsed.
+     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpirationInSeconds} has
+     * elapsed.
      */
     @SuppressWarnings("DuplicatedCode")
     private InetAddress[] getLocalAddresses() {
@@ -239,7 +247,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } catch (final UnknownHostException ex) {
                 // dns entry may be temporarily unavailable
                 if (this.localAddresses == null) {
-                    throw new IllegalArgumentException("The dns could not resolve the globalContactPoint the first time.");
+                    throw new IllegalArgumentException(
+                        "The DNS could not resolve the globalContactPoint the first time.");
                 }
             }
         }
@@ -248,12 +257,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private static CosmosLoadBalancingPolicy buildFrom(final Builder builder) {
-        return new CosmosLoadBalancingPolicy(builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
+        return new CosmosLoadBalancingPolicy(
+            builder.readDC, builder.writeDC, builder.globalEndpoint, builder.dnsExpirationInSeconds);
     }
 
     @SuppressWarnings("unchecked")
     private static CopyOnWriteArrayList<Host> cloneList(final CopyOnWriteArrayList<Host> list) {
-        return (CopyOnWriteArrayList<Host>)list.clone();
+        return (CopyOnWriteArrayList<Host>) list.clone();
     }
 
     private boolean dnsExpired() {
@@ -267,14 +277,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static boolean isReadRequest(final Statement statement) {
         if (statement instanceof RegularStatement) {
             if (statement instanceof SimpleStatement) {
-                final SimpleStatement simpleStatement = (SimpleStatement)statement;
+                final SimpleStatement simpleStatement = (SimpleStatement) statement;
                 return isReadRequest(simpleStatement.getQueryString());
             } else if (statement instanceof BuiltStatement) {
-                final BuiltStatement builtStatement = (BuiltStatement)statement;
+                final BuiltStatement builtStatement = (BuiltStatement) statement;
                 return isReadRequest(builtStatement.getQueryString());
             }
         } else if (statement instanceof BoundStatement) {
-            final BoundStatement boundStatement = (BoundStatement)statement;
+            final BoundStatement boundStatement = (BoundStatement) statement;
             return isReadRequest(boundStatement.preparedStatement().getQueryString());
         } else if (statement instanceof BatchStatement) {
             return false;
@@ -321,13 +331,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static void validate(final Builder builder) {
         if (builder.globalEndpoint.isEmpty()) {
             if (builder.writeDC.isEmpty() || builder.readDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint is not specified, you need to provide both " +
-                    "readDC and writeDC.");
+                throw new IllegalArgumentException("When the globalEndpoint is not specified, you need to provide both "
+                    + "readDC and writeDC.");
             }
         } else {
             if (!builder.writeDC.isEmpty()) {
-                throw new IllegalArgumentException("When the globalEndpoint is specified, you can't provide writeDC. Writes will go " +
-                    "to the default write region when the globalEndpoint is specified.");
+                throw new IllegalArgumentException("When the globalEndpoint is specified, you can't provide writeDC. "
+                    + "Writes will go to the default write region when the globalEndpoint is specified.");
             }
         }
     }
@@ -336,6 +346,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Types
 
+    /**
+     * A builder for constructing {@link CosmosLoadBalancingPolicy} objects.
+     */
     public static class Builder {
 
         private int dnsExpirationInSeconds = 60;
@@ -343,16 +356,35 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         private String readDC = "";
         private String writeDC = "";
 
+        /**
+         * Constructs a new {@link CosmosLoadBalancingPolicy} object.
+         *
+         * @return a newly constructed {@link CosmosLoadBalancingPolicy} object.
+         */
         public CosmosLoadBalancingPolicy build() {
             validate(this);
             return CosmosLoadBalancingPolicy.buildFrom(this);
         }
 
+        /**
+         * Sets the value of the DNS expiry interval.
+         *
+         * @param dnsExpirationInSeconds DNS expiry interval in seconds.
+         *
+         * @return a reference to the current {@link Builder}.
+         */
         public Builder withDnsExpirationInSeconds(final int dnsExpirationInSeconds) {
             this.dnsExpirationInSeconds = dnsExpirationInSeconds;
             return this;
         }
 
+        /**
+         * Sets the global endpoint address.
+         *
+         * @param globalEndpoint a global endpoint address.
+         *
+         * @return a reference to the current {@link Builder}.
+         */
         public Builder withGlobalEndpoint(final String globalEndpoint) {
             final int index = globalEndpoint.lastIndexOf(':');
             this.globalEndpoint = index == -1
@@ -361,11 +393,25 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return this;
         }
 
+        /**
+         * Sets the read datacenter name.
+         *
+         * @param readDC read datacenter name.
+         *
+         * @return a reference to the current {@link Builder}.
+         */
         public Builder withReadDC(final String readDC) {
             this.readDC = readDC;
             return this;
         }
 
+        /**
+         * Sets the read datacenter name.
+         *
+         * @param writeDC write datacenter name.
+         *
+         * @return a reference to the current {@link Builder}.
+         */
         public Builder withWriteDC(final String writeDC) {
             this.writeDC = writeDC;
             return this;
@@ -379,12 +425,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         private final Statement statement;
         private final List<? extends Host> writeHosts;
 
-        public int remainingRead;
-        public int remainingWrite;
+        private int remainingRead;
+        private int remainingWrite;
         private int idx;
         private int remainingRemote;
 
-        public HostIterator(
+        HostIterator(
             final List<? extends Host> readHosts,
             final List<? extends Host> writeHosts,
             final int startIdx,

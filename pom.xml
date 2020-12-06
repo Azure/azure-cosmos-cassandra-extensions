@@ -3,8 +3,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 Licensed under the MIT License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
@@ -51,6 +50,7 @@ Licensed under the MIT License.
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.log4j>2.13.3</version.log4j>
     <version.slf4j-api>1.7.30</version.slf4j-api>
+    <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
   </properties>
 
@@ -113,6 +113,10 @@ Licensed under the MIT License.
     <pluginManagement>
       <plugins>
         <plugin>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>3.1.1</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
         </plugin>
@@ -133,8 +137,16 @@ Licensed under the MIT License.
           <version>3.2.0</version>
         </plugin>
         <plugin>
+          <artifactId>maven-project-info-reports-plugin</artifactId>
+          <version>3.1.1</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-resources-plugin</artifactId>
           <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>3.9.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-source-plugin</artifactId>
@@ -146,27 +158,12 @@ Licensed under the MIT License.
         </plugin>
         <plugin>
           <groupId>com.github.spotbugs</groupId>
-          <artifactId>spotbugs</artifactId>
-          <version>4.1.4</version>
-        </plugin>
-        <plugin>
-          <!-- Documentation: https://spotbugs.github.io/spotbugs-maven-plugin/index.html -->
-          <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
-          <version>4.1.4</version>
+          <version>${version.spotbugs}</version>
         </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
-      <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-deploy-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-install-plugin</artifactId>
-      </plugin>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
@@ -207,12 +204,11 @@ Licensed under the MIT License.
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
-        <version>4.1.4</version>
         <dependencies>
           <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs</artifactId>
-            <version>4.1.4</version>
+            <version>${version.spotbugs}</version>
           </dependency>
         </dependencies>
         <configuration>
@@ -256,10 +252,29 @@ Licensed under the MIT License.
           </resource>
         </resources>
         <plugins>
+          <plugin>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <configuration>
+              <configLocation>azure-cosmos-style.xml</configLocation>
+              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
+              <encoding>UTF-8</encoding>
+              <consoleOutput>true</consoleOutput>
+              <failsOnError>true</failsOnError>
+              <linkXRef>false</linkXRef>
+            </configuration>
+            <executions>
+              <execution>
+                <id>validate</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
           <!-- Don't compile module-info.java, see java-lts profile -->
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.8.1</version>
             <configuration>
               <source>1.8</source>
               <target>1.8</target>
@@ -271,27 +286,22 @@ Licensed under the MIT License.
           <!-- Avoid errors from module-info -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.1.1</version>
             <configuration>
               <sourceFileExcludes>
                 <sourceFileExclude>module-info.java</sourceFileExclude>
               </sourceFileExcludes>
-              <quiet>true</quiet>
             </configuration>
           </plugin>
         </plugins>
       </build>
       <reporting>
         <plugins>
-          <!-- Avoid errors from module-info -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.1.1</version>
             <configuration>
               <sourceFileExcludes>
                 <sourceFileExclude>module-info.java</sourceFileExclude>
               </sourceFileExcludes>
-              <quiet>true</quiet>
             </configuration>
           </plugin>
         </plugins>
@@ -312,6 +322,26 @@ Licensed under the MIT License.
           </resource>
         </resources>
         <plugins>
+          <plugin>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <configuration>
+              <configLocation>azure-cosmos-style.xml</configLocation>
+              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
+              <encoding>UTF-8</encoding>
+              <consoleOutput>true</consoleOutput>
+              <failsOnError>true</failsOnError>
+              <linkXRef>false</linkXRef>
+            </configuration>
+            <executions>
+              <execution>
+                <id>validate</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
             <version>3.8.1</version>
@@ -345,6 +375,22 @@ Licensed under the MIT License.
         </plugins>
       </build>
     </profile>
+
   </profiles>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>checkstyle</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
 
 </project>

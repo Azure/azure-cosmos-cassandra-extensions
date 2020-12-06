@@ -70,8 +70,8 @@ import static org.assertj.core.api.Assertions.fail;
  * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
- * runs, we generate a keyspace names of the form <b>downgrading_</b><i>&lt;random-uuid&gt;</i>. Should a keyspace by this
- * name already exists, it is reused.
+ * runs, we generate a keyspace names of the form <b>downgrading_</b><i>&lt;random-uuid&gt;</i>. Should a keyspace by
+ * this name already exists, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
  * <li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
@@ -141,6 +141,9 @@ public class CosmosCassandraExtensionsExample {
 
     // region Methods
 
+    /**
+     * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-extensions.
+     */
     @Test(groups = { "examples" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
@@ -261,7 +264,8 @@ public class CosmosCassandraExtensionsExample {
         final int width3 = 30;
         final int width4 = 21;
 
-        final String format = "%-" + width1 + "s" + "%-" + width2 + "s" + "%-" + width3 + "s" + "%-" + width4 + "s" + "%n";
+        final String format = "%-" + width1 + "s" + "%-" + width2 + "s" + "%-" + width3 + "s" + "%-" + width4 + "s"
+            + "%n";
 
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
         drawLine(width1, width2, width3, width4);

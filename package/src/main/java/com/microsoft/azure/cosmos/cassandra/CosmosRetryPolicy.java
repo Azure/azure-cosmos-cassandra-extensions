@@ -31,7 +31,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Fields
 
-    private final static Random random = new Random();
+    private static final Random RANDOM = new Random();
     private final int fixedBackOffTimeMillis;
     private final int growingBackOffTimeMillis;
     private final int maxRetryCount;
@@ -46,11 +46,27 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this.growingBackOffTimeMillis = builder.growingBackOffTimeMillis;
     }
 
+    /**
+     * Initializes a newly created {@link CosmosRetryPolicy} object
+     *
+     * @param maxRetryCount maximum number of times to retry an operation before failing.
+     *
+     * @deprecated use {@link #builder CosmosRetryPolicy.builder} to construct a CosmosRetryPolicy instead.
+     */
     @Deprecated
     public CosmosRetryPolicy(final int maxRetryCount) {
         this(maxRetryCount, 5000, 1000);
     }
 
+    /**
+     * Initializes a newly created {@link CosmosRetryPolicy} object
+     *
+     * @param maxRetryCount maximum number of times to retry an operation before failing.
+     * @param fixedBackOffTimeMillis fixed backoff time in milliseconds.
+     * @param growingBackOffTimeMillis growing backoff time in milliseconds.
+     *
+     * @deprecated use {@link #builder CosmosRetryPolicy.builder} to construct a CosmosRetryPolicy instead.
+     */
     @Deprecated
     public CosmosRetryPolicy(
         final int maxRetryCount, final int fixedBackOffTimeMillis, final int growingBackOffTimeMillis) {
@@ -64,10 +80,20 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Accessors
 
+    /**
+     * Gets a newly created {@link Builder builder} object for constructing a {@link CosmosRetryPolicy}.
+     *
+     * @return a newly created {@link CosmosLoadBalancingPolicy} builder instance.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Gets the maximum retry count specified by this {@link CosmosLoadBalancingPolicy}.
+     *
+     * @return the maximum retry count specified by this {@link CosmosLoadBalancingPolicy}.
+     */
     public int getMaxRetryCount() {
         return this.maxRetryCount;
     }
@@ -117,7 +143,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
                         final int growingBackOffSaltMillis = 2000;
                         retryMillis = this.maxRetryCount == -1
                             ? this.fixedBackOffTimeMillis
-                            : this.growingBackOffTimeMillis * retryNumber + random.nextInt(growingBackOffSaltMillis);
+                            : this.growingBackOffTimeMillis * retryNumber + RANDOM.nextInt(growingBackOffSaltMillis);
                     }
                     Thread.sleep(retryMillis);
                     retryDecision = RetryDecision.retry(null);
@@ -167,7 +193,9 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final String[] tokens = exceptionString.split(",");
         for (final String token : tokens) {
             final String[] kvp = token.split("=");
-            if (kvp.length != 2) continue;
+            if (kvp.length != 2) {
+                continue;
+            }
             if ("RetryAfterMs".equals(kvp[0].trim())) {
                 final String value = kvp[1];
                 return Integer.parseInt(value);
@@ -186,26 +214,55 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Types
 
-    public final static class Builder {
+    /**
+     * A builder for constructing {@link CosmosRetryPolicy} objects.
+     */
+    public static final class Builder {
 
         private int fixedBackOffTimeInMillis = 5_000;
         private int growingBackOffTimeMillis = 1_000;
         private int maxRetryCount = 5;
 
+        /**
+         * Constructs a new {@link CosmosRetryPolicy} object.
+         *
+         * @return a newly constructed {@link CosmosRetryPolicy} object.
+         */
         public CosmosRetryPolicy build() {
             return new CosmosRetryPolicy(this);
         }
 
+        /**
+         * Sets the value of the fixed backoff time in milliseconds.
+         *
+         * @param value fixed backoff time in milliseconds.
+         *
+         * @return a reference to the current {@link CosmosLoadBalancingPolicy.Builder}.
+         */
         public Builder withFixedBackOffTimeInMillis(final int value) {
             this.fixedBackOffTimeInMillis = value;
             return this;
         }
 
+        /**
+         * Sets the value of the growing backoff time in milliseconds.
+         *
+         * @param value growing backoff time in milliseconds.
+         *
+         * @return a reference to the current {@link CosmosLoadBalancingPolicy.Builder}.
+         */
         public Builder withGrowingBackOffTimeInMillis(final int value) {
             this.growingBackOffTimeMillis = value;
             return this;
         }
 
+        /**
+         * Sets the value of the maximum retry count.
+         *
+         * @param value maximum retry count.
+         *
+         * @return a reference to the current {@link CosmosLoadBalancingPolicy.Builder}.
+         */
         public Builder withMaxRetryCount(final int value) {
             this.maxRetryCount = value;
             return this;

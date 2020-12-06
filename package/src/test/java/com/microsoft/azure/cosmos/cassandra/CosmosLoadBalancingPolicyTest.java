@@ -42,12 +42,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
  * <h3>
- * Preconditions:
+ * Preconditions</h3>
  * <ol>
  * <li> A Cosmos DB Cassandra API account is required. It should have two regions, one used as a read datacenter (e.g,
  * East US) and another used as a write datacenter (e.g., West US).
  * <li> These system or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>
@@ -85,11 +85,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * </table>
  * </ol>
  * <h3>
- * Side effects:
+ * Side effects</h3>
  * <ol>
  * <li>Creates a number of keyspaces in the cluster, each with replication factor 3. To prevent collisions especially
- * during CI test runs, we generate keyspace names of the form <i><name></i><b>_</b><i></i><random-uuid></i>. Should a
- * keyspace by the generated name already exists, it is reused.
+ * during CI test runs, we generate keyspace names of the form <i>&lt;name&gt;</i><b><code>_</code></b><i>&lt;
+ * random-uuid&gt;</i>. Should a keyspace by the generated name already exists, it is reused.
  * <li>Creates a table within each keyspace created or reused. If a table with a given name already exists, it is
  * reused.
  * <li>Executes all types of {@link Statement} queries.
@@ -109,6 +109,12 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Methods
 
+    /**
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying the combination of a read datacenter and a global
+     * endpoint (with no write datacenter) routes requests correctly.
+     *
+     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     */
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testGlobalEndpointAndReadDatacenter() {
         testAllStatements(
@@ -119,6 +125,12 @@ public class CosmosLoadBalancingPolicyTest {
             uniqueName("globalAndRead"));
     }
 
+    /**
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a global endpoint (with no read or write datacenter)
+     * routes requests correctly.
+     *
+     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     */
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testGlobalEndpointOnly() {
         testAllStatements(
@@ -128,6 +140,10 @@ public class CosmosLoadBalancingPolicyTest {
             uniqueName("globalOnly"));
     }
 
+    /**
+     * Verifies that invalid {@link CosmosLoadBalancingPolicy} configurations produce {@link IllegalArgumentException}
+     * errors.
+     */
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testInvalid() {
 
@@ -159,6 +175,12 @@ public class CosmosLoadBalancingPolicyTest {
         ).isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying read and write datacenters (with no global endpoint)
+     * routes requests correctly.
+     *
+     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     */
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void testReadDCAndWriteDC() {
 
@@ -206,7 +228,7 @@ public class CosmosLoadBalancingPolicyTest {
             // SimpleStatements
 
             SimpleStatement simpleStatement = new SimpleStatement(format(
-                "SELECT * FROM %s.%s WHERE sensor_id = uuid() and date = toDate(now())",
+                "SELECT * FROM %s.%s WHERE sensor_id=uuid() and date=toDate(now())",
                 keyspaceName,
                 tableName));
             session.execute(simpleStatement);
@@ -218,14 +240,14 @@ public class CosmosLoadBalancingPolicyTest {
             session.execute(simpleStatement);
 
             simpleStatement = new SimpleStatement(format(
-                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = "
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp="
                     + "toTimestamp(now())",
                 keyspaceName,
                 tableName));
             session.execute(simpleStatement);
 
             simpleStatement = new SimpleStatement(format(
-                "DELETE FROM %s.%s WHERE sensor_id = uuid() AND date = toDate(now()) AND timestamp = toTimestamp(now())",
+                "DELETE FROM %s.%s WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp=toTimestamp(now())",
                 keyspaceName,
                 tableName));
             session.execute(simpleStatement);

@@ -25,11 +25,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 /**
  * This test illustrates use of the {@link CosmosFailoverAwareRRPolicy} class.
  * <h3>
- * Preconditions:
+ * Preconditions</h3>
  * <ol>
  * <li>A Cosmos DB Cassandra API account is required.
  * <li>These system variables or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>
@@ -57,11 +57,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * </table>
  * </ol>
  * <h3>
- * Side effects:
+ * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
- * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
- * name already exists, it is reused.
+ * runs, we generate a keyspace names of the form <b>downgrading_</b><i>&lt;random-uuid&gt;</i>. Should a keyspace by
+ * this name already exists, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
  * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
@@ -82,6 +82,9 @@ public class CosmosFailoverAwareRRPolicyTest {
 
     // region Methods
 
+    /**
+     *
+     */
     @SuppressWarnings("deprecation")
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {

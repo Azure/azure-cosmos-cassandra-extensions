@@ -32,11 +32,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
  * <h3>
- * Preconditions:
+ * Preconditions</h3>
  * <ol>
  * <li>A Cosmos DB Cassandra API account is required.
  * <li>These system variables or--alternatively--environment variables must be set.
- * <table>
+ * <table><caption></caption>
  * <thead>
  * <tr>
  * <th>System variable</th>
@@ -64,22 +64,23 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * </table>
  * </ol>
  * <h3>
- * Side effects:
+ * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
- * runs, we generate a keyspace names of the form <b>downgrading_</b><i></i><random-uuid></i>. Should a keyspace by this
- * name already exists, it is reused.
+ * runs, we generate a keyspace names of the form <b><code>downgrading_</code></b><i>&lt;random-uuid&gt;</i>. Should a
+ * keyspace by this name already exists, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
  * </li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
  * runs.
  * </ol>
  * <h3>
- * Notes:
+ * Notes</h3>
  * <ul>
- * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy} does; feel free to adapt it to your application needs;
- * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on
- * idempotence for more information.
+ * <li>The downgrading logic here is similar to what {@code DowngradingConsistencyRetryPolicy} does; feel free to adapt
+ * it to your application needs.
+ * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
+ * information.
  * </ul>
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
@@ -98,6 +99,9 @@ public class CosmosRetryPolicyTest {
 
     // region Methods
 
+    /**
+     * Verifies that the {@link CosmosRetryPolicy} class integrates with DataStax Java Driver 3.
+     */
     @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
     public void canIntegrateWithCosmos() {
 
@@ -130,6 +134,9 @@ public class CosmosRetryPolicyTest {
         }
     }
 
+    /**
+     * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries on a connection-related exception.
+     */
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void canRetryOnConnectionException() {
 
@@ -146,18 +153,27 @@ public class CosmosRetryPolicyTest {
         }
     }
 
+    /**
+     * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with fixed backoff time.
+     */
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(-1).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
     }
 
+    /**
+     * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with growing backoff time.
+     */
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
     }
 
+    /**
+     * Verifies that the {@link CosmosRetryPolicy} class rethrows when {@code max-retries} is exceeded.
+     */
     @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
@@ -170,7 +186,6 @@ public class CosmosRetryPolicyTest {
 
     /**
      * Initiates a connection to the cluster specified by the given contact points and port.
-     *
      */
     private static Session connect(final CosmosRetryPolicy retryPolicy) {
 
@@ -206,7 +221,7 @@ public class CosmosRetryPolicyTest {
 
             final long expectedDuration = 1000000 * (retryPolicy.getMaxRetryCount() == -1
                 ? FIXED_BACK_OFF_TIME
-                : (long)retryNumber * GROWING_BACK_OFF_TIME);
+                : (long) retryNumber * GROWING_BACK_OFF_TIME);
             final long startTime = System.nanoTime();
 
             final RetryDecision retryDecision = retryPolicy.onRequestError(statement,
@@ -217,7 +232,7 @@ public class CosmosRetryPolicyTest {
             final long duration = System.nanoTime() - startTime;
 
             assertThat(retryDecision.getType()).isEqualTo(expectedRetryDecisionType);
-            assertThat((double)duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
+            assertThat((double) duration).isGreaterThan(expectedDuration - 0.01 * expectedDuration);
         }
     }
 
