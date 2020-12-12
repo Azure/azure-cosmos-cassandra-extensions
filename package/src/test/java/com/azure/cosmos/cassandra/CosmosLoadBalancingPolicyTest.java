@@ -115,7 +115,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosLoadBalancingPolicyTest {
+public final class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
@@ -269,14 +269,7 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
-    private void cleanUp(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
-        session.execute(format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
-    }
-
-    @NonNull
-    private CqlSession connect(@NonNull final DriverConfigLoader configLoader) {
-
-        final CqlSession session = CqlSession.builder().withConfigLoader(configLoader).build();
+    private static CqlSession checkState(final CqlSession session) {
 
         final DriverContext context = session.getContext();
         final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
@@ -313,6 +306,19 @@ public class CosmosLoadBalancingPolicyTest {
             nodes,
             retryPolicy,
             loadBalancingPolicy);
+
+        return session;
+    }
+
+    private void cleanUp(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
+        session.execute(format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
+    }
+
+    @NonNull
+    private CqlSession connect(@NonNull final DriverConfigLoader configLoader) {
+
+        final CqlSession session = checkState(CqlSession.builder().withConfigLoader(configLoader).build());
+        checkState(session);
 
         return session;
     }

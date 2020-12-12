@@ -100,7 +100,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosRetryPolicyTest {
+public final class CosmosRetryPolicyTest {
 
     // region Fields
 
@@ -214,7 +214,7 @@ public class CosmosRetryPolicyTest {
     @BeforeClass
     public void connect() {
 
-        this.session = CqlSession.builder().withConfigLoader(
+        this.session = checkState(CqlSession.builder().withConfigLoader(
             DriverConfigLoader.programmaticBuilder()
                 .withStringList(DefaultDriverOption.CONTACT_POINTS, CONTACT_POINTS)
                 .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, USERNAME)
@@ -222,36 +222,7 @@ public class CosmosRetryPolicyTest {
                 .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
                 .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DATACENTER)
                 .build())
-            .build();
-
-        final DriverContext context = this.session.getContext();
-        final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
-
-        final RetryPolicy retryPolicy = context.getRetryPolicy(profile.getName());
-
-        assertThat(retryPolicy.getClass()).isEqualTo(CosmosRetryPolicy.class);
-
-        assertThat(((CosmosRetryPolicy) retryPolicy).getFixedBackoffTimeInMillis())
-            .isEqualTo(profile.getInt(Option.FIXED_BACKOFF_TIME));
-
-        assertThat(((CosmosRetryPolicy) retryPolicy).getGrowingBackoffTimeInMillis())
-            .isEqualTo(profile.getInt(Option.GROWING_BACKOFF_TIME));
-
-        assertThat(((CosmosRetryPolicy) retryPolicy).getMaxRetryCount())
-            .isEqualTo(profile.getInt(Option.MAX_RETRIES));
-
-        final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
-
-        assertThat(loadBalancingPolicy.getClass()).isEqualTo(DefaultLoadBalancingPolicy.class);
-
-        final Map<UUID, Node> nodes = this.session.getMetadata().getNodes();
-        // TODO (DANOBLE) Add check that the number of nodes is correct based on a (to be defined) parameter to the test
-
-        LOG.info("[{}] connected to {} with {} and {}",
-            this.session.getName(),
-            nodes,
-            retryPolicy,
-            loadBalancingPolicy);
+            .build());
     }
 
     @BeforeMethod
@@ -271,6 +242,40 @@ public class CosmosRetryPolicyTest {
     // endregion
 
     // region Privates
+
+    private static CqlSession checkState(final CqlSession session) {
+
+        final DriverContext context = session.getContext();
+        final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
+
+        final RetryPolicy retryPolicy = context.getRetryPolicy(profile.getName());
+
+        assertThat(retryPolicy.getClass()).isEqualTo(CosmosRetryPolicy.class);
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).getFixedBackoffTimeInMillis())
+            .isEqualTo(profile.getInt(Option.FIXED_BACKOFF_TIME));
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).getGrowingBackoffTimeInMillis())
+            .isEqualTo(profile.getInt(Option.GROWING_BACKOFF_TIME));
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).getMaxRetryCount())
+            .isEqualTo(profile.getInt(Option.MAX_RETRIES));
+
+        final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
+
+        assertThat(loadBalancingPolicy.getClass()).isEqualTo(DefaultLoadBalancingPolicy.class);
+
+        final Map<UUID, Node> nodes = session.getMetadata().getNodes();
+        // TODO (DANOBLE) Add check that the number of nodes is correct based on a (to be defined) parameter to the test
+
+        LOG.info("[{}] connected to {} with {} and {}",
+            session.getName(),
+            nodes,
+            retryPolicy,
+            loadBalancingPolicy);
+
+        return session;
+    }
 
     /**
      * Tests a retry operation
