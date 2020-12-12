@@ -85,10 +85,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this(maxRetryCount, Option.FIXED_BACKOFF_TIME.getDefaultValue(), Option.GROWING_BACKOFF_TIME.getDefaultValue());
     }
 
-    // endregion
-
-    // region Accessors
-
     CosmosRetryPolicy(
         final int maxRetryCount, final int fixedBackOffTimeInMillis, final int growingBackoffTimeInMillis) {
 
@@ -96,6 +92,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this.fixedBackoffTimeInMillis = fixedBackOffTimeInMillis;
         this.growingBackoffTimeInMillis = growingBackoffTimeInMillis;
     }
+
+    // endregion
+
+    // region Accessors
 
     /**
      * Gets the {@code fixed-backoff-time} specified by this {@link CosmosRetryPolicy} object.
@@ -117,8 +117,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // endregion
 
-    // region Methods
-
     /**
      * Gets the {@code max-retries} specified by this {@link CosmosRetryPolicy} object.
      *
@@ -127,6 +125,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     public int getMaxRetryCount() {
         return this.maxRetryCount;
     }
+
+    // region Methods
 
     /**
      * Closes the current {@link CosmosRetryPolicy}.
@@ -206,6 +206,14 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return this.retryManyTimesOrThrow(retryCount);
     }
 
+    @Override
+    public String toString() {
+        return "CosmosRetryPolicy({"
+            + Option.FIXED_BACKOFF_TIME.getName() + ':' + this.fixedBackoffTimeInMillis + ','
+            + Option.GROWING_BACKOFF_TIME.getName() + ':' + this.growingBackoffTimeInMillis + ','
+            + Option.MAX_RETRIES.getName() + ':' + this.maxRetryCount + "})";
+    }
+
     // endregion
 
     // region Privates
@@ -246,15 +254,15 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return -1;
     }
 
-    // endregion
-
-    // region Types
-
     private RetryDecision retryManyTimesOrThrow(final int retryCount) {
         return this.maxRetryCount == -1 || retryCount < this.maxRetryCount
             ? RetryDecision.RETRY_SAME
             : RetryDecision.RETHROW;
     }
+
+    // endregion
+
+    // region Types
 
     enum Option implements DriverOption {
 
@@ -272,6 +280,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         private final Object defaultValue;
         private final BiFunction<Option, DriverExecutionProfile, ?> getter;
+        private final String name;
         private final String path;
 
         <T, R> Option(
@@ -279,12 +288,18 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
             this.defaultValue = defaultValue;
             this.getter = getter;
+            this.name = name;
             this.path = PATH_PREFIX + name;
         }
 
         @SuppressWarnings("unchecked")
         public <T> T getDefaultValue() {
             return (T) this.defaultValue;
+        }
+
+        @NonNull
+        public String getName() {
+            return this.name;
         }
 
         @NonNull

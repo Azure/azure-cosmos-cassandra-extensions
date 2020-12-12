@@ -3,14 +3,19 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.CosmosRetryPolicy.Option;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
+import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
 import com.datastax.oss.driver.api.core.servererrors.ServerError;
@@ -19,22 +24,27 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 
+import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.TestCommon.HOSTNAME_AND_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.display;
+import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
+import static com.azure.cosmos.cassandra.TestCommon.matchSocketAddress;
 import static com.azure.cosmos.cassandra.TestCommon.read;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.azure.cosmos.cassandra.TestCommon.write;
@@ -94,18 +104,20 @@ public class CosmosRetryPolicyTest {
 
     // region Fields
 
-    static final String LOCAL_DATACENTER = TestCommon.getPropertyOrEnvironmentVariable(
+    static final String LOCAL_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.local-datacenter",
         "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
         "localhost");
 
+    static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
-    private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicy.Option.FIXED_BACKOFF_TIME.getDefaultValue();
-    private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicy.Option.GROWING_BACKOFF_TIME.getDefaultValue();
+    private static final int FIXED_BACK_OFF_TIME = Option.FIXED_BACKOFF_TIME.getDefaultValue();
+    private static final int GROWING_BACK_OFF_TIME = Option.GROWING_BACKOFF_TIME.getDefaultValue();
     private static final String KEYSPACE_NAME = uniqueName("downgrading");
     private static final int MAX_RETRIES = CosmosRetryPolicy.Option.MAX_RETRIES.getDefaultValue();
     private static final String TABLE_NAME = "sensor_data";
-    private static final int TIMEOUT = 30_0000;
+    private static final int TIMEOUT_IN_MILLIS = 30_0000;
 
     private CqlSession session = null;
 
@@ -116,7 +128,7 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class integrates with DataStax Java Driver 4.
      */
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() ->
@@ -136,11 +148,10 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries on a connection-related exception.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void canRetryOnConnectionException() {
 
-        final Matcher address = HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
-        assertThat(address.matches()).isTrue();
+        final Matcher address = matchSocketAddress(GLOBAL_ENDPOINT);
 
         final CoordinatorException coordinatorException = new ServerError(new DefaultNode(
             new DefaultEndPoint(
@@ -163,7 +174,7 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with fixed backoff time.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
@@ -173,7 +184,7 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with growing backoff time.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
@@ -197,16 +208,61 @@ public class CosmosRetryPolicyTest {
 
     /**
      * Opens the {@link #session} for testing {@link CosmosRetryPolicy}.
+     *
+     * This method also verifies that the resulting session is configured and connected as expected.
      */
     @BeforeClass
     public void connect() {
-        this.session = connect(GLOBAL_ENDPOINT, USERNAME, PASSWORD, LOCAL_DATACENTER);
+
+        this.session = CqlSession.builder().withConfigLoader(
+            DriverConfigLoader.programmaticBuilder()
+                .withStringList(DefaultDriverOption.CONTACT_POINTS, CONTACT_POINTS)
+                .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, USERNAME)
+                .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, PASSWORD)
+                .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
+                .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DATACENTER)
+                .build())
+            .build();
+
+        final DriverContext context = this.session.getContext();
+        final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
+
+        final RetryPolicy retryPolicy = context.getRetryPolicy(profile.getName());
+
+        assertThat(retryPolicy.getClass()).isEqualTo(CosmosRetryPolicy.class);
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).getFixedBackoffTimeInMillis())
+            .isEqualTo(profile.getInt(Option.FIXED_BACKOFF_TIME));
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).getGrowingBackoffTimeInMillis())
+            .isEqualTo(profile.getInt(Option.GROWING_BACKOFF_TIME));
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).getMaxRetryCount())
+            .isEqualTo(profile.getInt(Option.MAX_RETRIES));
+
+        final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
+
+        assertThat(loadBalancingPolicy.getClass()).isEqualTo(DefaultLoadBalancingPolicy.class);
+
+        final Map<UUID, Node> nodes = this.session.getMetadata().getNodes();
+        // TODO (DANOBLE) Add check that the number of nodes is correct based on a (to be defined) parameter to the test
+
+        LOG.info("[{}] connected to {} with {} and {}",
+            this.session.getName(),
+            nodes,
+            retryPolicy,
+            loadBalancingPolicy);
+    }
+
+    @BeforeMethod
+    public void logTestName(final Method method) {
+        LOG.info("{}", method.getName());
     }
 
     /**
      * Verifies that the {@link CosmosRetryPolicy} class rethrows when {@code max-retries} is exceeded.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         this.retry(retryPolicy, MAX_RETRIES + 1, MAX_RETRIES + 1, RetryDecision.RETHROW);
@@ -217,40 +273,6 @@ public class CosmosRetryPolicyTest {
     // region Privates
 
     /**
-     * Initiates a connection to the cluster specified by the given contact points and port.
-     *
-     * @param globalEndPoint  the contact points to use.
-     * @param username        the username for authenticating.
-     * @param password        the password for authenticating.
-     * @param localDatacenter the local datacenter.
-     */
-    @SuppressWarnings("SameParameterValue")
-    @NonNull
-    private static CqlSession connect(
-        @NonNull final String globalEndPoint,
-        @NonNull final String username,
-        @NonNull final String password,
-        @NonNull final String localDatacenter) {
-
-        final Matcher address = HOSTNAME_AND_PORT.matcher(globalEndPoint);
-        assertThat(address.matches()).isTrue();
-
-        final Collection<EndPoint> endPoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
-            address.group("hostname"),
-            Integer.parseUnsignedInt(address.group("port")))));
-
-        return CqlSession.builder()
-            .withConfigLoader(DriverConfigLoader.programmaticBuilder()
-                .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
-                .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, CosmosRetryPolicy.class)
-                .build())
-            .withAuthCredentials(username, password)
-            .withLocalDatacenter(localDatacenter)
-            .addContactEndPoints(endPoints)
-            .build();
-    }
-
-    /**
      * Tests a retry operation
      */
     private void retry(
@@ -259,7 +281,7 @@ public class CosmosRetryPolicyTest {
         final int retryNumberEnd,
         final RetryDecision expectedRetryDecision) {
 
-        final Matcher address = HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
+        final Matcher address = matchSocketAddress(GLOBAL_ENDPOINT);
         assertThat(address.matches()).isTrue();
 
         final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(

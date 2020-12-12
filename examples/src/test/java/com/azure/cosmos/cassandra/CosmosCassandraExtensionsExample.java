@@ -3,6 +3,9 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.codahale.metrics.CsvReporter;
+import com.codahale.metrics.ScheduledReporter;
+import com.codahale.metrics.Timer;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -10,13 +13,18 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
+import com.datastax.oss.driver.api.core.metrics.Metrics;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.testng.AssertJUnit.fail;
 
@@ -82,18 +90,22 @@ import static org.testng.AssertJUnit.fail;
  * @see CosmosRetryPolicy
  * @see <a href="../../../../doc-files/application.conf.html">application.conf</a>
  * @see <a href="../../../../doc-files/reference.conf.html">reference.conf</a>
- * @see <a href="https://docs.datastax.com/en/developer/java-driver/4.9/manual/">DataStax Java Driver manual</a>
- * @see <a href="https://docs.datastax.com/en/developer/java-driver/4.9/manual/core/configuration/">DataStax Java Driver
- * configuration</a>
+ * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/">DataStax Java Driver manual</a>
+ * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/configuration/">DataStax Java
+ * Driver configuration</a>
  */
 public class CosmosCassandraExtensionsExample {
 
     // region Fields
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
-    private static final int TIMEOUT = 30_000;
 
-    private CqlSession session;
+    private static final File REPORTING_DIRECTORY = new File(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.reporting-directory",
+        "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
+        System.getProperty("user.home")));
+
+    private static final int TIMEOUT_IN_MILLIS = 30_000;
 
     // endregion
 
@@ -102,52 +114,92 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-driver-4-extensions.
      */
-    @Test(groups = { "examples" }, timeOut = TIMEOUT)
+    @Test(groups = { "examples" }, timeOut = TIMEOUT_IN_MILLIS)
     public void canIntegrateWithCosmos() {
 
-        try (final Session ignored = this.connect()) {
+        try (final CqlSession session = CqlSession.builder().build()) {
 
-            assertThatCode(this::createSchema).doesNotThrowAnyException();
+            final Metrics metrics = session.getMetrics().orElseThrow();
 
-            assertThatCode(() ->
-                this.write(CONSISTENCY_LEVEL)
-            ).doesNotThrowAnyException();
+            final Timer sessionRequestTimer = (Timer) metrics
+                .getSessionMetric(DefaultSessionMetric.CQL_REQUESTS)
+                .orElseThrow();
 
-            assertThatCode(() -> {
-                final ResultSet rows = this.read(CONSISTENCY_LEVEL);
-                this.display(rows);
-            }).doesNotThrowAnyException();
+            long requestCount = 0;
 
-        } catch (final Exception error) {
+            try (final ScheduledReporter reporter = CsvReporter.forRegistry(metrics.getRegistry())
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .build(REPORTING_DIRECTORY)) {
+
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount);
+
+                assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount += 2);
+
+                assertThatCode(() -> this.write(session, CONSISTENCY_LEVEL)).doesNotThrowAnyException();
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount += 1);
+
+                assertThatCode(() -> {
+                    final ResultSet rows = this.read(session, CONSISTENCY_LEVEL);
+                    this.display(rows);
+                }).doesNotThrowAnyException();
+
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount + 1);
+                reporter.report();
+            }
+
+        } catch (final Throwable error) {
             final StringWriter stringWriter = new StringWriter();
             error.printStackTrace(new PrintWriter(stringWriter));
-            fail(format("connect failed with %s", stringWriter));
+            fail(format("failed with %s", stringWriter));
         }
     }
 
     // region Privates
 
     /**
-     * Initiates a connection to the cluster specified by application.conf.
+     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
+     * <p>
+     * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
+     *
+     * @param property     a system property name.
+     * @param variable     an environment variable name.
+     * @param defaultValue the default value--which may be {@code null}--to be used if neither {@code property} or
+     *                     {@code variable} is set.
+     *
+     * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
+     * {@code defaultValue}.
      */
-    private Session connect() {
-        this.session = CqlSession.builder().build();
-        System.out.println("Connected to session: " + this.session.getName());
-        return this.session;
+    @SuppressWarnings("SameParameterValue")
+    static String getPropertyOrEnvironmentVariable(
+        @NonNull final String property, @NonNull final String variable, final String defaultValue) {
+
+        String value = System.getProperty(property);
+
+        if (value == null) {
+            value = System.getenv(variable);
+        }
+
+        if (value == null) {
+            value = defaultValue;
+        }
+
+        return value;
     }
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
      */
-    private void createSchema() {
+    private void createSchema(final CqlSession session) {
 
-        this.session.execute(SimpleStatement.newInstance(
+        session.execute(SimpleStatement.newInstance(
             "CREATE KEYSPACE IF NOT EXISTS downgrading WITH replication = {"
                 + "'class':'SimpleStrategy',"
                 + "'replication_factor':3"
                 + "}"));
 
-        this.session.execute(SimpleStatement.newInstance(
+        session.execute(SimpleStatement.newInstance(
             "CREATE TABLE IF NOT EXISTS downgrading.sensor_data ("
                 + "sensor_id uuid,"
                 + "date date,"
@@ -202,7 +254,7 @@ public class CosmosCassandraExtensionsExample {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    private ResultSet read(final ConsistencyLevel consistencyLevel) {
+    private ResultSet read(final CqlSession session, final ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Reading at %s%n", consistencyLevel);
 
@@ -215,7 +267,7 @@ public class CosmosCassandraExtensionsExample {
                 + "timestamp > '2018-02-26+01:00'")
             .setConsistencyLevel(consistencyLevel);
 
-        final ResultSet rows = this.session.execute(statement);
+        final ResultSet rows = session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
 
         return rows;
@@ -226,7 +278,7 @@ public class CosmosCassandraExtensionsExample {
      *
      * @param consistencyLevel the consistency level to apply.
      */
-    private void write(final ConsistencyLevel consistencyLevel) {
+    private void write(final CqlSession session, final ConsistencyLevel consistencyLevel) {
 
         System.out.printf("Writing at %s%n", consistencyLevel);
 
@@ -254,7 +306,7 @@ public class CosmosCassandraExtensionsExample {
                 + "2.52)"))
             .setConsistencyLevel(consistencyLevel);
 
-        this.session.execute(batch);
+        session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
     }
 

@@ -12,40 +12,45 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.String.format;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * A utility class that implements common static methods useful for writing tests.
  */
 public final class TestCommon {
 
-    private TestCommon() {
-        throw new UnsupportedOperationException();
-    }
+    static final List<String> CONTACT_POINTS = Arrays.asList(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.contact-point",
+        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
+        "localhost:10350").split("\\s*,\\s*"));
 
     // region Fields
-
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "localhost:9042");
-
-    static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
-
+        "localhost:10350");
     // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the
     //  emulator?
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
         "");
-
     static final String USERNAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.username",
         "AZURE_COSMOS_CASSANDRA_USERNAME",
         "");
+    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+
+    private TestCommon() {
+        throw new UnsupportedOperationException();
+    }
 
     // endregion
 
@@ -136,6 +141,27 @@ public final class TestCommon {
     }
 
     /**
+     * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
+     * address.
+     * <p>
+     * Retrieve the {@code hostname} and {@code port} from the returned {@link Matcher Matcher} like this:
+     * <pre>{@code
+     * String hostname = matcher.group("hostname")
+     * String port = matcher.group("port")
+     * }</pre>
+     *
+     * @param socketAddress a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
+     *
+     * @return a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
+     * address.
+     */
+    @NonNull
+    static Matcher matchSocketAddress(final String socketAddress) {
+        final Matcher matcher = HOSTNAME_AND_PORT.matcher(socketAddress);
+        assertThat(matcher.matches()).isTrue();
+        return matcher;
+    }
+    /**
      * Queries data, retrying if necessary with a downgraded consistency level.
      *
      * @param session          the session for executing requests.
@@ -184,6 +210,10 @@ public final class TestCommon {
         return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
     }
 
+    // endregion
+
+    // region Privates
+
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *
@@ -228,10 +258,6 @@ public final class TestCommon {
         session.execute(batch);
         System.out.println("Write succeeded at " + consistencyLevel);
     }
-
-    // endregion
-
-    // region Privates
 
     /**
      * Draws a line to isolate headings from rows.

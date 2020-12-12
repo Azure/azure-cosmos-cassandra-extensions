@@ -19,6 +19,7 @@ variables:
 - name: Package.ArgLine
   value: >
     -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
+    -Dazure.cosmos.cassandra.contact-point='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
     -Dazure.cosmos.cassandra.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
     -Dazure.cosmos.cassandra.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
     -Dazure.cosmos.cassandra.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
@@ -30,6 +31,7 @@ variables:
 - name: Examples.ArgLine
   value: >
     -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
+    -Dazure.cosmos.cassandra.contact-point='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
     -Ddatastax-java-driver.advanced.auth-provider.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
     -Ddatastax-java-driver.advanced.auth-provider.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
     -Ddatastax-java-driver.basic.load-balancing-policy.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
