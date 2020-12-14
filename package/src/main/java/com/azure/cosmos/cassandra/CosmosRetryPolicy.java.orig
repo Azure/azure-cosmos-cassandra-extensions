@@ -114,6 +114,11 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return this.growingBackoffTimeInMillis;
     }
 
+<<<<<<< HEAD
+    // endregion
+
+=======
+>>>>>>> 4361d8d285da24c7111eb58481fd3207b61809f8
     /**
      * Gets the {@code max-retries} specified by this {@link CosmosRetryPolicy} object.
      *
@@ -122,6 +127,13 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     public int getMaxRetryCount() {
         return this.maxRetryCount;
     }
+
+<<<<<<< HEAD
+=======
+    // endregion
+
+>>>>>>> 4361d8d285da24c7111eb58481fd3207b61809f8
+    // region Methods
 
     /**
      * Closes the current {@link CosmosRetryPolicy}.

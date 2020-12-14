@@ -26,9 +26,13 @@ datastax-java-driver {
   }
   basic {
 
+<<<<<<< HEAD
+    contact-points = [${?AZURE_COSMOS_CASSANDRA_CONTACT_POINT}]
+=======
     contact-points = ["localhost:10350"]
     contact-points = [${?AZURE_COSMOS_CASSANDRA_CONTACT_POINT}]
     contact-points = [${?azure.cosmos.cassandra.contact-point}]
+>>>>>>> 4361d8d285da24c7111eb58481fd3207b61809f8
 
     load-balancing-policy {
 
@@ -48,9 +52,16 @@ datastax-java-driver {
       #
       #   Alternatively, set the environment variables referenced here to match the topology of your Cassandra instance.
 
+<<<<<<< HEAD
+=======
       global-endpoint = "localhost:10350"
+>>>>>>> 4361d8d285da24c7111eb58481fd3207b61809f8
       global-endpoint = ${?AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT}
       global-endpoint = ${?azure.cosmos.cassandra.global-endpoint}
+
+      # Local datacenter
+
+      loal-datacenter = ${?AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER}
 
       # Datacenter for read operations
 
