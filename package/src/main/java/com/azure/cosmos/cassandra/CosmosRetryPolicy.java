@@ -14,7 +14,6 @@ import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
-import com.datastax.oss.driver.api.core.servererrors.ServerError;
 import com.datastax.oss.driver.api.core.servererrors.WriteFailureException;
 import com.datastax.oss.driver.api.core.servererrors.WriteType;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -115,10 +114,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         return this.growingBackoffTimeInMillis;
     }
 
-    // endregion
-
-    // region Methods
-
     /**
      * Gets the {@code max-retries} specified by this {@link CosmosRetryPolicy} object.
      *
@@ -127,6 +122,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     public int getMaxRetryCount() {
         return this.maxRetryCount;
     }
+
+    // endregion
+
+    // region Methods
 
     /**
      * Closes the current {@link CosmosRetryPolicy}.
@@ -142,13 +141,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         RetryDecision retryDecision;
 
-        // TODO (DANOBLE) ServerError is not the same as ConnectionException and there is no obvious replacement
-        //  Consequently this decision tree must be rethought based on the new and very different CoordinatorException
-        //  hierarchy
         try {
-            if (error instanceof ServerError) {
-                return this.retryManyTimesOrThrow(retryCount);
-            }
             if (error instanceof OverloadedException || error instanceof WriteFailureException) {
                 if (this.maxRetryCount == -1 || retryCount < this.maxRetryCount) {
                     int retryAfterMillis = getRetryAfterMillis(error.toString());
@@ -221,6 +214,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         return this.retryManyTimesOrThrow(retryCount);
     }
+
+    // endregion
+
+    // region Privates
 
     // Example exceptionString:
     // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babas.cassandra.cosmos.azure.com/40

@@ -134,33 +134,6 @@ public class CosmosRetryPolicyTest {
     }
 
     /**
-     * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries on a connection-related exception.
-     */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
-    public void canRetryOnConnectionException() {
-
-        final Matcher address = HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
-        assertThat(address.matches()).isTrue();
-
-        final CoordinatorException coordinatorException = new ServerError(new DefaultNode(
-            new DefaultEndPoint(
-                new InetSocketAddress(
-                    address.group("hostname"),
-                    Integer.parseUnsignedInt(address.group("port")))),
-            (InternalDriverContext) this.session.getContext()), "canRetryOnConnectionException");
-
-        final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
-        final Request request = SimpleStatement.newInstance("SELECT * FROM retry");
-
-        for (int retryNumber = 0; retryNumber < MAX_RETRIES; retryNumber++) {
-            final RetryDecision retryDecision = retryPolicy.onErrorResponse(request, coordinatorException, retryNumber);
-            // TODO (DANOBLE) Is this the expected return value or should it be RETRY_NEXT?
-            //  Should we cycle through nodes in response to an error or retry on the same node?
-            assertThat(retryDecision).isEqualTo(RetryDecision.RETRY_SAME);
-        }
-    }
-
-    /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with fixed backoff time.
      */
     @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT)
@@ -184,7 +157,7 @@ public class CosmosRetryPolicyTest {
      * Closes the {@link #session} for testing {@link CosmosRetryPolicy} after dropping {@link #KEYSPACE_NAME}, if it
      * exists.
      */
-    @AfterClass
+    @AfterClass(timeOut = TIMEOUT)
     public void cleanUp() {
         if (this.session != null && !this.session.isClosed()) {
             try {
