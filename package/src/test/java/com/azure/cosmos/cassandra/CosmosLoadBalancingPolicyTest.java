@@ -311,17 +311,9 @@ public final class CosmosLoadBalancingPolicyTest {
         return session;
     }
 
-    private void cleanUp(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
-        session.execute(format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
-    }
-
     @NonNull
     private CqlSession connect(@NonNull final DriverConfigLoader configLoader) {
-
-        final CqlSession session = checkState(CqlSession.builder().withConfigLoader(configLoader).build());
-        checkState(session);
-
-        return session;
+        return checkState(CqlSession.builder().withConfigLoader(configLoader).build());
     }
 
     private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
@@ -444,7 +436,7 @@ public final class CosmosLoadBalancingPolicyTest {
             session.execute(batchStatement);
 
         } finally {
-            this.cleanUp(session, keyspaceName);
+            session.execute("DROP KEYSPACE IF EXISTS " + keyspaceName);
         }
     }
 
