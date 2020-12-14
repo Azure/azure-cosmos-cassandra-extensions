@@ -12,11 +12,13 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,18 +28,36 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public final class TestCommon {
 
+    private TestCommon() {
+        throw new UnsupportedOperationException();
+    }
+
+    // region Fields
+
+    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+
     static final List<String> CONTACT_POINTS = Arrays.asList(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.contact-point",
         "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
         "localhost:10350").split("\\s*,\\s*"));
 
-    // region Fields
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
         "localhost:10350");
+
+    static final List<InetSocketAddress> NODES = Arrays.stream(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.nodes",
+        "AZURE_COSMOS_CASSANDRA_NODES",
+        "localhost:10350").split("\\s*,\\s*"))
+        .map(value -> {
+            final Matcher match = matchSocketAddress(value);
+            return new InetSocketAddress(match.group("hostname"), Integer.parseUnsignedInt(match.group("port")));
+        }).collect(Collectors.toList());
+
     // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the
     //  emulator?
+
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
@@ -46,11 +66,6 @@ public final class TestCommon {
         "azure.cosmos.cassandra.username",
         "AZURE_COSMOS_CASSANDRA_USERNAME",
         "");
-    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
-
-    private TestCommon() {
-        throw new UnsupportedOperationException();
-    }
 
     // endregion
 
@@ -150,14 +165,14 @@ public final class TestCommon {
      * String port = matcher.group("port")
      * }</pre>
      *
-     * @param socketAddress a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
+     * @param value a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
      *
      * @return a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
      * address.
      */
     @NonNull
-    static Matcher matchSocketAddress(final String socketAddress) {
-        final Matcher matcher = HOSTNAME_AND_PORT.matcher(socketAddress);
+    static Matcher matchSocketAddress(final String value) {
+        final Matcher matcher = HOSTNAME_AND_PORT.matcher(value);
         assertThat(matcher.matches()).isTrue();
         return matcher;
     }

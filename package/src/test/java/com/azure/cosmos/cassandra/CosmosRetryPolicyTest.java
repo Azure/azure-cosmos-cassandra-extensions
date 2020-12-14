@@ -39,6 +39,7 @@ import java.util.regex.Matcher;
 
 import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.NODES;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
@@ -266,7 +267,7 @@ public final class CosmosRetryPolicyTest {
         assertThat(loadBalancingPolicy.getClass()).isEqualTo(DefaultLoadBalancingPolicy.class);
 
         final Map<UUID, Node> nodes = session.getMetadata().getNodes();
-        // TODO (DANOBLE) Add check that the number of nodes is correct based on a (to be defined) parameter to the test
+        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(NODES);
 
         LOG.info("[{}] connected to {} with {} and {}",
             session.getName(),
