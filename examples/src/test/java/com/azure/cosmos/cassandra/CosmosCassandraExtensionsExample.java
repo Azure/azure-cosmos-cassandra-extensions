@@ -21,6 +21,8 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
@@ -119,12 +121,17 @@ public class CosmosCassandraExtensionsExample {
 
         try (final CqlSession session = CqlSession.builder().build()) {
 
-            final Metrics metrics = session.getMetrics().orElseThrow();
+            if (session.getMetrics().isEmpty()) {
+                throw new NoSuchElementException("session metrics are unavailable");
+            }
 
-            final Timer sessionRequestTimer = (Timer) metrics
-                .getSessionMetric(DefaultSessionMetric.CQL_REQUESTS)
-                .orElseThrow();
+            final Metrics metrics = session.getMetrics().get();
 
+            if (metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).isEmpty()) {
+                throw new NoSuchElementException(DefaultSessionMetric.CQL_REQUESTS + " metrics are unavailable");
+            }
+
+            final Timer sessionRequestTimer = (Timer) metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).get();
             long requestCount = 0;
 
             try (final ScheduledReporter reporter = CsvReporter.forRegistry(metrics.getRegistry())
