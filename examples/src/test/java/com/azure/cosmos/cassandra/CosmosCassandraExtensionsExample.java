@@ -121,13 +121,13 @@ public class CosmosCassandraExtensionsExample {
 
         try (final CqlSession session = CqlSession.builder().build()) {
 
-            if (session.getMetrics().isEmpty()) {
+            if (!session.getMetrics().isPresent()) {
                 throw new NoSuchElementException("session metrics are unavailable");
             }
 
             final Metrics metrics = session.getMetrics().get();
 
-            if (metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).isEmpty()) {
+            if (!metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).isPresent()) {
                 throw new NoSuchElementException(DefaultSessionMetric.CQL_REQUESTS + " metrics are unavailable");
             }
 
