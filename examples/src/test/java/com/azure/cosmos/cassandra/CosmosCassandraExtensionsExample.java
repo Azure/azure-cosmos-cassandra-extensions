@@ -6,13 +6,16 @@ package com.azure.cosmos.cassandra;
 import com.codahale.metrics.CsvReporter;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Timer;
+import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -21,14 +24,16 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.testng.AssertJUnit.fail;
 
 /**
  * Shows how to use the Cosmos extensions for DataStax Java Driver 4 for Apache Cassandra.
@@ -100,7 +105,16 @@ public class CosmosCassandraExtensionsExample {
 
     // region Fields
 
-    private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.QUORUM;
+    private static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
+        getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.consistency-level",
+            "AZURE_COSMOS_CASSANDRA_CONSISTENCY_LEVEL",
+            "QUORUM"));
+
+    private static final String KEYSPACE_NAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.keyspace-name",
+        "AZURE_COSMOS_CASSANDRA_KEYSPACE_NAME",
+        "downgrading_" + UUID.randomUUID().toString().replace("-", ""));
 
     private static final File REPORTING_DIRECTORY = new File(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.reporting-directory",
@@ -121,45 +135,75 @@ public class CosmosCassandraExtensionsExample {
 
         try (final CqlSession session = CqlSession.builder().build()) {
 
+            //noinspection SimplifyOptionalCallChains
             if (!session.getMetrics().isPresent()) {
                 throw new NoSuchElementException("session metrics are unavailable");
             }
 
             final Metrics metrics = session.getMetrics().get();
 
+            //noinspection SimplifyOptionalCallChains
             if (!metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).isPresent()) {
                 throw new NoSuchElementException(DefaultSessionMetric.CQL_REQUESTS + " metrics are unavailable");
             }
 
             final Timer sessionRequestTimer = (Timer) metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).get();
-            long requestCount = 0;
+            final AtomicLong expectedRowCount = new AtomicLong();
+            long expectedRequestCount = 0;
 
             try (final ScheduledReporter reporter = CsvReporter.forRegistry(metrics.getRegistry())
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .convertRatesTo(TimeUnit.SECONDS)
                 .build(REPORTING_DIRECTORY)) {
 
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount);
-
                 assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount += 2);
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 2);
 
-                assertThatCode(() -> this.write(session, CONSISTENCY_LEVEL)).doesNotThrowAnyException();
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount += 1);
+                assertThatCode(() -> expectedRowCount.set(this.write(session))).doesNotThrowAnyException();
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 1);
 
                 assertThatCode(() -> {
-                    final ResultSet rows = this.read(session, CONSISTENCY_LEVEL);
+                    final List<Row> rows = this.read(session).all();
                     this.display(rows);
+                    assertThat(rows.size()).isEqualTo(expectedRowCount.get());
                 }).doesNotThrowAnyException();
 
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(requestCount + 1);
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount + 1);
                 reporter.report();
             }
 
+        } catch (final AssertionError error) {
+
+            // Reason: verification failure
+            throw error;
+
+        } catch (final AllNodesFailedException error) {
+
+            // Reason: connection failure
+
+            final StringWriter message = new StringWriter();
+            final PrintWriter writer = new PrintWriter(message);
+
+            writer.printf("Connection failure: %s. The complete list of errors grouped by node follows:%n",
+                error.getMessage().replaceFirst(
+                    " \\(showing first \\d+ nodes, use getAllErrors.+",
+                    ""));
+
+            for (final Map.Entry<Node, List<Throwable>> entry : error.getAllErrors().entrySet()) {
+                writer.printf("%n%s%n", entry.getKey());
+                for (final Throwable cause : entry.getValue()) {
+                    cause.printStackTrace(writer);
+                }
+            }
+
+            throw new AssertionError(message);
+
         } catch (final Throwable error) {
+
+            // Reason: unexpected failure
             final StringWriter stringWriter = new StringWriter();
             error.printStackTrace(new PrintWriter(stringWriter));
-            fail(format("failed with %s", stringWriter));
+            throw new AssertionError(format("unexpected failure:%n%s", stringWriter));
         }
     }
 
@@ -201,13 +245,13 @@ public class CosmosCassandraExtensionsExample {
     private void createSchema(final CqlSession session) {
 
         session.execute(SimpleStatement.newInstance(
-            "CREATE KEYSPACE IF NOT EXISTS downgrading WITH replication = {"
+            "CREATE KEYSPACE IF NOT EXISTS " + KEYSPACE_NAME + " WITH replication = {"
                 + "'class':'SimpleStrategy',"
                 + "'replication_factor':3"
                 + "}"));
 
         session.execute(SimpleStatement.newInstance(
-            "CREATE TABLE IF NOT EXISTS downgrading.sensor_data ("
+            "CREATE TABLE IF NOT EXISTS " + KEYSPACE_NAME + ".sensor_data ("
                 + "sensor_id uuid,"
                 + "date date,"
                 + "timestamp timestamp,"
@@ -221,7 +265,7 @@ public class CosmosCassandraExtensionsExample {
      *
      * @param rows the results to display.
      */
-    private void display(final ResultSet rows) {
+    private void display(final List<Row> rows) {
 
         final int width1 = 38;
         final int width2 = 12;
@@ -229,7 +273,10 @@ public class CosmosCassandraExtensionsExample {
         final int width4 = 21;
 
         final String format = "%-" + width1 + "s" + "%-" + width2 + "s" + "%-" + width3 + "s" + "%-" + width4 + "s%n";
+
+        System.out.println();
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
+
         drawLine(width1, width2, width3, width4);
 
         for (final Row row : rows) {
@@ -239,6 +286,8 @@ public class CosmosCassandraExtensionsExample {
                 row.getInstant("timestamp"),
                 row.getDouble("value"));
         }
+
+        System.out.println();
     }
 
     /**
@@ -259,23 +308,22 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Queries data, retrying if necessary with a downgraded CL.
      *
-     * @param consistencyLevel the consistency level to apply.
      */
-    private ResultSet read(final CqlSession session, final ConsistencyLevel consistencyLevel) {
+    private ResultSet read(final CqlSession session) {
 
-        System.out.printf("Reading at %s%n", consistencyLevel);
+        System.out.printf("Read from %s.sensor_data at %s ... ", KEYSPACE_NAME, CONSISTENCY_LEVEL);
 
         final SimpleStatement statement = SimpleStatement.newInstance(
             "SELECT sensor_id, date, timestamp, value "
-                + "FROM downgrading.sensor_data "
+                + "FROM " + KEYSPACE_NAME + ".sensor_data "
                 + "WHERE "
                 + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
                 + "date = '2018-02-26' AND "
                 + "timestamp > '2018-02-26+01:00'")
-            .setConsistencyLevel(consistencyLevel);
+            .setConsistencyLevel(CONSISTENCY_LEVEL);
 
         final ResultSet rows = session.execute(statement);
-        System.out.println("Read succeeded at " + consistencyLevel);
+        System.out.printf("succeeded%n");
 
         return rows;
     }
@@ -283,38 +331,39 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *
-     * @param consistencyLevel the consistency level to apply.
      */
-    private void write(final CqlSession session, final ConsistencyLevel consistencyLevel) {
+    private long write(final CqlSession session) {
 
-        System.out.printf("Writing at %s%n", consistencyLevel);
+        System.out.printf("Write to %s.sensor_data at %s ... ", KEYSPACE_NAME, CONSISTENCY_LEVEL);
 
         final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED)
-            .add(SimpleStatement.newInstance("INSERT INTO downgrading.sensor_data "
+            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + ".sensor_data "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:53:46.345+01:00',"
                 + "2.34)"))
-            .add(SimpleStatement.newInstance("INSERT INTO downgrading.sensor_data "
+            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + ".sensor_data "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:54:27.488+01:00',"
                 + "2.47)"))
-            .add(SimpleStatement.newInstance("INSERT INTO downgrading.sensor_data "
+            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + ".sensor_data "
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:56:33.739+01:00',"
                 + "2.52)"))
-            .setConsistencyLevel(consistencyLevel);
+            .setConsistencyLevel(CONSISTENCY_LEVEL);
 
         session.execute(batch);
-        System.out.println("Write succeeded at " + consistencyLevel);
+
+        System.out.printf("succeeded%n");
+        return batch.size();
     }
 
     // endregion
