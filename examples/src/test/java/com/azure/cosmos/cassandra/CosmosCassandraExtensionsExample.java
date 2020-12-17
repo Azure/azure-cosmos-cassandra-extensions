@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -116,10 +117,16 @@ public class CosmosCassandraExtensionsExample {
         "AZURE_COSMOS_CASSANDRA_KEYSPACE_NAME",
         "downgrading_" + UUID.randomUUID().toString().replace("-", ""));
 
-    private static final File REPORTING_DIRECTORY = new File(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.reporting-directory",
-        "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
-        System.getProperty("user.home")));
+    private static final File REPORTING_DIRECTORY = new File(
+        getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.reporting-directory",
+            "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
+            Path.of(
+                System.getProperty("user.home"),
+                ".local",
+                "var",
+                "lib",
+                "azure-cosmos-cassandra-driver-4").toString()));
 
     private static final int TIMEOUT_IN_MILLIS = 30_000;
 
@@ -132,6 +139,9 @@ public class CosmosCassandraExtensionsExample {
      */
     @Test(groups = { "examples" }, timeOut = TIMEOUT_IN_MILLIS)
     public void canIntegrateWithCosmos() {
+
+        //noinspection ResultOfMethodCallIgnored
+        REPORTING_DIRECTORY.mkdirs();
 
         try (final CqlSession session = CqlSession.builder().build()) {
 
@@ -307,7 +317,6 @@ public class CosmosCassandraExtensionsExample {
 
     /**
      * Queries data, retrying if necessary with a downgraded CL.
-     *
      */
     private ResultSet read(final CqlSession session) {
 
@@ -330,7 +339,6 @@ public class CosmosCassandraExtensionsExample {
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
-     *
      */
     private long write(final CqlSession session) {
 

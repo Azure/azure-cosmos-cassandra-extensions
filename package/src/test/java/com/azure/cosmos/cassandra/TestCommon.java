@@ -55,9 +55,6 @@ public final class TestCommon {
             return new InetSocketAddress(match.group("hostname"), Integer.parseUnsignedInt(match.group("port")));
         }).collect(Collectors.toList());
 
-    // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the
-    //  emulator?
-
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
