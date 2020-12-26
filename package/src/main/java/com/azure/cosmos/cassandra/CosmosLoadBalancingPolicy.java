@@ -27,6 +27,8 @@ import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,6 +40,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 /**
  * A {@link LoadBalancingPolicy} implementation with an option to specify read and write datacenters to route requests.
@@ -75,10 +78,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static final String OPTION_PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
 
     private final int dnsExpiryTimeInSeconds;
+    private final List<InetAddress> dnsLookupAddresses;
     private final String globalEndpoint;
     private final AtomicInteger index;
     private final String readDatacenter;
     private final String writeDatacenter;
+
+    private DistanceReporter distanceReporter;
 
     private volatile long lastDnsLookupTime;
 
@@ -108,11 +114,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.readDatacenter = Option.READ_DATACENTER.getValue(profile);
         this.writeDatacenter = Option.WRITE_DATACENTER.getValue(profile);
 
-        this.validate();
+        this.validateConfiguration();
 
         this.lastDnsLookupTime = Long.MAX_VALUE;
         this.index = new AtomicInteger();
         this.localAddresses = null;
+
+        this.dnsLookupAddresses = Collections.unmodifiableList(this.globalEndpoint.isEmpty()
+            ? new ArrayList<>()
+            : Arrays.asList(this.getLocalAddresses()));
     }
 
     // endregion
@@ -176,43 +186,21 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
-        LOG.info("init(nodes: {})", nodes);
-
-        List<InetAddress> dnsLookupAddresses = new ArrayList<>();
-
-        if (!this.globalEndpoint.isEmpty()) {
-            dnsLookupAddresses = Arrays.asList(this.getLocalAddresses());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("init({})", toString(nodes.values()));
         }
 
+        this.distanceReporter = distanceReporter;
         this.readLocalDatacenterNodes = new CopyOnWriteArrayList<>();
         this.remoteDatacenterNodes = new CopyOnWriteArrayList<>();
         this.writeLocalDatacenterNodes = new CopyOnWriteArrayList<>();
 
         for (final Node node : nodes.values()) {
-
-            final String datacenter = node.getDatacenter();
-            NodeDistance distance = NodeDistance.IGNORED;
-
-            if (!this.readDatacenter.isEmpty() && Objects.equals(datacenter, this.readDatacenter)) {
-                this.readLocalDatacenterNodes.add(node);
-                distance = NodeDistance.LOCAL;
-            }
-
-            if ((!this.writeDatacenter.isEmpty() && Objects.equals(datacenter, this.writeDatacenter))
-                || dnsLookupAddresses.contains(this.getAddress(node))) {
-                this.writeLocalDatacenterNodes.add(node);
-                distance = NodeDistance.LOCAL;
-            } else {
-                if (distance == NodeDistance.IGNORED) {
-                    distance = NodeDistance.REMOTE;
-                }
-                this.remoteDatacenterNodes.add(node);
-            }
-
-            distanceReporter.setDistance(node, distance);
+            this.reportDistance(node);
         }
 
         this.index.set(new Random().nextInt(Math.max(nodes.size(), 1)));
+        LOG.debug("-> init({})", this);
     }
 
     /**
@@ -234,82 +222,122 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @NonNull
     public Queue<Node> newQueryPlan(@Nullable final Request request, @Nullable final Session session) {
 
+        if (LOG.isDebugEnabled()) {
+            if (request == null) {
+                LOG.debug("newQueryPlan({request=null, session={}})", session == null ? null : session.getName());
+            } else {
+                LOG.debug("newQueryPlan({request={node:{},keyspace={}},session={}})",
+                    toString(request.getNode()),
+                    request.getKeyspace(),
+                    session == null ? "null" : session.getName());
+            }
+        }
+
         this.refreshNodesIfDnsExpired();
 
         final ConcurrentLinkedQueue<Node> queryPlan =  new ConcurrentLinkedQueue<>();
         final int start = this.index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
+        final boolean readRequest = isReadRequest(request);
 
-        if (isReadRequest(request)) {
+        if (readRequest) {
             addTo(queryPlan, start, this.readLocalDatacenterNodes);
         }
 
         addTo(queryPlan, start, this.writeLocalDatacenterNodes);
         addTo(queryPlan, start, this.remoteDatacenterNodes);
 
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("-> newQueryPlan({queryPlan={},readRequest={}})", toString(queryPlan), readRequest);
+        }
+
         return queryPlan;
     }
 
     @Override
     public void onAdd(@NonNull final Node node) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onAdd({})", toString(node));
+        }
         this.onUp(node);
     }
 
     @Override
     public void onDown(@NonNull final Node node) {
 
-        if (node.getDatacenter() == null) {
-            return;
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onDown({})", toString(node));
         }
 
-        if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
-            this.readLocalDatacenterNodes.remove(node);
-        }
+        if (node.getDatacenter() != null) {
 
-        if (!this.writeDatacenter.isEmpty()) {
-            if (node.getDatacenter().equals(this.writeDatacenter)) {
-                this.writeLocalDatacenterNodes.remove(node);
+            if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
+                this.readLocalDatacenterNodes.remove(node);
             }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
-            this.writeLocalDatacenterNodes.remove(node);
-        } else {
-            this.remoteDatacenterNodes.remove(node);
+
+            if (!this.writeDatacenter.isEmpty()) {
+                if (node.getDatacenter().equals(this.writeDatacenter)) {
+                    this.writeLocalDatacenterNodes.remove(node);
+                }
+            } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
+                this.writeLocalDatacenterNodes.remove(node);
+            } else {
+                this.remoteDatacenterNodes.remove(node);
+            }
         }
+
+        LOG.debug("-> onDown({})", this);
     }
 
     @Override
     public void onRemove(@NonNull final Node node) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onRemove({})", toString(node));
+        }
         this.onDown(node);
     }
 
     @Override
     public void onUp(@NonNull final Node node) {
 
-        if (node.getDatacenter() == null) {
-            return;
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onUp({})", node);
         }
 
-        if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
-            this.readLocalDatacenterNodes.addIfAbsent(node);
-        }
+        if (node.getDatacenter() != null) {
 
-        if (!this.writeDatacenter.isEmpty()) {
-            if (node.getDatacenter().equals(this.writeDatacenter)) {
-                this.writeLocalDatacenterNodes.addIfAbsent(node);
+            if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
+                this.readLocalDatacenterNodes.addIfAbsent(node);
             }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
-            this.writeLocalDatacenterNodes.addIfAbsent(node);
-        } else {
-            this.remoteDatacenterNodes.addIfAbsent(node);
+
+            if (!this.writeDatacenter.isEmpty()) {
+                if (node.getDatacenter().equals(this.writeDatacenter)) {
+                    this.writeLocalDatacenterNodes.addIfAbsent(node);
+                }
+            } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
+                this.writeLocalDatacenterNodes.addIfAbsent(node);
+            } else {
+                this.remoteDatacenterNodes.addIfAbsent(node);
+            }
+
+            this.reportDistance(node);
         }
+
+        LOG.debug("-> onUp({})", this);
     }
 
     @Override
     public String toString() {
-        return "CosmosRetryPolicy({"
-            + Option.DNS_EXPIRY_TIME.getName() + ':' + this.dnsExpiryTimeInSeconds + ','
-            + Option.GLOBAL_ENDPOINT.getName() + ":\"" + this.globalEndpoint + "\","
-            + Option.READ_DATACENTER.getName() + ":\"" + this.readDatacenter + "\","
-            + Option.WRITE_DATACENTER.getName() + ":\"" + this.writeDatacenter + "\"})";
+        return "CosmosLoadBalancingPolicy({"
+            + "configuration:{"
+            + Option.DNS_EXPIRY_TIME.getName() + '=' + this.dnsExpiryTimeInSeconds + ','
+            + Option.GLOBAL_ENDPOINT.getName() + "=\"" + this.globalEndpoint + "\","
+            + Option.READ_DATACENTER.getName() + "=\"" + this.readDatacenter + "\","
+            + Option.WRITE_DATACENTER.getName() + "=\"" + this.writeDatacenter + "\""
+            + "},datacenter-nodes:{"
+            + "read-local" + "=" + toString(this.readLocalDatacenterNodes) + ","
+            + "remote" + "=" + toString(this.remoteDatacenterNodes)  + ","
+            + "write-local" + "=" + toString(this.writeLocalDatacenterNodes)
+            + "}})";
     }
 
     // endregion
@@ -445,7 +473,47 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.remoteDatacenterNodes = new CopyOnWriteArrayList<>(remoteNodes);
     }
 
-    private void validate() {
+    private void reportDistance(@NonNull final Node node) {
+
+        final String datacenter = node.getDatacenter();
+        NodeDistance distance = NodeDistance.IGNORED;
+
+        if (!this.readDatacenter.isEmpty() && Objects.equals(datacenter, this.readDatacenter)) {
+            this.readLocalDatacenterNodes.add(node);
+            distance = NodeDistance.LOCAL;
+        }
+
+        if ((!this.writeDatacenter.isEmpty() && Objects.equals(datacenter, this.writeDatacenter))
+            || this.dnsLookupAddresses.contains(this.getAddress(node))) {
+            this.writeLocalDatacenterNodes.add(node);
+            distance = NodeDistance.LOCAL;
+        } else {
+            if (distance == NodeDistance.IGNORED) {
+                distance = NodeDistance.REMOTE;
+            }
+            this.remoteDatacenterNodes.add(node);
+        }
+
+        this.distanceReporter.setDistance(node, distance);
+    }
+
+    @NonNull
+    private static String toString(@Nullable final Node node) {
+        return node == null ? "null" : "Node("
+            + "endPoint=" + node.getEndPoint() + ","
+            + "datacenter=" + node.getDatacenter() + ","
+            + "distance=" + node.getDistance() + ","
+            + "hostId=" + node.getHostId() + ","
+            + "hashCode=" + node.hashCode()
+            + ")";
+    }
+
+    @NonNull
+    private static String toString(@NonNull final Collection<Node> nodes) {
+        return nodes.stream().map(CosmosLoadBalancingPolicy::toString).collect(Collectors.joining(",", "[", "]"));
+    }
+
+    private void validateConfiguration() {
 
         if (this.globalEndpoint.isEmpty()) {
 
