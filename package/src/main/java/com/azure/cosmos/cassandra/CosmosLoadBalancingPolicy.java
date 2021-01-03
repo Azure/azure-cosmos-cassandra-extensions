@@ -12,6 +12,7 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -37,7 +38,6 @@ import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -57,10 +57,10 @@ import java.util.stream.Collectors;
  * }
  * }</pre>
  * If a {@code read-datacenter} is specified, {@linkplain Node nodes} in that datacenter are prioritized for read
- * requests. To determine the datacenter for write requests, a value for either {@code global-endpoint} or
- * {@code write-datacenter} must then be provided. If {@code write-datacenter} is specified, writes will be prioritized
- * for that location. When a {@code global-endpoint} is specified, write requests will be prioritized for the default
- * write location.
+ * requests. To determine the datacenter for write requests, a value for either {@code global-endpoint} or {@code
+ * write-datacenter} must then be provided. If {@code write-datacenter} is specified, writes will be prioritized for
+ * that location. When a {@code global-endpoint} is specified, write requests will be prioritized for the default write
+ * location.
  * <p>
  * Specifying a {@code global-endpoint} allows the client to gracefully failover by changing the default write location.
  * In this case the {@code dns-expiry-time} is essentially the maximum time required to recover from the failover. By
@@ -81,19 +81,19 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private final List<InetAddress> dnsLookupAddresses;
     private final String globalEndpoint;
     private final AtomicInteger index;
+    private final Object lock;
     private final String readDatacenter;
     private final String writeDatacenter;
 
     private DistanceReporter distanceReporter;
-
     private volatile long lastDnsLookupTime;
 
     @SuppressFBWarnings("VO_VOLATILE_REFERENCE_TO_ARRAY")
     private volatile InetAddress[] localAddresses;
 
-    private volatile CopyOnWriteArrayList<Node> readLocalDatacenterNodes;
-    private volatile CopyOnWriteArrayList<Node> remoteDatacenterNodes;
-    private volatile CopyOnWriteArrayList<Node> writeLocalDatacenterNodes;
+    private volatile List<Node> localNodesForReading;
+    private volatile List<Node> localNodesForWriting;
+    private volatile List<Node> remoteNodes;
 
     // endregion
 
@@ -119,6 +119,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.lastDnsLookupTime = Long.MAX_VALUE;
         this.index = new AtomicInteger();
         this.localAddresses = null;
+        this.lock = new Object();
 
         this.dnsLookupAddresses = Collections.unmodifiableList(this.globalEndpoint.isEmpty()
             ? new ArrayList<>()
@@ -180,7 +181,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     /**
      * Initializes the list of hosts in read, write, local, and remote categories.
      *
-     * @param nodes the nodes to be examined.
+     * @param nodes            the nodes to be examined.
      * @param distanceReporter an object that the policy uses to signal decisions it makes about node distances.
      */
     @Override
@@ -191,9 +192,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         this.distanceReporter = distanceReporter;
-        this.readLocalDatacenterNodes = new CopyOnWriteArrayList<>();
-        this.remoteDatacenterNodes = new CopyOnWriteArrayList<>();
-        this.writeLocalDatacenterNodes = new CopyOnWriteArrayList<>();
+        this.localNodesForReading = new ArrayList<>();
+        this.remoteNodes = new ArrayList<>();
+        this.localNodesForWriting = new ArrayList<>();
 
         for (final Node node : nodes.values()) {
             this.reportDistance(node);
@@ -209,8 +210,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * For read requests, the coordinators are ordered to ensure that each known host in the read datacenter is tried
      * first. If none of these coordinators are reachable, all other hosts will be tried. For writes and all other
      * requests, the coordinators are ordered to ensure that each known host in the write datacenter or the default
-     * write location (looked up and cached from the global-endpoint) are tried first. If none of these coordinators
-     * are reachable, all other hosts will be tried.
+     * write location (looked up and cached from the global-endpoint) are tried first. If none of these coordinators are
+     * reachable, all other hosts will be tried.
      *
      * @param request the current request or {@code null}.
      * @param session the current session or {@code null}.
@@ -235,19 +236,19 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.refreshNodesIfDnsExpired();
 
-        final ConcurrentLinkedQueue<Node> queryPlan =  new ConcurrentLinkedQueue<>();
         final int start = this.index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
+        final ConcurrentLinkedQueue<Node> queryPlan = new ConcurrentLinkedQueue<>();
         final boolean readRequest = isReadRequest(request);
 
         if (readRequest) {
-            addTo(queryPlan, start, this.readLocalDatacenterNodes);
+            addTo(queryPlan, this.localNodesForReading, start);
         }
 
-        addTo(queryPlan, start, this.writeLocalDatacenterNodes);
-        addTo(queryPlan, start, this.remoteDatacenterNodes);
+        addTo(queryPlan, this.localNodesForWriting, start);
+        addTo(queryPlan, this.remoteNodes, start);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("-> newQueryPlan({queryPlan={},readRequest={}})", toString(queryPlan), readRequest);
+            LOG.debug("-> newQueryPlan({read-request={}, query-plan={}})", readRequest, toString(queryPlan));
         }
 
         return queryPlan;
@@ -255,74 +256,62 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onAdd(@NonNull final Node node) {
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("onAdd({})", toString(node));
         }
-        this.onUp(node);
+
+        synchronized (this.lock) {
+            this.reportDistance(node);
+        }
+
+        LOG.debug("-> onAdd({})", this);
     }
 
     @Override
     public void onDown(@NonNull final Node node) {
-
         if (LOG.isDebugEnabled()) {
             LOG.debug("onDown({})", toString(node));
         }
-
-        if (node.getDatacenter() != null) {
-
-            if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
-                this.readLocalDatacenterNodes.remove(node);
-            }
-
-            if (!this.writeDatacenter.isEmpty()) {
-                if (node.getDatacenter().equals(this.writeDatacenter)) {
-                    this.writeLocalDatacenterNodes.remove(node);
-                }
-            } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
-                this.writeLocalDatacenterNodes.remove(node);
-            } else {
-                this.remoteDatacenterNodes.remove(node);
-            }
-        }
-
-        LOG.debug("-> onDown({})", this);
     }
 
     @Override
     public void onRemove(@NonNull final Node node) {
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("onRemove({})", toString(node));
         }
-        this.onDown(node);
+
+        final String datacenter = node.getDatacenter();
+
+        if (datacenter != null) {
+
+            synchronized (this.lock) {
+
+                if (!this.readDatacenter.isEmpty() && datacenter.equals(this.readDatacenter)) {
+                    removeFrom(this.localNodesForReading, node);
+                }
+
+                if (!this.writeDatacenter.isEmpty()) {
+                    if (datacenter.equals(this.writeDatacenter)) {
+                        this.localNodesForWriting.remove(node);
+                    }
+                } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
+                    removeFrom(this.localNodesForWriting, node);
+                } else {
+                    removeFrom(this.remoteNodes, node);
+                }
+            }
+        }
+
+        LOG.debug("-> onRemove({})", this);
     }
 
     @Override
     public void onUp(@NonNull final Node node) {
-
         if (LOG.isDebugEnabled()) {
             LOG.debug("onUp({})", node);
         }
-
-        if (node.getDatacenter() != null) {
-
-            if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
-                this.readLocalDatacenterNodes.addIfAbsent(node);
-            }
-
-            if (!this.writeDatacenter.isEmpty()) {
-                if (node.getDatacenter().equals(this.writeDatacenter)) {
-                    this.writeLocalDatacenterNodes.addIfAbsent(node);
-                }
-            } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
-                this.writeLocalDatacenterNodes.addIfAbsent(node);
-            } else {
-                this.remoteDatacenterNodes.addIfAbsent(node);
-            }
-
-            this.reportDistance(node);
-        }
-
-        LOG.debug("-> onUp({})", this);
     }
 
     @Override
@@ -334,9 +323,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             + Option.READ_DATACENTER.getName() + "=\"" + this.readDatacenter + "\","
             + Option.WRITE_DATACENTER.getName() + "=\"" + this.writeDatacenter + "\""
             + "},datacenter-nodes:{"
-            + "read-local" + "=" + toString(this.readLocalDatacenterNodes) + ","
-            + "remote" + "=" + toString(this.remoteDatacenterNodes)  + ","
-            + "write-local" + "=" + toString(this.writeLocalDatacenterNodes)
+            + "read-local" + "=" + toString(this.localNodesForReading) + ","
+            + "remote" + "=" + toString(this.remoteNodes) + ","
+            + "write-local" + "=" + toString(this.localNodesForWriting)
             + "}})";
     }
 
@@ -349,14 +338,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * <p>
      * If {@link #dnsExpiryTimeInSeconds} has elapsed, the array of local addresses is also updated.
      *
-     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpiryTimeInSeconds}
-     * has elapsed.
+     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpiryTimeInSeconds} has
+     * elapsed.
      *
      * @throws IllegalStateException if the DNS could not resolve the {@link #globalEndpoint} and local addresses have
-     * not yet been enumerated.
+     *                               not yet been enumerated.
      */
     @NonNull
-    private synchronized InetAddress[] getLocalAddresses() {
+    private InetAddress[] getLocalAddresses() {
 
         if (this.localAddresses == null || this.dnsExpired()) {
             try {
@@ -377,7 +366,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return this.localAddresses;
     }
 
-    private static void addTo(final Queue<Node> queryPlan, final int start, final List<Node> nodes) {
+    private static void addTo(final List<Node> nodes, final Node node) {
+
+        final EndPoint endPoint = node.getEndPoint();
+
+        for (final Node current : nodes) {
+            if (endPoint.equals(current.getEndPoint())) {
+                return;
+            }
+        }
+
+        nodes.add(node);
+    }
+
+    private static void addTo(final Queue<Node> queryPlan, final List<Node> nodes, final int start) {
 
         final int length = nodes.size();
         final int end = start + length;
@@ -427,9 +429,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private void reclassifyNodes(
-        final List<Node> nodes,
-        final List<Node> localNodes,
-        final List<Node> remoteNodes,
+        final List<Node> nodes, final List<Node> localNodes, final List<Node> remoteNodes,
         final InetAddress[] localAddresses) {
 
         for (final Node node : nodes) {
@@ -458,19 +458,33 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private void refreshNodesIfDnsExpired() {
 
-        if (this.globalEndpoint.isEmpty() || !this.dnsExpired()) {
-            return;
+        synchronized (this.lock) {
+
+            if (this.globalEndpoint.isEmpty() || !this.dnsExpired()) {
+                return;
+            }
+
+            final InetAddress[] localAddresses = this.getLocalAddresses();
+            final List<Node> localNodes = new ArrayList<>();
+            final List<Node> remoteNodes = new ArrayList<>();
+
+            this.reclassifyNodes(this.localNodesForWriting, localNodes, remoteNodes, localAddresses);
+            this.reclassifyNodes(this.remoteNodes, localNodes, remoteNodes, localAddresses);
+            this.localNodesForWriting = localNodes;
+            this.remoteNodes = remoteNodes;
         }
+    }
 
-        final InetAddress[] localAddresses = this.getLocalAddresses();
-        final List<Node> localNodes = new ArrayList<>();
-        final List<Node> remoteNodes = new ArrayList<>();
-
-        this.reclassifyNodes(this.writeLocalDatacenterNodes, localNodes, remoteNodes, localAddresses);
-        this.reclassifyNodes(this.remoteDatacenterNodes, localNodes, remoteNodes, localAddresses);
-
-        this.writeLocalDatacenterNodes = new CopyOnWriteArrayList<>(localNodes);
-        this.remoteDatacenterNodes = new CopyOnWriteArrayList<>(remoteNodes);
+    private static void removeFrom(final List<Node> nodes, final Node node) {
+        final EndPoint endPoint = node.getEndPoint();
+        int i = 0;
+        for (final Node current : nodes) {
+            if (endPoint.equals(current.getEndPoint())) {
+                nodes.remove(i);
+                break;
+            }
+            i++;
+        }
     }
 
     private void reportDistance(@NonNull final Node node) {
@@ -478,20 +492,23 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final String datacenter = node.getDatacenter();
         NodeDistance distance = NodeDistance.IGNORED;
 
-        if (!this.readDatacenter.isEmpty() && Objects.equals(datacenter, this.readDatacenter)) {
-            this.readLocalDatacenterNodes.add(node);
-            distance = NodeDistance.LOCAL;
-        }
+        if (datacenter != null) {
 
-        if ((!this.writeDatacenter.isEmpty() && Objects.equals(datacenter, this.writeDatacenter))
-            || this.dnsLookupAddresses.contains(this.getAddress(node))) {
-            this.writeLocalDatacenterNodes.add(node);
-            distance = NodeDistance.LOCAL;
-        } else {
-            if (distance == NodeDistance.IGNORED) {
+            if (!this.readDatacenter.isEmpty() && Objects.equals(datacenter, this.readDatacenter)) {
+                addTo(this.localNodesForReading, node);
+                distance = NodeDistance.LOCAL;
+            }
+
+            if (!this.writeDatacenter.isEmpty() && Objects.equals(datacenter, this.writeDatacenter)) {
+                addTo(this.localNodesForWriting, node);
+                distance = NodeDistance.LOCAL;
+            } else if (this.dnsLookupAddresses.contains(this.getAddress(node))) {
+                addTo(this.localNodesForWriting, node);
+                distance = NodeDistance.LOCAL;
+            } else if (distance == NodeDistance.IGNORED) {
+                addTo(this.remoteNodes, node);
                 distance = NodeDistance.REMOTE;
             }
-            this.remoteDatacenterNodes.add(node);
         }
 
         this.distanceReporter.setDistance(node, distance);
