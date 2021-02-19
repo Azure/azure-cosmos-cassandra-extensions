@@ -1,4 +1,3 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
 package com.azure.cosmos.cassandra;
@@ -81,9 +80,9 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * <h3>
  * Side effects</h3>
  * <ol>
- * <li>Creates a keyspace in the cluster with replication factor 3. To prevent collisions especially during CI test
- * runs, we generate a keyspace name of the form <b>downgrading_</b><i>&gt;random-uuid&lt;</i>. Should a keyspace by
- * this name already exist, it is reused.
+ * <li>Creates a keyspace in the cluster with replication factor 4, the number of replicas per partition in a Cosmos DB
+ * instance. To prevent collisions especially during CI test runs, we generate a keyspace name of the form 
+ * <b>downgrading_</b><i>&gt;random-uuid&lt;</i>. Should a keyspace by this name already exist, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
  * <li>The keyspace created or reused is then dropped. This prevents keyspaces from accumulating with repeated test
@@ -258,7 +257,7 @@ public class CosmosCassandraExtensionsExample {
         session.execute(SimpleStatement.newInstance(
             "CREATE KEYSPACE IF NOT EXISTS " + KEYSPACE_NAME + " WITH replication = {"
                 + "'class':'SimpleStrategy',"
-                + "'replication_factor':3"
+                + "'replication_factor':4"
                 + "}"));
 
         session.execute(SimpleStatement.newInstance(

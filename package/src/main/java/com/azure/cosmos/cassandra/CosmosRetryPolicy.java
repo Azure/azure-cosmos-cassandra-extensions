@@ -13,11 +13,14 @@ import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
+import com.datastax.oss.driver.api.core.servererrors.DefaultWriteType;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
 import com.datastax.oss.driver.api.core.servererrors.WriteFailureException;
 import com.datastax.oss.driver.api.core.servererrors.WriteType;
 import com.datastax.oss.driver.api.core.session.Request;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.Random;
@@ -54,6 +57,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // region Fields
 
     private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 2_000;
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosRetryPolicy.class);
     private static final String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
     private static final Random RANDOM = new Random();
 
@@ -71,6 +75,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
      * @param driverContext an object holding the context of the current driver instance.
      * @param profileName   name of the configuration profile to apply.
      */
+    @SuppressWarnings("unused")
     public CosmosRetryPolicy(final DriverContext driverContext, final String profileName) {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
@@ -172,7 +177,26 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final boolean dataPresent,
         final int retryCount) {
 
-        return this.retryManyTimesOrThrow(retryCount);
+        final RetryDecision decision = retryCount == 0 && received >= blockFor && !dataPresent
+            ? RetryDecision.RETRY_SAME
+            : RetryDecision.RETHROW;
+
+        if (decision == RetryDecision.RETRY_SAME && LOG.isDebugEnabled()) {
+            LOG.debug(
+                "retrying on read timeout on same host: { "
+                    + "consistencyLevel: {}, "
+                    + "blockFor: {}, "
+                    + "dataPresent: {}, "
+                    + "received: {}, "
+                    + "retryCount: {} }",
+                consistencyLevel,
+                blockFor,
+                false,
+                received,
+                retryCount);
+        }
+
+        return decision;
     }
 
     @Override
@@ -196,18 +220,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     }
 
     @Override
-    public String toString() {
-        return "CosmosRetryPolicy({"
-            + Option.FIXED_BACKOFF_TIME.getName() + ':' + this.fixedBackoffTimeInMillis + ','
-            + Option.GROWING_BACKOFF_TIME.getName() + ':' + this.growingBackoffTimeInMillis + ','
-            + Option.MAX_RETRIES.getName() + ':' + this.maxRetryCount + "})";
-    }
-
-    // endregion
-
-    // region Privates
-
-    @Override
     public RetryDecision onWriteTimeout(
         @NonNull final Request request,
         @NonNull final ConsistencyLevel consistencyLevel,
@@ -216,7 +228,33 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final int received,
         final int retryCount) {
 
-        return this.retryManyTimesOrThrow(retryCount);
+        final RetryDecision decision = retryCount == 0 && writeType == DefaultWriteType.BATCH_LOG
+            ? RetryDecision.RETRY_SAME
+            : RetryDecision.RETHROW;
+
+        if (decision == RetryDecision.RETRY_SAME && LOG.isDebugEnabled()) {
+            LOG.debug(
+                "retrying on write timeout on same host: { "
+                    + "consistencyLevel: {}, "
+                    + "writeType: {}, "
+                    + "blockFor: {}, "
+                    + "received: {}, "
+                    + "retryCount: {} }",
+                consistencyLevel,
+                writeType,
+                blockFor,
+                received,
+                retryCount);
+        }
+        return decision;
+    }
+
+    @Override
+    public String toString() {
+        return "CosmosRetryPolicy({"
+            + Option.FIXED_BACKOFF_TIME.getName() + ':' + this.fixedBackoffTimeInMillis + ','
+            + Option.GROWING_BACKOFF_TIME.getName() + ':' + this.growingBackoffTimeInMillis + ','
+            + Option.MAX_RETRIES.getName() + ':' + this.maxRetryCount + "})";
     }
 
     // endregion
@@ -239,7 +277,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
             if (kvp.length != 2) {
                 continue;
             }
-            if (kvp[0].trim().equals("RetryAfterMs")) {
+            if ("RetryAfterMs".equals(kvp[0].trim())) {
                 return Integer.parseInt(kvp[1]);
             }
         }
