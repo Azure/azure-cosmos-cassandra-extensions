@@ -2,7 +2,7 @@
 <suite name="CI" verbose="1">
   <test name="examples">
     <classes>
-      <class name="com.microsoft.azure.cosmos.cassandra.CosmosCassandraExtensionsExample"/>
+      <class name="com.azure.cosmos.cassandra.CosmosCassandraExtensionsExample"/>
     </classes>
   </test>
 </suite>

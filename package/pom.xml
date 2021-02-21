@@ -8,20 +8,25 @@ Licensed under the MIT License.
 
   <modelVersion>4.0.0</modelVersion>
 
-  <artifactId>azure-cosmos-cassandra-extensions</artifactId>
+  <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
   <packaging>jar</packaging>
-  <version>0.13.0</version>
+  <version>0.1.0</version>
 
   <parent>
-    <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
-    <groupId>com.microsoft.azure</groupId>
-    <version>0.13.0</version>
+    <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
+    <groupId>com.azure</groupId>
+    <version>0.1.0</version>
   </parent>
 
   <dependencies>
     <dependency>
-      <artifactId>cassandra-driver-core</artifactId>
-      <groupId>com.datastax.cassandra</groupId>
+      <groupId>com.datastax.oss</groupId>
+      <artifactId>java-driver-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.datastax.oss</groupId>
+      <artifactId>java-driver-query-builder</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
@@ -54,5 +59,28 @@ Licensed under the MIT License.
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-javadoc-resources</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+            <configuration>
+              <attach>false</attach>
+              <descriptors>
+                <descriptor>src/assembly/javadoc-resources.xml</descriptor>
+              </descriptors>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 
 </project>
