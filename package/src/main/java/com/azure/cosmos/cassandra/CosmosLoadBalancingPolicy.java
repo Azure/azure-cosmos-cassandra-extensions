@@ -458,9 +458,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private void refreshNodesIfDnsExpired() {
 
+        if (this.globalEndpoint.isEmpty()) {
+            return;
+        }
+
         synchronized (this.lock) {
 
-            if (this.globalEndpoint.isEmpty() || !this.dnsExpired()) {
+            if (!this.dnsExpired()) {
                 return;
             }
 
