@@ -12,36 +12,24 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
-<<<<<<< HEAD
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
-=======
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-<<<<<<< HEAD
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-=======
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
-<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-=======
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,16 +37,10 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
-<<<<<<< HEAD
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
-=======
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 
 /**
  * A {@link LoadBalancingPolicy} implementation with an option to specify read and write datacenters to route requests.
@@ -75,17 +57,10 @@ import java.util.function.BiFunction;
  * }
  * }</pre>
  * If a {@code read-datacenter} is specified, {@linkplain Node nodes} in that datacenter are prioritized for read
-<<<<<<< HEAD
  * requests. To determine the datacenter for write requests, a value for either {@code global-endpoint} or {@code
  * write-datacenter} must then be provided. If {@code write-datacenter} is specified, writes will be prioritized for
  * that location. When a {@code global-endpoint} is specified, write requests will be prioritized for the default write
  * location.
-=======
- * requests. To determine the datacenter for write requests, a value for either {@code global-endpoint} or
- * {@code write-datacenter} must then be provided. If {@code write-datacenter} is specified, writes will be prioritized
- * for that location. When a {@code global-endpoint} is specified, write requests will be prioritized for the default
- * write location.
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
  * <p>
  * Specifying a {@code global-endpoint} allows the client to gracefully failover by changing the default write location.
  * In this case the {@code dns-expiry-time} is essentially the maximum time required to recover from the failover. By
@@ -99,7 +74,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Fields
 
-<<<<<<< HEAD
     private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
     private static final String OPTION_PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
 
@@ -120,20 +94,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private volatile List<Node> localNodesForReading;
     private volatile List<Node> localNodesForWriting;
     private volatile List<Node> remoteNodes;
-=======
-    private static final String PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
-
-    private final int dnsExpiryTimeInSeconds;
-    private final String globalEndpoint;
-    private final AtomicInteger index = new AtomicInteger();
-    private final String readDatacenter;
-    private final String writeDatacenter;
-    private long lastDnsLookupTime = Long.MIN_VALUE;
-    private InetAddress[] localAddresses = null;
-    private CopyOnWriteArrayList<Node> readLocalDcNodes;
-    private CopyOnWriteArrayList<Node> remoteDcNodes;
-    private CopyOnWriteArrayList<Node> writeLocalDcNodes;
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 
     // endregion
 
@@ -154,7 +114,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.readDatacenter = Option.READ_DATACENTER.getValue(profile);
         this.writeDatacenter = Option.WRITE_DATACENTER.getValue(profile);
 
-<<<<<<< HEAD
         this.validateConfiguration();
 
         this.lastDnsLookupTime = Long.MAX_VALUE;
@@ -205,9 +164,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     public String getWriteDatacenter() {
         return this.writeDatacenter;
-=======
-        this.validate();
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
     }
 
     // endregion
@@ -225,17 +181,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     /**
      * Initializes the list of hosts in read, write, local, and remote categories.
      *
-<<<<<<< HEAD
      * @param nodes            the nodes to be examined.
-=======
-     * @param nodes the nodes to be examined.
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
      * @param distanceReporter an object that the policy uses to signal decisions it makes about node distances.
      */
     @Override
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
-<<<<<<< HEAD
         if (LOG.isDebugEnabled()) {
             LOG.debug("init({})", toString(nodes.values()));
         }
@@ -267,62 +218,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      *
      * @return a new query plan represented as a {@linkplain Queue queue} of {@linkplain Node nodes}. The queue is a
      * concurrent queue as required by the {@link LoadBalancingPolicy#newQueryPlan} contract.
-=======
-        List<InetAddress> dnsLookupAddresses = new ArrayList<>();
-
-        if (!this.globalEndpoint.isEmpty()) {
-            dnsLookupAddresses = Arrays.asList(this.getLocalAddresses());
-        }
-
-        this.readLocalDcNodes = new CopyOnWriteArrayList<>();
-        this.writeLocalDcNodes = new CopyOnWriteArrayList<>();
-        this.remoteDcNodes = new CopyOnWriteArrayList<>();
-
-        for (final Node node : nodes.values()) {
-
-            final String datacenter = node.getDatacenter();
-            NodeDistance distance = NodeDistance.IGNORED;
-
-            if (!this.readDatacenter.isEmpty() && Objects.equals(datacenter, this.readDatacenter)) {
-                this.readLocalDcNodes.add(node);
-                distance = NodeDistance.LOCAL;
-            }
-
-            if ((!this.writeDatacenter.isEmpty() && Objects.equals(datacenter, this.writeDatacenter))
-                || dnsLookupAddresses.contains(this.getAddress(node))) {
-                this.writeLocalDcNodes.add(node);
-                distance = NodeDistance.LOCAL;
-            } else {
-                assert distance == NodeDistance.IGNORED;
-                this.remoteDcNodes.add(node);
-                distance = NodeDistance.REMOTE;
-            }
-
-            distanceReporter.setDistance(node, distance);
-        }
-
-        this.index.set(new Random().nextInt(Math.max(nodes.size(), 1)));
-    }
-
-    /**
-     * Returns the hosts to use for a new query.
-     * <p>
-     * For read requests, the returned plan will always try each known host in the readDC first. If none of these hosts
-     * are reachable, it will try all other hosts. For writes and all other requests, the returned plan will always try
-     * each known host in the writeDC or the default write region (looked up and cached from the globalEndpoint) first.
-     * If none of the host is reachable, it will try all other hosts.
-     *
-     * @param request the current request or {@code null}.
-     * @param session the the current session or {@code null}.
-     *
-     * @return a new query plan represented as a {@linkplain Queue queue} of {@linkplain Node nodes}.
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
      */
     @Override
     @NonNull
     public Queue<Node> newQueryPlan(@Nullable final Request request, @Nullable final Session session) {
 
-<<<<<<< HEAD
         if (LOG.isDebugEnabled()) {
             if (request == null) {
                 LOG.debug("newQueryPlan({request=null, session={}})", session == null ? null : session.getName());
@@ -350,26 +250,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         if (LOG.isDebugEnabled()) {
             LOG.debug("-> newQueryPlan({read-request={}, query-plan={}})", readRequest, toString(queryPlan));
         }
-=======
-        this.refreshHostsIfDnsExpired();
-
-        final ArrayDeque<Node> queryPlan =  new ArrayDeque<>();
-        final int start = this.index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
-
-        if (isReadRequest(request)) {
-            addTo(queryPlan, start, this.readLocalDcNodes);
-        }
-
-        addTo(queryPlan, start, this.writeLocalDcNodes);
-        addTo(queryPlan, start, this.remoteDcNodes);
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 
         return queryPlan;
     }
 
     @Override
     public void onAdd(@NonNull final Node node) {
-<<<<<<< HEAD
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("onAdd({})", toString(node));
@@ -380,14 +266,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         LOG.debug("-> onAdd({})", this);
-=======
-        this.onUp(node);
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
     }
 
     @Override
     public void onDown(@NonNull final Node node) {
-<<<<<<< HEAD
         if (LOG.isDebugEnabled()) {
             LOG.debug("onDown({})", toString(node));
         }
@@ -423,36 +305,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         LOG.debug("-> onRemove({})", this);
-=======
-
-        if (node.getDatacenter() == null) {
-            return;
-        }
-
-        if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
-            this.readLocalDcNodes.remove(node);
-        }
-
-        if (!this.writeDatacenter.isEmpty()) {
-            if (node.getDatacenter().equals(this.writeDatacenter)) {
-                this.writeLocalDcNodes.remove(node);
-            }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
-            this.writeLocalDcNodes.remove(node);
-        } else {
-            this.remoteDcNodes.remove(node);
-        }
-    }
-
-    @Override
-    public void onRemove(@NonNull final Node node) {
-        this.onDown(node);
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
     }
 
     @Override
     public void onUp(@NonNull final Node node) {
-<<<<<<< HEAD
         if (LOG.isDebugEnabled()) {
             LOG.debug("onUp({})", node);
         }
@@ -471,26 +327,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             + "remote" + "=" + toString(this.remoteNodes) + ","
             + "write-local" + "=" + toString(this.localNodesForWriting)
             + "}})";
-=======
-
-        if (node.getDatacenter() == null) {
-            return;
-        }
-
-        if (!this.readDatacenter.isEmpty() && node.getDatacenter().equals(this.readDatacenter)) {
-            this.readLocalDcNodes.addIfAbsent(node);
-        }
-
-        if (!this.writeDatacenter.isEmpty()) {
-            if (node.getDatacenter().equals(this.writeDatacenter)) {
-                this.writeLocalDcNodes.addIfAbsent(node);
-            }
-        } else if (Arrays.asList(this.getLocalAddresses()).contains(this.getAddress(node))) {
-            this.writeLocalDcNodes.addIfAbsent(node);
-        } else {
-            this.remoteDcNodes.addIfAbsent(node);
-        }
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
     }
 
     // endregion
@@ -502,7 +338,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * <p>
      * If {@link #dnsExpiryTimeInSeconds} has elapsed, the array of local addresses is also updated.
      *
-<<<<<<< HEAD
      * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpiryTimeInSeconds} has
      * elapsed.
      *
@@ -510,14 +345,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      *                               not yet been enumerated.
      */
     @NonNull
-=======
-     * @return value of {@link #localAddresses} which will have been updated, if {@link #dnsExpiryTimeInSeconds}
-     * has elapsed.
-     *
-     * @throws IllegalStateException if the DNS could not resolve the {@link #globalEndpoint} and local addresses have
-     * not yet been enumerated.
-     */
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
     private InetAddress[] getLocalAddresses() {
 
         if (this.localAddresses == null || this.dnsExpired()) {
@@ -539,7 +366,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return this.localAddresses;
     }
 
-<<<<<<< HEAD
     private static void addTo(final List<Node> nodes, final Node node) {
 
         final EndPoint endPoint = node.getEndPoint();
@@ -554,9 +380,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private static void addTo(final Queue<Node> queryPlan, final List<Node> nodes, final int start) {
-=======
-    private static void addTo(final ArrayDeque<Node> queryPlan, final int start, final List<Node> nodes) {
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 
         final int length = nodes.size();
         final int end = start + length;
@@ -605,7 +428,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return false;
     }
 
-<<<<<<< HEAD
     private void reclassifyNodes(
         final List<Node> nodes, final List<Node> localNodes, final List<Node> remoteNodes,
         final InetAddress[] localAddresses) {
@@ -709,48 +531,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private void validateConfiguration() {
-=======
-    private void refreshHostsIfDnsExpired() {
-
-        if (this.globalEndpoint.isEmpty() || (this.writeLocalDcNodes != null && !this.dnsExpired())) {
-            return;
-        }
-
-        final CopyOnWriteArrayList<Node> oldLocalDcNodes = this.writeLocalDcNodes;
-        final CopyOnWriteArrayList<Node> oldRemoteDcNodes = this.remoteDcNodes;
-
-        final List<InetAddress> localAddresses = Arrays.asList(this.getLocalAddresses());
-        final CopyOnWriteArrayList<Node> localDcNodes = new CopyOnWriteArrayList<>();
-        final CopyOnWriteArrayList<Node> remoteDcNodes = new CopyOnWriteArrayList<>();
-
-        if (this.writeLocalDcNodes != null) {
-            for (final Node node : oldLocalDcNodes) {
-                if (localAddresses.contains(this.getAddress(node))) {
-                    localDcNodes.addIfAbsent(node);
-                } else {
-                    remoteDcNodes.addIfAbsent(node);
-                }
-            }
-        }
-
-        for (final Node node : oldRemoteDcNodes) {
-            if (localAddresses.contains(this.getAddress(node))) {
-                localDcNodes.addIfAbsent(node);
-            } else {
-                remoteDcNodes.addIfAbsent(node);
-            }
-        }
-
-        this.writeLocalDcNodes = localDcNodes;
-        this.remoteDcNodes = remoteDcNodes;
-    }
-
-    // endregion
-
-    // region Types
-
-    private void validate() {
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
 
         if (this.globalEndpoint.isEmpty()) {
 
@@ -767,13 +547,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
-<<<<<<< HEAD
     // endregion
 
     // region Types
 
-=======
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
     enum Option implements DriverOption {
 
         DNS_EXPIRY_TIME("dns-expiry-time", (option, profile) ->
@@ -797,10 +574,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         private final Object defaultValue;
         private final BiFunction<Option, DriverExecutionProfile, ?> getter;
-<<<<<<< HEAD
         private final String name;
-=======
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
         private final String path;
 
         <T, R> Option(
@@ -808,12 +582,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
             this.defaultValue = defaultValue;
             this.getter = getter;
-<<<<<<< HEAD
             this.name = name;
             this.path = OPTION_PATH_PREFIX + name;
-=======
-            this.path = PATH_PREFIX + name;
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
         }
 
         @SuppressWarnings("unchecked")
@@ -822,14 +592,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         @NonNull
-<<<<<<< HEAD
         public String getName() {
             return this.name;
         }
 
         @NonNull
-=======
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98
         @Override
         public String getPath() {
             return this.path;

@@ -12,7 +12,6 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-<<<<<<< HEAD:package/src/test/java/com/azure/cosmos/cassandra/TestCommon.java
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
@@ -23,12 +22,6 @@ import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-=======
-import java.util.UUID;
-import java.util.regex.Pattern;
-
-import static java.lang.String.format;
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98:package/src/test/java/com/microsoft/azure/cosmos/cassandra/TestCommon.java
 
 /**
  * A utility class that implements common static methods useful for writing tests.
@@ -41,7 +34,6 @@ public final class TestCommon {
 
     // region Fields
 
-<<<<<<< HEAD:package/src/test/java/com/azure/cosmos/cassandra/TestCommon.java
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
     static final List<String> CONTACT_POINTS = Arrays.asList(getPropertyOrEnvironmentVariable(
@@ -63,25 +55,10 @@ public final class TestCommon {
             return new InetSocketAddress(match.group("hostname"), Integer.parseUnsignedInt(match.group("port")));
         }).collect(Collectors.toList());
 
-=======
-    static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.global-endpoint",
-        "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "localhost:9042");
-
-    static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
-
-    // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the
-    //  emulator?
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98:package/src/test/java/com/microsoft/azure/cosmos/cassandra/TestCommon.java
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
         "");
-<<<<<<< HEAD:package/src/test/java/com/azure/cosmos/cassandra/TestCommon.java
-=======
-
->>>>>>> af78f426eb7e96f31c5851b02bec5bb84de0da98:package/src/test/java/com/microsoft/azure/cosmos/cassandra/TestCommon.java
     static final String USERNAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.username",
         "AZURE_COSMOS_CASSANDRA_USERNAME",
@@ -196,6 +173,7 @@ public final class TestCommon {
         assertThat(matcher.matches()).isTrue();
         return matcher;
     }
+
     /**
      * Queries data, retrying if necessary with a downgraded consistency level.
      *
