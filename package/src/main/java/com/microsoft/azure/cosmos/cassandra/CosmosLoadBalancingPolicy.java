@@ -118,7 +118,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final CopyOnWriteArrayList<Host> writeLocalDCAddresses = new CopyOnWriteArrayList<Host>();
         final CopyOnWriteArrayList<Host> remoteDCAddresses = new CopyOnWriteArrayList<Host>();
 
-        List<InetAddress> dnsLookupAddresses = new ArrayList<InetAddress>();
+        List<InetAddress> dnsLookupAddresses = new ArrayList<>();
         if (!this.globalContactPoint.isEmpty()) {
             dnsLookupAddresses = Arrays.asList(this.getLocalAddresses());
         }
