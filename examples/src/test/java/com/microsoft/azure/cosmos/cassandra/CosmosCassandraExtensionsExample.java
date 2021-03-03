@@ -83,6 +83,11 @@ public class CosmosCassandraExtensionsExample {
 
     // region Fields
 
+    static final String[] CONTACT_POINT = { getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.contact-point",
+        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
+        "localhost:9042") };
+
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
@@ -109,21 +114,22 @@ public class CosmosCassandraExtensionsExample {
         "");
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = QUORUM;
-    private static final String[] CONTACT_POINTS;
     private static final int FIXED_BACK_OFF_TIME = 5000;
     private static final int GROWING_BACK_OFF_TIME = 1000;
     private static final String KEYSPACE_NAME = "downgrading_" + UUID.randomUUID().toString().replace("-", "");
     private static final int MAX_RETRY_COUNT = 5;
     private static final int PORT;
-    private static final int TIMEOUT = 30000;
+    private static final int TIMEOUT_IN_MILLISECONDS = 30_000;
 
     static {
 
-        final int index = GLOBAL_ENDPOINT.lastIndexOf(':');
+        int index = CONTACT_POINT[0].lastIndexOf(':');
         assertThat(index).isGreaterThan(0);
 
-        final String hostname = GLOBAL_ENDPOINT.substring(0, index);
-        final String port = GLOBAL_ENDPOINT.substring(index + 1);
+        String hostname = CONTACT_POINT[0].substring(0, index);
+        String port = CONTACT_POINT[0].substring(index + 1);
+        CONTACT_POINT[0] = hostname;
+
         int value = -1;
 
         try {
@@ -133,8 +139,18 @@ public class CosmosCassandraExtensionsExample {
             fail("expected integer port number in range [0, 65535], not " + port);
         }
 
-        CONTACT_POINTS = new String[] { hostname };
         PORT = value;
+
+        for (int i = 1; i < CONTACT_POINT.length; i++) {
+
+            index = CONTACT_POINT[i].lastIndexOf(':');
+            assertThat(index).isGreaterThan(0);
+
+            value = Integer.parseUnsignedInt(CONTACT_POINT[i].substring(index + 1));
+            assertThat(value).isEqualTo(PORT);
+
+            CONTACT_POINT[i] = CONTACT_POINT[i].substring(0, index);
+        }
     }
 
     // endregion
@@ -144,13 +160,19 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-extensions.
      */
-    @Test(groups = { "examples" }, timeOut = TIMEOUT)
+    @Test(groups = { "examples" }, timeOut = TIMEOUT_IN_MILLISECONDS)
     public void canIntegrateWithCosmos() {
 
         final Session session = connect();
 
         try {
             assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
+
+            try {
+                Thread.sleep(5_000);
+            } catch (InterruptedException error) {
+                System.out.println("sleep interrupted");
+            }
 
             assertThatCode(() ->
                 this.write(session, CONSISTENCY_LEVEL)
@@ -217,7 +239,7 @@ public class CosmosCassandraExtensionsExample {
                 //  See https://docs.datastax.com/en/developer/java-driver/3.10/manual/reconnection/
                 //  The default policy is new ExponentialReconnectionPolicy(1_000, 10 * 60 * 1000)
             .withCredentials(USERNAME, PASSWORD)
-            .addContactPoints(CONTACT_POINTS)
+            .addContactPoints(CONTACT_POINT)
             .withPort(PORT)
             .withSSL()
             .build();
