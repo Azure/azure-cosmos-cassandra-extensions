@@ -1,6 +1,6 @@
 ## Release History
 
-## 0.13.0 (Unreleased)
+## 0.13.0
 This is a maintenance release that:
 * Resolves some bugs.
 * Improves the test code.
