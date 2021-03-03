@@ -113,7 +113,7 @@ jobs:
     displayName: 'Publish staged artifacts'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifact: 'driver-4.java-8.$(ImageName)'
+      artifact: 'driver-3.java-8.$(ImageName)'
       publishLocation: 'pipeline'
 
 - job: Build_with_Java_11
@@ -175,5 +175,5 @@ jobs:
     displayName: 'Publish staged artifacts'
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifact: 'driver-4.java-11.$(ImageName)'
+      artifact: 'driver-3.java-11.$(ImageName)'
       publishLocation: 'pipeline'
