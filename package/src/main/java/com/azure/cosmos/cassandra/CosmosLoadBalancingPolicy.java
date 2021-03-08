@@ -225,12 +225,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (LOG.isDebugEnabled()) {
             if (request == null) {
-                LOG.debug("newQueryPlan({request=null, session={}})", session == null ? null : session.getName());
+                LOG.debug("newQueryPlan({\"request\":null,\"session\":{}})",
+                    session == null ? "null" : '"' + session.getName() + '"');
             } else {
-                LOG.debug("newQueryPlan({request={node:{},keyspace={}},session={}})",
+                LOG.debug("newQueryPlan({\"request\":{\"node\":{},\"keyspace\":\"{}\"},\"session\":{}})",
                     toString(request.getNode()),
                     request.getKeyspace(),
-                    session == null ? "null" : session.getName());
+                    session == null ? "null" : '"' + session.getName() + '"');
             }
         }
 
@@ -248,7 +249,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         addTo(queryPlan, this.remoteNodes, start);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("-> newQueryPlan({read-request={}, query-plan={}})", readRequest, toString(queryPlan));
+            LOG.debug("-> newQueryPlan({\"read-request\":{},\"query-plan\":{}})", readRequest, toString(queryPlan));
         }
 
         return queryPlan;
@@ -310,22 +311,22 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void onUp(@NonNull final Node node) {
         if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp({})", node);
+            LOG.debug("onUp({})", toString(node));
         }
     }
 
     @Override
     public String toString() {
         return "CosmosLoadBalancingPolicy({"
-            + "configuration:{"
-            + Option.DNS_EXPIRY_TIME.getName() + '=' + this.dnsExpiryTimeInSeconds + ','
-            + Option.GLOBAL_ENDPOINT.getName() + "=\"" + this.globalEndpoint + "\","
-            + Option.READ_DATACENTER.getName() + "=\"" + this.readDatacenter + "\","
-            + Option.WRITE_DATACENTER.getName() + "=\"" + this.writeDatacenter + "\""
-            + "},datacenter-nodes:{"
-            + "read-local" + "=" + toString(this.localNodesForReading) + ","
-            + "remote" + "=" + toString(this.remoteNodes) + ","
-            + "write-local" + "=" + toString(this.localNodesForWriting)
+            + "\"configuration\":{"
+            + '"' + Option.DNS_EXPIRY_TIME.getName() + "\":" + this.dnsExpiryTimeInSeconds + ','
+            + '"' + Option.GLOBAL_ENDPOINT.getName() + "\":\"" + this.globalEndpoint + "\","
+            + '"' + Option.READ_DATACENTER.getName() + "\":\"" + this.readDatacenter + "\","
+            + '"' + Option.WRITE_DATACENTER.getName() + "\":\"" + this.writeDatacenter + "\""
+            + "},\"datacenter-nodes\":{"
+            + "\"read-local\":" + toString(this.localNodesForReading) + ","
+            + "\"remote\":" + toString(this.remoteNodes) + ","
+            + "\"write-local\":" + toString(this.localNodesForWriting)
             + "}})";
     }
 
@@ -520,13 +521,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @NonNull
     private static String toString(@Nullable final Node node) {
-        return node == null ? "null" : "Node("
-            + "endPoint=" + node.getEndPoint() + ","
-            + "datacenter=" + node.getDatacenter() + ","
-            + "distance=" + node.getDistance() + ","
-            + "hostId=" + node.getHostId() + ","
-            + "hashCode=" + node.hashCode()
-            + ")";
+        return node == null ? "null" : "{"
+            + "\"endPoint\":\"" + node.getEndPoint() + "\","
+            + "\"datacenter\":\"" + node.getDatacenter() + "\","
+            + "\"distance\":\"" + node.getDistance() + "\","
+            + "\"hostId\":\"" + node.getHostId() + "\","
+            + "\"hashCode\":\"" + node.hashCode() + "\""
+            + "}";
     }
 
     @NonNull

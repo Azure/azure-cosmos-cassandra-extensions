@@ -45,11 +45,11 @@ Licensed under the MIT License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
     <!-- Main dependency version numbers -->
-    <version.cassandra-driver>4.9.0</version.cassandra-driver>
+    <version.cassandra-driver>[4.7,4.11)</version.cassandra-driver>
+    <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.log4j>2.13.3</version.log4j>
-    <version.slf4j-api>1.7.30</version.slf4j-api>
     <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
   </properties>

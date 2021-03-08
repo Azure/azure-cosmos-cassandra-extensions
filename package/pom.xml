@@ -19,6 +19,7 @@ Licensed under the MIT License.
   </parent>
 
   <dependencies>
+    <!-- Main dependencies -->
     <dependency>
       <groupId>com.datastax.oss</groupId>
       <artifactId>java-driver-core</artifactId>
@@ -29,6 +30,7 @@ Licensed under the MIT License.
       <artifactId>slf4j-api</artifactId>
       <scope>compile</scope>
     </dependency>
+    <!-- Test dependencies -->
     <dependency>
       <groupId>com.datastax.oss</groupId>
       <artifactId>java-driver-query-builder</artifactId>
