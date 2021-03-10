@@ -16,6 +16,8 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -38,8 +40,10 @@ import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -79,6 +83,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private final int dnsExpiryTimeInSeconds;
     private final List<InetAddress> dnsLookupAddresses;
+    private final InternalDriverContext driverContext;
     private final String globalEndpoint;
     private final AtomicInteger index;
     private final Object lock;
@@ -86,6 +91,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private final String writeDatacenter;
 
     private DistanceReporter distanceReporter;
+
+    private volatile Function<Request, Queue<Node>> getNodes;
     private volatile long lastDnsLookupTime;
 
     @SuppressFBWarnings("VO_VOLATILE_REFERENCE_TO_ARRAY")
@@ -105,6 +112,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @param driverContext an object holding the context of the current driver instance.
      * @param profileName   name of the configuration profile to apply.
      */
+    @SuppressWarnings("Java9CollectionFactory")
     public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
@@ -116,14 +124,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.validateConfiguration();
 
-        this.lastDnsLookupTime = Long.MAX_VALUE;
+        this.driverContext = (InternalDriverContext) driverContext;
         this.index = new AtomicInteger();
+        this.lastDnsLookupTime = Long.MAX_VALUE;
         this.localAddresses = null;
         this.lock = new Object();
 
-        this.dnsLookupAddresses = Collections.unmodifiableList(this.globalEndpoint.isEmpty()
-            ? new ArrayList<>()
-            : Arrays.asList(this.getLocalAddresses()));
+        this.dnsLookupAddresses = this.globalEndpoint.isEmpty()
+            ? Collections.emptyList()
+            : Collections.unmodifiableList(Arrays.asList(this.getLocalAddresses()));
     }
 
     // endregion
@@ -197,15 +206,40 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.localNodesForWriting = new ArrayList<>();
 
         for (final Node node : nodes.values()) {
-            this.reportDistance(node);
+            this.reportDistanceAndClassify(node);
         }
 
-        this.index.set(new Random().nextInt(Math.max(nodes.size(), 1)));
-        LOG.debug("-> init({})", this);
+        final MetadataManager metadataManager = this.driverContext.getMetadataManager();
+        Semaphore permissionToGetNodes = new Semaphore(Integer.MAX_VALUE);
+
+        this.getNodes = (request) -> {
+            permissionToGetNodes.acquireUninterruptibly();
+            try {
+                return this.doGetNodes(request);
+            } finally {
+                permissionToGetNodes.release();
+            }
+        };
+
+        permissionToGetNodes.acquireUninterruptibly(Integer.MAX_VALUE);
+
+        metadataManager.refreshNodes().whenComplete((ignored, error) -> {
+
+            if (error != null) {
+                LOG.error("node refresh failed due to ", error);
+            }
+
+            final int size = this.driverContext.getMetadataManager().getMetadata().getNodes().size();
+            this.index.set(new Random().nextInt(Math.max(size, 1)));
+            permissionToGetNodes.release(Integer.MAX_VALUE);
+            this.getNodes = this::doGetNodes;
+        });
+
+        LOG.debug("init -> {}", this);
     }
 
     /**
-     * Returns an ordered list of coordinators to use for a new query.
+     * Returns an {@link Queue ordered list} of {@link Node coordinators} to use for a new query.
      * <p>
      * For read requests, the coordinators are ordered to ensure that each known host in the read datacenter is tried
      * first. If none of these coordinators are reachable, all other hosts will be tried. For writes and all other
@@ -235,24 +269,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        this.refreshNodesIfDnsExpired();
-
-        final int start = this.index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
-        final ConcurrentLinkedQueue<Node> queryPlan = new ConcurrentLinkedQueue<>();
-        final boolean readRequest = isReadRequest(request);
-
-        if (readRequest) {
-            addTo(queryPlan, this.localNodesForReading, start);
-        }
-
-        addTo(queryPlan, this.localNodesForWriting, start);
-        addTo(queryPlan, this.remoteNodes, start);
+        Queue<Node> nodes = this.getNodes.apply(request);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("-> newQueryPlan({\"read-request\":{},\"query-plan\":{}})", readRequest, toString(queryPlan));
+            LOG.debug("newQueryPlan -> {}, returns({})", this, toString(nodes));
         }
 
-        return queryPlan;
+        return nodes;
     }
 
     @Override
@@ -263,10 +286,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         synchronized (this.lock) {
-            this.reportDistance(node);
+            this.reportDistanceAndClassify(node);
         }
 
-        LOG.debug("-> onAdd({})", this);
+        LOG.debug("onAdd -> {}", this);
     }
 
     @Override
@@ -305,7 +328,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        LOG.debug("-> onRemove({})", this);
+        LOG.debug("onRemove -> {}", this);
     }
 
     @Override
@@ -329,10 +352,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             + "\"write-local\":" + toString(this.localNodesForWriting)
             + "}})";
     }
-
-    // endregion
-
-    // region Privates
 
     /**
      * DNS lookup based on the {@link #globalEndpoint} address.
@@ -367,6 +386,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return this.localAddresses;
     }
 
+    // endregion
+
+    // region Privates
+
     private static void addTo(final List<Node> nodes, final Node node) {
 
         final EndPoint endPoint = node.getEndPoint();
@@ -392,6 +415,24 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private boolean dnsExpired() {
         return System.currentTimeMillis() / 1000 > this.lastDnsLookupTime + this.dnsExpiryTimeInSeconds;
+    }
+
+    private Queue<Node> doGetNodes(Request request) {
+
+        this.refreshNodesIfDnsExpired();
+
+        final int start = this.index.updateAndGet(value -> value > Integer.MAX_VALUE - 10_000 ? 0 : value + 1);
+        final ConcurrentLinkedQueue<Node> queryPlan = new ConcurrentLinkedQueue<>();
+        final boolean readRequest = isReadRequest(request);
+
+        if (readRequest) {
+            addTo(queryPlan, this.localNodesForReading, start);
+        }
+
+        addTo(queryPlan, this.localNodesForWriting, start);
+        addTo(queryPlan, this.remoteNodes, start);
+
+        return queryPlan;
     }
 
     private InetAddress getAddress(final Node node) {
@@ -492,7 +533,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
-    private void reportDistance(@NonNull final Node node) {
+    private void reportDistanceAndClassify(@NonNull final Node node) {
 
         final String datacenter = node.getDatacenter();
         NodeDistance distance = NodeDistance.IGNORED;
@@ -520,7 +561,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @NonNull
-    private static String toString(@Nullable final Node node) {
+    private static String toString(@Nullable final Object that) {
+
+        final Node node = (Node) that;
+
         return node == null ? "null" : "{"
             + "\"endPoint\":\"" + node.getEndPoint() + "\","
             + "\"datacenter\":\"" + node.getDatacenter() + "\","
@@ -531,9 +575,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @NonNull
-    private static String toString(@NonNull final Collection<Node> nodes) {
+    private static String toString(@NonNull final Collection<? super Node> nodes) {
         return nodes.stream().map(CosmosLoadBalancingPolicy::toString).collect(Collectors.joining(",", "[", "]"));
     }
+
+    // endregion
+
+    // region Types
 
     private void validateConfiguration() {
 
@@ -553,8 +601,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     // endregion
-
-    // region Types
 
     enum Option implements DriverOption {
 
@@ -613,6 +659,4 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return (T) this.getter.apply(this, profile);
         }
     }
-
-    // endregion
 }
