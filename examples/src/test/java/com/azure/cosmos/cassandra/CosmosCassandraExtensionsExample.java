@@ -168,7 +168,7 @@ public class CosmosCassandraExtensionsExample {
                 assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 2);
 
-                Thread.sleep(10_000);
+                Thread.sleep(1_000);
                 assertThatCode(() -> expectedRowCount.set(this.write(session))).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 1);
 
@@ -180,6 +180,11 @@ public class CosmosCassandraExtensionsExample {
 
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount + 1);
                 reporter.report();
+                
+            } finally {
+                assertThatCode(() ->
+                    session.execute(SimpleStatement.newInstance("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME))
+                ).doesNotThrowAnyException();
             }
 
         } catch (final AssertionError error) {

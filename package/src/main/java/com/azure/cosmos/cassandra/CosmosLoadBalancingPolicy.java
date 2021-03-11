@@ -235,7 +235,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.getNodes = this::doGetNodes;
         });
 
-        LOG.debug("init -> {}", this);
+        LOG.debug("init -> returns(void), {}", this);
     }
 
     /**
@@ -269,10 +269,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        Queue<Node> nodes = this.getNodes.apply(request);
+        final Queue<Node> nodes = this.getNodes.apply(request);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan -> {}, returns({})", this, toString(nodes));
+            LOG.debug("newQueryPlan -> returns({}), this", toString(nodes), this);
         }
 
         return nodes;
@@ -289,7 +289,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.reportDistanceAndClassify(node);
         }
 
-        LOG.debug("onAdd -> {}", this);
+        LOG.debug("onAdd -> returns(void), {}", this);
     }
 
     @Override
@@ -328,7 +328,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        LOG.debug("onRemove -> {}", this);
+        LOG.debug("onRemove -> returns(void), {}", this);
     }
 
     @Override
@@ -556,7 +556,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 distance = NodeDistance.REMOTE;
             }
         }
-
+        LOG.debug("reportDistanceAndClassify({}) -> setting distance to {}", toString(node), distance);
         this.distanceReporter.setDistance(node, distance);
     }
 
