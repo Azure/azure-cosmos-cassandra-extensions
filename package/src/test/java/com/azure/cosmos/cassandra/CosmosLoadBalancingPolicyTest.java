@@ -43,7 +43,6 @@ import java.util.UUID;
 
 import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.TestCommon.NODES;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;

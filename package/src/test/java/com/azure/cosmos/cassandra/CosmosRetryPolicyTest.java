@@ -18,7 +18,6 @@ import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
-import com.datastax.oss.driver.api.core.servererrors.ServerError;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
@@ -39,7 +38,6 @@ import java.util.regex.Matcher;
 
 import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.TestCommon.NODES;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
