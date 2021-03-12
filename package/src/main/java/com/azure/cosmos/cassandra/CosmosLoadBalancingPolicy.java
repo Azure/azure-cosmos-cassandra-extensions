@@ -44,6 +44,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -269,7 +270,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        final Queue<Node> nodes = this.getNodes.apply(request);
+        final Function<Request, Queue<Node>> function = this.getNodes;
+        final Queue<Node> nodes = function.apply(request);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("newQueryPlan -> returns({}), {}", toString(nodes), this);
