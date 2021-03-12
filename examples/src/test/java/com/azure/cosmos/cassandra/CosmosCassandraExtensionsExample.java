@@ -180,7 +180,7 @@ public class CosmosCassandraExtensionsExample {
 
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount + 1);
                 reporter.report();
-                
+
             } finally {
                 assertThatCode(() ->
                     session.execute(SimpleStatement.newInstance("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME))
