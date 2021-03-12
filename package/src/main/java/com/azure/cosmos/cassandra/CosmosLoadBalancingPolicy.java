@@ -210,9 +210,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         final MetadataManager metadataManager = this.driverContext.getMetadataManager();
-        Semaphore permissionToGetNodes = new Semaphore(Integer.MAX_VALUE);
+        final Semaphore permissionToGetNodes = new Semaphore(Integer.MAX_VALUE);
 
-        this.getNodes = (request) -> {
+        this.getNodes = request -> {
             permissionToGetNodes.acquireUninterruptibly();
             try {
                 return this.doGetNodes(request);
@@ -272,7 +272,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final Queue<Node> nodes = this.getNodes.apply(request);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan -> returns({}), this", toString(nodes), this);
+            LOG.debug("newQueryPlan -> returns({}), {}", toString(nodes), this);
         }
 
         return nodes;
@@ -417,7 +417,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         return System.currentTimeMillis() / 1000 > this.lastDnsLookupTime + this.dnsExpiryTimeInSeconds;
     }
 
-    private Queue<Node> doGetNodes(Request request) {
+    private Queue<Node> doGetNodes(final Request request) {
 
         this.refreshNodesIfDnsExpired();
 
