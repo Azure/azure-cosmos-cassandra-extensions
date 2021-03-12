@@ -23,7 +23,7 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -120,7 +120,7 @@ public class CosmosCassandraExtensionsExample {
         getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.reporting-directory",
             "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
-            Path.of(
+            Paths.get(
                 System.getProperty("user.home"),
                 ".local",
                 "var",
