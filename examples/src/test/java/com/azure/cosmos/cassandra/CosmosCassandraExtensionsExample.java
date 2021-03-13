@@ -168,7 +168,6 @@ public class CosmosCassandraExtensionsExample {
                 assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 2);
 
-                Thread.sleep(1_000);
                 assertThatCode(() -> expectedRowCount.set(this.write(session))).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 1);
 
