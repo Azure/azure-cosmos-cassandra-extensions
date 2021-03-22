@@ -13,7 +13,7 @@ Licensed under the MIT License.
   </description>
   <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
 
-  <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
+  <artifactId>azure-cosmos-cassandra-driver-3</artifactId>
   <groupId>com.microsoft.azure</groupId>
   <packaging>pom</packaging>
   <version>0.13.0</version>
