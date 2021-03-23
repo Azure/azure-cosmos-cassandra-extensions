@@ -8,12 +8,12 @@ Licensed under the MIT License.
 
   <modelVersion>4.0.0</modelVersion>
 
-  <artifactId>azure-cosmos-cassandra-extensions.examples</artifactId>
+  <artifactId>azure-cosmos-cassandra-driver-3-examples</artifactId>
   <packaging>jar</packaging>
   <version>0.13.0</version>
 
   <parent>
-    <artifactId>azure-cosmos-cassandra-extensions.parent</artifactId>
+    <artifactId>azure-cosmos-cassandra-driver-3</artifactId>
     <groupId>com.microsoft.azure</groupId>
     <version>0.13.0</version>
   </parent>
