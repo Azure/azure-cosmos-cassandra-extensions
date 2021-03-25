@@ -14,15 +14,15 @@ Disable hostname verification and use a custom trust store that contains only th
 
 Do this by setting these values in your `application.conf`:
 ```yml
-datastax-java-driver.advanced.ssl-engine-factory.hostname-verifcation = false
+datastax-java-driver.advanced.ssl-engine-factory.hostname-validation = false
 datastax-java-driver.advanced.ssl-engine-factory.truststore-path = <truststore-path>
 datastax-java-driver.advanced.ssl-engine-factory.truststore-password = <truststore-password>
 ```
 or from the java command line using these options:
 ```bash
--Ddatastax-java-driver.advanced.ssl-engine-factory.hostname-verifcation=false
--Dadvanced.ssl-engine-factory.truststore-path=$truststore_path
--Dadvanced.ssl-engine-factory.truststore-password=$truststore_password
+-Ddatastax-java-driver.advanced.ssl-engine-factory.hostname-validation=false
+-Ddatastax-java-driver.advanced.ssl-engine-factory.truststore-path=$truststore_path
+-Ddatastax-java-driver.advanced.ssl-engine-factory.truststore-password=$truststore_password
 ```
 
 Here is a bash script for importing an SSL certificate for any web service into a a `java` truststore.
