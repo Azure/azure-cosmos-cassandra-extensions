@@ -166,7 +166,7 @@ public class CosmosCassandraExtensionsExample {
                 .build(REPORTING_DIRECTORY)) {
 
                 assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 2);
+                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 3);
 
                 assertThatCode(() -> expectedRowCount.set(this.write(session))).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 1);
@@ -256,7 +256,7 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
      */
-    private void createSchema(final CqlSession session) {
+    private void createSchema(final CqlSession session) throws InterruptedException {
 
         session.execute(SimpleStatement.newInstance(
             "CREATE KEYSPACE IF NOT EXISTS " + KEYSPACE_NAME + " WITH replication = {"
@@ -264,14 +264,18 @@ public class CosmosCassandraExtensionsExample {
                 + "'replication_factor':4"
                 + "}"));
 
+        session.execute(SimpleStatement.newInstance("DROP TABLE IF EXISTS " + KEYSPACE_NAME + ".sensor_date"));
+
         session.execute(SimpleStatement.newInstance(
-            "CREATE TABLE IF NOT EXISTS " + KEYSPACE_NAME + ".sensor_data ("
+            "CREATE TABLE " + KEYSPACE_NAME + ".sensor_data ("
                 + "sensor_id uuid,"
                 + "date date,"
                 + "timestamp timestamp,"
                 + "value double,"
                 + "PRIMARY KEY ((sensor_id,date),timestamp)"
                 + ")"));
+
+        Thread.sleep(5_000L);  // gives time for the table creation to sync across regions
     }
 
     /**
