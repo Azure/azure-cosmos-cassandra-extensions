@@ -95,7 +95,7 @@ public final class TestCommon {
             keyspaceName,
             tableName));
 
-        Thread.sleep(5_000);
+        Thread.sleep(5_000);  // allows time for the table to be created in all regions
     }
 
     /**
