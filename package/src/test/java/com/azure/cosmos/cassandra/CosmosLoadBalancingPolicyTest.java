@@ -121,7 +121,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
 
-    // TODO (DANOBLE) What does the cassandra api return for the local datacenter name when it is hosted by the
+    // TODO (DANOBLE) What does the Cassandra API return for the local datacenter name when it is hosted by the
     //  emulator?
 
     static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
@@ -198,10 +198,14 @@ public final class CosmosLoadBalancingPolicyTest {
         final String readDatacenter = "East US";
         final String writeDatacenter = "West US";
 
+        // No configuration
+
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(newProgrammaticDriverConfigLoaderBuilder().build(), programmaticArguments),
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
+
+        // Read datacenter only (without a write datacenter)
 
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
@@ -212,6 +216,8 @@ public final class CosmosLoadBalancingPolicyTest {
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
 
+        // Write datacenter only (without a read datacenter)
+
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
@@ -220,6 +226,8 @@ public final class CosmosLoadBalancingPolicyTest {
                 programmaticArguments),
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
+
+        // Global endpoint with a write datacenter (not a read datacenter)
 
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
@@ -231,6 +239,8 @@ public final class CosmosLoadBalancingPolicyTest {
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
 
+        // Global endpoint with a read and a write datacenter (not just a read datacenter)
+        
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
@@ -323,7 +333,10 @@ public final class CosmosLoadBalancingPolicyTest {
             .withStringList(DefaultDriverOption.CONTACT_POINTS, CONTACT_POINTS)
             .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, USERNAME)
             .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, PASSWORD)
-            .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, DefaultRetryPolicy.class);
+            .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, DefaultRetryPolicy.class)
+            .withString(Option.GLOBAL_ENDPOINT, "")
+            .withString(Option.READ_DATACENTER, "")
+            .withString(Option.WRITE_DATACENTER, "");
     }
 
     private void testAllStatements(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
