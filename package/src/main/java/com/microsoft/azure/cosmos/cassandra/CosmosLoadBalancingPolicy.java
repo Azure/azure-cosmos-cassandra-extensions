@@ -488,21 +488,25 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 if (this.remainingRead > 0 && readRequest) {
                     this.remainingRead--;
                     host = this.readHosts.get(this.idx++ % this.readHosts.size());
-                    LOG.debug("attempting read request in read datacenter at {}", host);
+                    LOG.debug("offering host {} for read request in read datacenter", host);
                     return host;
                 }
 
                 if (this.remainingWrite > 0) {
                     this.remainingWrite--;
                     host = this.writeHosts.get(this.idx++ % this.writeHosts.size());
-                    LOG.debug("attempting {} request in write datacenter at {}", readRequest ? "read" : "write", host);
+                    LOG.debug("offering host {} for {} request in write datacenter",
+                        host,
+                        readRequest ? "read" : "write");
                     return host;
                 }
 
                 if (this.remainingRemote > 0) {
                     this.remainingRemote--;
                     host = this.remoteHosts.get(this.idx++ % this.remoteHosts.size());
-                    LOG.debug("attempting {} request in remote datacenter at {}", readRequest ? "read" : "write", host);
+                    LOG.debug("offering host {} for {} request in remote datacenter",
+                        host,
+                        readRequest ? "read" : "write");
                     return host;
                 }
 
