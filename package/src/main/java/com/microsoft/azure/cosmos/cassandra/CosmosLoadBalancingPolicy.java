@@ -14,12 +14,14 @@ import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.querybuilder.BuiltStatement;
 import com.google.common.collect.AbstractIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -42,13 +44,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Fields
 
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
+
     private final int dnsExpirationInSeconds;
-    private final String globalContactPoint;
-    private final AtomicInteger index = new AtomicInteger();
-    private final String readDC;
-    private final String writeDC;
-    private long lastDnsLookupTime = Long.MIN_VALUE;
-    private InetAddress[] localAddresses = null;
+    private final String globalEndpoint;
+    private final AtomicInteger index;
+    private final String readDatacenter;
+    private final String writeDatacenter;
+    private long lastDnsLookupTime;
+
+    private InetAddress[] localAddresses;
     private CopyOnWriteArrayList<Host> readLocalDCHosts;
     private CopyOnWriteArrayList<Host> remoteDcHosts;
     private CopyOnWriteArrayList<Host> writeLocalDcHosts;
@@ -58,12 +63,24 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Constructors
 
     private CosmosLoadBalancingPolicy(
-        final String readDC, final String writeDC, final String globalContactPoint, final int dnsExpirationInSeconds) {
+        final String readDatacenter,
+        final String writeDatacenter,
+        final String globalEndpoint,
+        final int dnsExpirationInSeconds) {
 
-        this.readDC = readDC;
-        this.writeDC = writeDC;
-        this.globalContactPoint = globalContactPoint;
+        LOG.debug("globalEndpoint: '{}', readDatacenter: '{}', writeDatacenter: '{}', dnsExpirationInSeconds: '{}'",
+            globalEndpoint,
+            readDatacenter,
+            writeDatacenter,
+            dnsExpirationInSeconds);
+
+        this.globalEndpoint = globalEndpoint;
+        this.readDatacenter = readDatacenter;
+        this.writeDatacenter = writeDatacenter;
         this.dnsExpirationInSeconds = dnsExpirationInSeconds;
+
+        this.index = new AtomicInteger();
+        this.lastDnsLookupTime = Long.MAX_VALUE;
     }
 
     // endregion
@@ -89,8 +106,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Return the HostDistance for the provided host.
-     * <p>This policy considers the nodes for the writeDC and the default write region at distance {@code LOCAL}.
+     * Return the {@link HostDistance} for the provided {@link Host}.
+     * <p>
+     * This policy considers the nodes for the write datacenter and the default write region at distance {@code LOCAL}.
      *
      * @param host the host of which to return the distance of.
      *
@@ -98,8 +116,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @Override
     public HostDistance distance(final Host host) {
-        if (!this.writeDC.isEmpty()) {
-            if (host.getDatacenter().equals(this.writeDC)) {
+
+        if (!this.writeDatacenter.isEmpty()) {
+            if (host.getDatacenter().equals(this.writeDatacenter)) {
                 return HostDistance.LOCAL;
             }
         } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getEndPoint().resolve().getAddress())) {
@@ -114,21 +133,21 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @Override
     public void init(final Cluster cluster, final Collection<Host> hosts) {
-        final CopyOnWriteArrayList<Host> readLocalDCAddresses = new CopyOnWriteArrayList<Host>();
-        final CopyOnWriteArrayList<Host> writeLocalDCAddresses = new CopyOnWriteArrayList<Host>();
-        final CopyOnWriteArrayList<Host> remoteDCAddresses = new CopyOnWriteArrayList<Host>();
 
-        List<InetAddress> dnsLookupAddresses = new ArrayList<>();
-        if (!this.globalContactPoint.isEmpty()) {
-            dnsLookupAddresses = Arrays.asList(this.getLocalAddresses());
-        }
+        final CopyOnWriteArrayList<Host> readLocalDCAddresses = new CopyOnWriteArrayList<>();
+        final CopyOnWriteArrayList<Host> writeLocalDCAddresses = new CopyOnWriteArrayList<>();
+        final CopyOnWriteArrayList<Host> remoteDCAddresses = new CopyOnWriteArrayList<>();
+
+        final List<InetAddress> dnsLookupAddresses = this.globalEndpoint.isEmpty()
+            ? Collections.emptyList()
+            : Arrays.asList(this.getLocalAddresses());
 
         for (final Host host : hosts) {
-            if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
+            if (!this.readDatacenter.isEmpty() && host.getDatacenter().equals(this.readDatacenter)) {
                 readLocalDCAddresses.add(host);
             }
 
-            if ((!this.writeDC.isEmpty() && host.getDatacenter().equals(this.writeDC))
+            if ((!this.writeDatacenter.isEmpty() && host.getDatacenter().equals(this.writeDatacenter))
                 || dnsLookupAddresses.contains(host.getEndPoint().resolve().getAddress())) {
                 writeLocalDCAddresses.add(host);
             } else {
@@ -185,12 +204,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return;
         }
 
-        if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
+        if (!this.readDatacenter.isEmpty() && host.getDatacenter().equals(this.readDatacenter)) {
             this.readLocalDCHosts.remove(host);
         }
 
-        if (!this.writeDC.isEmpty()) {
-            if (host.getDatacenter().equals(this.writeDC)) {
+        if (!this.writeDatacenter.isEmpty()) {
+            if (host.getDatacenter().equals(this.writeDatacenter)) {
                 this.writeLocalDcHosts.remove(host);
             }
         } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getEndPoint().resolve().getAddress())) {
@@ -207,16 +226,17 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onUp(final Host host) {
+
         if (host == null || host.getDatacenter() == null) {
             return;
         }
 
-        if (!this.readDC.isEmpty() && host.getDatacenter().equals(this.readDC)) {
+        if (!this.readDatacenter.isEmpty() && host.getDatacenter().equals(this.readDatacenter)) {
             this.readLocalDCHosts.addIfAbsent(host);
         }
 
-        if (!this.writeDC.isEmpty()) {
-            if (host.getDatacenter().equals(this.writeDC)) {
+        if (!this.writeDatacenter.isEmpty()) {
+            if (host.getDatacenter().equals(this.writeDatacenter)) {
                 this.writeLocalDcHosts.addIfAbsent(host);
             }
         } else if (Arrays.asList(this.getLocalAddresses()).contains(host.getEndPoint().resolve().getAddress())) {
@@ -231,7 +251,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Privates
 
     /**
-     * DNS lookup based on the {@link #globalContactPoint}.
+     * DNS lookup based on the {@link #globalEndpoint}.
      * <p>
      * If {@link #dnsExpirationInSeconds} has elapsed, the array of local addresses is also updated.
      *
@@ -242,7 +262,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private InetAddress[] getLocalAddresses() {
         if (this.localAddresses == null || this.dnsExpired()) {
             try {
-                this.localAddresses = InetAddress.getAllByName(this.globalContactPoint);
+                this.localAddresses = InetAddress.getAllByName(this.globalEndpoint);
                 this.lastDnsLookupTime = System.currentTimeMillis() / 1000;
             } catch (final UnknownHostException ex) {
                 // dns entry may be temporarily unavailable
@@ -295,7 +315,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private void refreshHostsIfDnsExpired() {
 
-        if (this.globalContactPoint.isEmpty() || (this.writeLocalDcHosts != null && !this.dnsExpired())) {
+        if (this.globalEndpoint.isEmpty() || (this.writeLocalDcHosts != null && !this.dnsExpired())) {
             return;
         }
 
@@ -420,6 +440,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private static class HostIterator extends AbstractIterator<Host> {
 
+        // region Fields
+
         private final List<? extends Host> readHosts;
         private final List<? extends Host> remoteHosts;
         private final Statement statement;
@@ -429,6 +451,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         private int remainingWrite;
         private int idx;
         private int remainingRemote;
+
+        // endregion
+
+        // region Constructors
 
         HostIterator(
             final List<? extends Host> readHosts,
@@ -447,27 +473,44 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.remainingRemote = remoteHosts.size();
         }
 
+        // endregion
+
+        // region Methods
+
         @SuppressWarnings("LoopStatementThatDoesntLoop")
         protected Host computeNext() {
+
             while (true) {
-                if (this.remainingRead > 0 && isReadRequest(this.statement)) {
+
+                final boolean readRequest = isReadRequest(this.statement);
+                final Host host;
+
+                if (this.remainingRead > 0 && readRequest) {
                     this.remainingRead--;
-                    return this.readHosts.get(this.idx++ % this.readHosts.size());
+                    host = this.readHosts.get(this.idx++ % this.readHosts.size());
+                    LOG.debug("attempting read request in read datacenter at {}", host);
+                    return host;
                 }
 
                 if (this.remainingWrite > 0) {
                     this.remainingWrite--;
-                    return this.writeHosts.get(this.idx++ % this.writeHosts.size());
+                    host = this.writeHosts.get(this.idx++ % this.writeHosts.size());
+                    LOG.debug("attempting {} request in write datacenter at {}", readRequest ? "read" : "write", host);
+                    return host;
                 }
 
                 if (this.remainingRemote > 0) {
                     this.remainingRemote--;
-                    return this.remoteHosts.get(this.idx++ % this.remoteHosts.size());
+                    host = this.remoteHosts.get(this.idx++ % this.remoteHosts.size());
+                    LOG.debug("attempting {} request in remote datacenter at {}", readRequest ? "read" : "write", host);
+                    return host;
                 }
 
                 return this.endOfData();
             }
         }
+
+        // endregion
     }
 
     // endregion
