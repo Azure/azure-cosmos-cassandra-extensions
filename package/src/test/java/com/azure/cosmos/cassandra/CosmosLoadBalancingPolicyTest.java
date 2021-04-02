@@ -240,7 +240,7 @@ public final class CosmosLoadBalancingPolicyTest {
         ).isInstanceOf(IllegalArgumentException.class);
 
         // Global endpoint with a read and a write datacenter (not just a read datacenter)
-        
+
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
