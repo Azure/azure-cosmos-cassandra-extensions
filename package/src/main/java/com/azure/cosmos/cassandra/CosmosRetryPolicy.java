@@ -56,7 +56,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Fields
 
-    private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 2_000;
+    private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 1_000;
     private static final Logger LOG = LoggerFactory.getLogger(CosmosRetryPolicy.class);
     private static final String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
     private static final Random RANDOM = new Random();
