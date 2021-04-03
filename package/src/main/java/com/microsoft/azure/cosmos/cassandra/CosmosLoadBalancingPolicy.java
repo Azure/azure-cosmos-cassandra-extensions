@@ -80,7 +80,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.dnsExpirationInSeconds = dnsExpirationInSeconds;
 
         this.index = new AtomicInteger();
-        this.lastDnsLookupTime = Long.MAX_VALUE;
+        this.lastDnsLookupTime = Long.MIN_VALUE;
     }
 
     // endregion
