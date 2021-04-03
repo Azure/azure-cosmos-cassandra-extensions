@@ -16,9 +16,14 @@ variables:
   value: $(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4.log
   readonly: true
 
+- name: Reporting.Directory
+  value: $(Build.ArtifactStagingDirectory)
+  readonly: true
+
 - name: Package.ArgLine
   value: >
     -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
+    -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
     -Dazure.cosmos.cassandra.contact-point='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
     -Dazure.cosmos.cassandra.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
     -Dazure.cosmos.cassandra.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
@@ -26,12 +31,14 @@ variables:
     -Dazure.cosmos.cassandra.local-datacenter='$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)'
     -Dazure.cosmos.cassandra.read-datacenter='$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)'
     -Dazure.cosmos.cassandra.write-datacenter='$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)'
+    -Dazure.cosmos.cassandra.nodes='$(AZURE_COSMOS_CASSANDRA_NODES)'
   readonly: true
 
 - name: Examples.ArgLine
   value: >
+    -DAZURE_COSMOS_CASSANDRA_CONTACT_POINT='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
     -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
-    -Dazure.cosmos.cassandra.contact-point='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
+    -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
     -Ddatastax-java-driver.advanced.auth-provider.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
     -Ddatastax-java-driver.advanced.auth-provider.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
     -Ddatastax-java-driver.basic.load-balancing-policy.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'

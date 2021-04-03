@@ -16,7 +16,7 @@ Licensed under the MIT License.
   <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
   <groupId>com.azure</groupId>
   <packaging>pom</packaging>
-  <version>0.1.0</version>
+  <version>0.1.0-beta.1</version>
 
   <developers>
     <developer>
@@ -45,11 +45,11 @@ Licensed under the MIT License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
     <!-- Main dependency version numbers -->
-    <version.cassandra-driver>4.9.0</version.cassandra-driver>
+    <version.cassandra-driver>[4.7,4.11)</version.cassandra-driver>
+    <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.log4j>2.13.3</version.log4j>
-    <version.slf4j-api>1.7.30</version.slf4j-api>
     <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
   </properties>
@@ -75,9 +75,13 @@ Licensed under the MIT License.
       </dependency>
       <dependency>
         <groupId>com.datastax.oss</groupId>
+        <artifactId>java-driver-metrics-micrometer</artifactId>
+        <version>${version.cassandra-driver}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.datastax.oss</groupId>
         <artifactId>java-driver-query-builder</artifactId>
         <version>${version.cassandra-driver}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -98,19 +102,16 @@ Licensed under the MIT License.
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${version.assertj-core}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <scope>test</scope>
         <version>${version.slf4j-api}</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
         <version>${version.testng}</version>
-        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>

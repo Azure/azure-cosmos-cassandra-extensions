@@ -5,6 +5,7 @@ module com.azure.cosmos.cassandra {
 
     exports com.azure.cosmos.cassandra;
 
-    requires transitive com.datastax.oss.driver.core;
+    requires com.datastax.oss.driver.core;
     requires com.github.spotbugs.annotations;
+    requires org.slf4j;
 }

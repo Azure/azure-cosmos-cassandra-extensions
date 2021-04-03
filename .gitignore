@@ -6,3 +6,5 @@ target/
 .factorypath
 .project
 *.iml
+*.log
+*.output

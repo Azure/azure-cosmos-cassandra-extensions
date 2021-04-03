@@ -7,14 +7,18 @@ import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicy.Option;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.ProgrammaticDriverConfigLoaderBuilder;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
@@ -22,26 +26,28 @@ import com.datastax.oss.driver.api.querybuilder.insert.Insert;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.SkipException;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.net.InetSocketAddress;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
 
+import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
+import static com.azure.cosmos.cassandra.TestCommon.matchSocketAddress;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
@@ -109,9 +115,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosLoadBalancingPolicyTest {
+public final class CosmosLoadBalancingPolicyTest {
 
     // region Fields
+
+    static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+
+    // TODO (DANOBLE) What does the Cassandra API return for the local datacenter name when it is hosted by the
+    //  emulator?
 
     static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.read-datacenter",
@@ -123,11 +134,16 @@ public class CosmosLoadBalancingPolicyTest {
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
 
-    private static final int TIMEOUT = 300_000;
+    private static final int TIMEOUT_IN_MILLIS = 300_000;
 
     // endregion
 
     // region Methods
+
+    @BeforeMethod
+    public void logTestName(final Method method) {
+        LOG.info("{}", method.getName());
+    }
 
     /**
      * Verifies that a {@link CosmosLoadBalancingPolicy} specifying the combination of a {@code read-datacenter} and a 
@@ -136,7 +152,7 @@ public class CosmosLoadBalancingPolicyTest {
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void testGlobalEndpointAndReadDatacenter() {
 
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
@@ -157,7 +173,7 @@ public class CosmosLoadBalancingPolicyTest {
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void testGlobalEndpointOnly() {
 
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
@@ -175,17 +191,21 @@ public class CosmosLoadBalancingPolicyTest {
      * Verifies that invalid {@link CosmosLoadBalancingPolicy} configurations produce {@link IllegalArgumentException}
      * errors.
      */
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void testInvalidConfiguration() {
 
         final ProgrammaticArguments programmaticArguments = ProgrammaticArguments.builder().build();
         final String readDatacenter = "East US";
         final String writeDatacenter = "West US";
 
+        // No configuration
+
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(newProgrammaticDriverConfigLoaderBuilder().build(), programmaticArguments),
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
+
+        // Read datacenter only (without a write datacenter)
 
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
@@ -196,6 +216,8 @@ public class CosmosLoadBalancingPolicyTest {
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
 
+        // Write datacenter only (without a read datacenter)
+
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
                 newProgrammaticDriverConfigLoaderBuilder()
@@ -204,6 +226,8 @@ public class CosmosLoadBalancingPolicyTest {
                 programmaticArguments),
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
+
+        // Global endpoint with a write datacenter (not a read datacenter)
 
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
@@ -214,6 +238,8 @@ public class CosmosLoadBalancingPolicyTest {
                 programmaticArguments),
             "default")
         ).isInstanceOf(IllegalArgumentException.class);
+
+        // Global endpoint with a read and a write datacenter (not just a read datacenter)
 
         assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
             new DefaultDriverContext(
@@ -234,7 +260,7 @@ public class CosmosLoadBalancingPolicyTest {
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT)
+    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
     public void testReadDatacenterAndWriteDatacenter() {
 
         if (WRITE_DATACENTER.isEmpty()) {
@@ -256,31 +282,61 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
-    private void cleanUp(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
-        session.execute(format("DROP KEYSPACE IF EXISTS %s", keyspaceName));
+    private static CqlSession checkState(final CqlSession session) {
+
+        final DriverContext context = session.getContext();
+        final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
+
+        final RetryPolicy retryPolicy = context.getRetryPolicy(profile.getName());
+
+        assertThat(retryPolicy.getClass()).isEqualTo(DefaultRetryPolicy.class);
+
+        final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
+
+        assertThat(loadBalancingPolicy.getClass()).isEqualTo(CosmosLoadBalancingPolicy.class);
+
+        assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getDnsExpiryTimeInSeconds())
+            .isEqualTo(profile.getInt(Option.DNS_EXPIRY_TIME));
+
+        final String globalEndpoint = profile.getString(Option.GLOBAL_ENDPOINT);
+
+        if (!globalEndpoint.isEmpty()) {
+            assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getGlobalEndpoint())
+                .isEqualTo(matchSocketAddress(globalEndpoint).group("hostname"));
+        }
+
+        assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getReadDatacenter())
+            .isEqualTo(profile.getString(Option.READ_DATACENTER));
+
+        assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getWriteDatacenter())
+            .isEqualTo(profile.getString(Option.WRITE_DATACENTER));
+
+        final Map<UUID, Node> nodes = session.getMetadata().getNodes();
+//        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(NODES);
+
+        LOG.info("[{}] connected to {} with {} and {}",
+            session.getName(),
+            nodes,
+            retryPolicy,
+            loadBalancingPolicy);
+
+        return session;
     }
 
     @NonNull
     private CqlSession connect(@NonNull final DriverConfigLoader configLoader) {
-
-        final Matcher address = TestCommon.HOSTNAME_AND_PORT.matcher(GLOBAL_ENDPOINT);
-        assertThat(address.matches()).isTrue();
-
-        final Collection<EndPoint> endPoints = Collections.singletonList(new DefaultEndPoint(new InetSocketAddress(
-            address.group("hostname"),
-            Integer.parseUnsignedInt(address.group("port")))));
-
-        return CqlSession.builder()
-            .withAuthCredentials(USERNAME, PASSWORD)
-            .withConfigLoader(configLoader)
-            .addContactEndPoints(endPoints)
-            .build();
+        return checkState(CqlSession.builder().withConfigLoader(configLoader).build());
     }
 
     private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
-        return DriverConfigLoader.programmaticBuilder().withClass(
-            DefaultDriverOption.RETRY_POLICY_CLASS,
-            DefaultRetryPolicy.class);
+        return DriverConfigLoader.programmaticBuilder()
+            .withStringList(DefaultDriverOption.CONTACT_POINTS, CONTACT_POINTS)
+            .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, USERNAME)
+            .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, PASSWORD)
+            .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, DefaultRetryPolicy.class)
+            .withString(Option.GLOBAL_ENDPOINT, "")
+            .withString(Option.READ_DATACENTER, "")
+            .withString(Option.WRITE_DATACENTER, "");
     }
 
     private void testAllStatements(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
@@ -395,7 +451,7 @@ public class CosmosLoadBalancingPolicyTest {
             session.execute(batchStatement);
 
         } finally {
-            this.cleanUp(session, keyspaceName);
+            session.execute("DROP KEYSPACE IF EXISTS " + keyspaceName);
         }
     }
 

@@ -10,19 +10,27 @@ Licensed under the MIT License.
 
   <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
   <packaging>jar</packaging>
-  <version>0.1.0</version>
+  <version>0.1.0-beta.1</version>
 
   <parent>
     <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
     <groupId>com.azure</groupId>
-    <version>0.1.0</version>
+    <version>0.1.0-beta.1</version>
   </parent>
 
   <dependencies>
+    <!-- Main dependencies -->
     <dependency>
       <groupId>com.datastax.oss</groupId>
       <artifactId>java-driver-core</artifactId>
+      <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <!-- Test dependencies -->
     <dependency>
       <groupId>com.datastax.oss</groupId>
       <artifactId>java-driver-query-builder</artifactId>
@@ -46,11 +54,6 @@ Licensed under the MIT License.
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
