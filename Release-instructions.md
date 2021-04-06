@@ -25,7 +25,7 @@
 
       if required.
       
-- [ ] Push your changes and submit a release PR against the code on develop/java-driver-3.
+- [ ] Push your changes and submit a release PR against the code on master.
 
       Use this title text:
 
@@ -36,3 +36,5 @@
       This is release <version>.
 
 - [ ] When your PR is complete, publish the release artifacts from the CI build to the Maven Repository.
+
+      Retain the build to preserve the release artifacts and a record of the test results.
