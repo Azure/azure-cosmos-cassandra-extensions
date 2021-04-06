@@ -35,10 +35,9 @@ set -o errexit -o nounset
 # Variables
 ###########
 
-declare -r script_root="$(cd "$(dirname "$0")" && pwd)"
 declare -r script_name="$(basename "$0")"
 
-# Update these variables to your liking
+# Update these variables to your liking (they cannot be changed from the command line)
 
 declare -r cacerts_storepath=~/.config/truststore.p12
 declare -r cacerts_storepass=unprotected
@@ -48,19 +47,22 @@ declare -r cacerts_storetype=pkcs12
 # Functions
 ###########
 
-function usage {
-
-    man "${script_name}"
-    exit 0
-}
-
 function error {
-    echo "${script_name} error: $2" 1>&2
+    echo "[$(date --iso-8601=seconds)] ${script_name} error: $2" 1>&2
     exit $1
 }
 
 function note {
     echo "[$(date --iso-8601=seconds)] ${script_name} note: $1" 1>&2
+}
+
+function usage {
+
+    echo "${script_name} --host <hostname> --port <port-number> --name <alias>"
+    echo "  host  DNS name or IP address."
+    echo "  port  Port number."
+    echo "  name  An alias for the certificate entry in the truststore (default: \$host:\$port")
+    exit 0
 }
 
 [[ $OSTYPE != cygwin ]] || error 1 "cygwin is unsupported"
@@ -95,8 +97,8 @@ while [[ $1 != '--' ]]; do
 done
 
 [[ ! -z ${host:-} ]] || error 1 "value for host is required"
-[[ ! -z ${port:-} ]] || declare -r port="8081"
-[[ ! -z ${name:-} ]] || declare -r name="https://$host:$port/"
+[[ ! -z ${port:-} ]] || error 1 "value for port is required"
+[[ ! -z ${name:-} ]] || declare -r name="$host:$port/"
 
 ###########
 # Main
