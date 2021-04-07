@@ -46,4 +46,3 @@
       - [ ] Verify that the package has been published to:
 
             https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4-extensions
-
