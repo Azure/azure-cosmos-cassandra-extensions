@@ -1,4 +1,4 @@
-# Azure Cosmos Cassandra Extensions for DataStax Java Driver 3 for Apache Cassandra
+*# Azure Cosmos Cassandra Extensions for DataStax Java Driver 3 for Apache Cassandra
 ## Release instructions
 
 - [ ] Create a release branch based on master.
@@ -37,4 +37,12 @@
 
 - [ ] When your PR is complete, publish the release artifacts from the CI build to the Maven Repository.
 
-      Retain the build to preserve the release artifacts and a record of the test results.
+      - [ ] Retain the build to preserve the release artifacts and a record of the test results.
+
+      - [ ] Verify that the parent POM has been published to:
+
+            https://repo.maven.apache.org/maven2/com/microsoft/azure/azure-cosmos-cassandra-driver-3/
+
+      - [ ] Verify that the package has been published to:
+
+            https://repo.maven.apache.org/maven2/com/microsoft/azure/azure-cosmos-cassandra-extensions/
