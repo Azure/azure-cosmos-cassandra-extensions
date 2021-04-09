@@ -34,8 +34,6 @@ public final class TestCommon {
 
     // region Fields
 
-    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
-
     static final List<String> CONTACT_POINTS = Arrays.asList(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.contact-point",
         "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
@@ -46,6 +44,28 @@ public final class TestCommon {
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
         "localhost:10350");
 
+    static final String PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.password",
+        "AZURE_COSMOS_CASSANDRA_PASSWORD",
+        "");
+
+    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.read-datacenter",
+        "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
+        "localhost");
+
+    static final String USERNAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.username",
+        "AZURE_COSMOS_CASSANDRA_USERNAME",
+        "");
+
+    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.write-datacenter",
+        "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
+        "localhost");
+
+    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+
     static final List<InetSocketAddress> NODES = Arrays.stream(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.nodes",
         "AZURE_COSMOS_CASSANDRA_NODES",
@@ -54,15 +74,6 @@ public final class TestCommon {
             final Matcher match = matchSocketAddress(value);
             return new InetSocketAddress(match.group("hostname"), Integer.parseUnsignedInt(match.group("port")));
         }).collect(Collectors.toList());
-
-    static final String PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.password",
-        "AZURE_COSMOS_CASSANDRA_PASSWORD",
-        "");
-    static final String USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.username",
-        "AZURE_COSMOS_CASSANDRA_USERNAME",
-        "");
 
     // endregion
 

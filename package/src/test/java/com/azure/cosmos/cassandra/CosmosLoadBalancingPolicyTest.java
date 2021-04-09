@@ -44,9 +44,10 @@ import java.util.UUID;
 import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
+import static com.azure.cosmos.cassandra.TestCommon.READ_DATACENTER;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.WRITE_DATACENTER;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
-import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static com.azure.cosmos.cassandra.TestCommon.matchSocketAddress;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
@@ -123,16 +124,6 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // TODO (DANOBLE) What does the Cassandra API return for the local datacenter name when it is hosted by the
     //  emulator?
-
-    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.read-datacenter",
-        "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
-        "localhost");
-
-    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.write-datacenter",
-        "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
-        "localhost");
 
     private static final int TIMEOUT_IN_MILLIS = 300_000;
 
