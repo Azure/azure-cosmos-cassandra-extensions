@@ -8,14 +8,14 @@
   <includeBaseDirectory>false</includeBaseDirectory>
   <files>
     <file>
-      <source>src/test/javadoc/doc-files/application.conf.html</source>
-      <outputDirectory>testapidocs/doc-files</outputDirectory>
+      <source>src/main/javadoc/doc-files/application.conf.html</source>
+      <outputDirectory>apidocs/doc-files</outputDirectory>
       <destName>application.conf.html</destName>
       <filtered>true</filtered>
     </file>
     <file>
-      <source>src/test/resources/application.conf</source>
-      <outputDirectory>testapidocs/doc-files</outputDirectory>
+      <source>src/main/resources/application.conf</source>
+      <outputDirectory>apidocs/doc-files</outputDirectory>
       <destName>application.conf.text</destName>
       <filtered>false</filtered>
     </file>

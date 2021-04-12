@@ -19,6 +19,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -27,12 +28,9 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Paths;
-import java.sql.Driver;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -117,9 +115,6 @@ public class CosmosCassandraIntegrationTest {
 
     // region Fields
 
-    private static final DriverConfigLoader CONFIG_LOADER = DriverConfigLoader.fromClasspath(
-        "cosmos-cassandra-integration-test.conf");
-
     private static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
         getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.consistency-level",
@@ -149,10 +144,13 @@ public class CosmosCassandraIntegrationTest {
     // region Methods
 
     /**
-     * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-driver-4-extensions.
+     * Verify that the extensions integrate with DataStax Java Driver 4 and its configuration system.
+     *
+     * @param loader A {@linkplain DriverConfigLoader loader} of the configuration under test.
      */
+    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @Test(groups = { "integration" }, dataProvider = "test-cases", timeOut = TIMEOUT_IN_MILLIS)
-    public void canIntegrateWithCosmos(final DriverConfigLoader loader) {
+    public void canIntegrate(@NonNull final DriverConfigLoader loader) {
 
         try (final CqlSession session = CqlSession.builder().withConfigLoader(loader).build()) {
 
@@ -233,6 +231,13 @@ public class CosmosCassandraIntegrationTest {
         }
     }
 
+    @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @BeforeClass
+    public void init() {
+        REPORTING_DIRECTORY.mkdirs();
+    }
+
     /** Provides the list of {@link CosmosCassandraIntegrationTest} cases.
      *
      * @return The list of {@link CosmosCassandraIntegrationTest} cases.
@@ -257,12 +262,6 @@ public class CosmosCassandraIntegrationTest {
 
         testCases[2] = new Object[] { newDriverConfigLoader("", READ_DATACENTER, WRITE_DATACENTER) };
         return testCases;
-    }
-
-    @BeforeClass
-    void init() {
-        //noinspection ResultOfMethodCallIgnored
-        REPORTING_DIRECTORY.mkdirs();
     }
 
     // region Privates

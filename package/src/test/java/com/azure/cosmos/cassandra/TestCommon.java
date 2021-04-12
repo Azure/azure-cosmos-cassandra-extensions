@@ -66,15 +66,6 @@ public final class TestCommon {
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
-    static final List<InetSocketAddress> NODES = Arrays.stream(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.nodes",
-        "AZURE_COSMOS_CASSANDRA_NODES",
-        "localhost:10350").split("\\s*,\\s*"))
-        .map(value -> {
-            final Matcher match = matchSocketAddress(value);
-            return new InetSocketAddress(match.group("hostname"), Integer.parseUnsignedInt(match.group("port")));
-        }).collect(Collectors.toList());
-
     // endregion
 
     // region Methods

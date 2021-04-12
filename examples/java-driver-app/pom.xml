@@ -8,9 +8,9 @@ Licensed under the MIT License.
 
   <modelVersion>4.0.0</modelVersion>
 
-  <artifactId>azure-cosmos-cassandra-driver-4-examples</artifactId>
+  <artifactId>azure-cosmos-cassandra-driver-4-examples.java-driver-app</artifactId>
   <packaging>jar</packaging>
-  <version>0.1.0-beta.1</version>
+  <version>0.1.0-beta.2</version>
 
   <description>
     Illustrates use of the DataStax Java Driver 4 for Apache Cassandra client library with Azure Cosmos awareness features.
@@ -19,54 +19,46 @@ Licensed under the MIT License.
   <parent>
     <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
     <groupId>com.azure</groupId>
-    <version>0.1.0-beta.1</version>
+    <version>0.1.0-beta.2</version>
+    <relativePath>../../pom.xml</relativePath>
   </parent>
 
   <dependencies>
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.datastax.oss</groupId>
       <artifactId>java-driver-query-builder</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.datastax.oss</groupId>
       <artifactId>java-driver-metrics-micrometer</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-api</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-slf4j-impl</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -84,7 +76,7 @@ Licensed under the MIT License.
             <configuration>
               <attach>false</attach>
               <descriptors>
-                <descriptor>src/assembly/javadoc-resources.xml</descriptor>
+                <descriptor>src/main/assembly/javadoc-resources.xml</descriptor>
               </descriptors>
             </configuration>
           </execution>

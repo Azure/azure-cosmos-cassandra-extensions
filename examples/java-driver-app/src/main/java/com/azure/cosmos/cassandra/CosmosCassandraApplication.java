@@ -1,3 +1,4 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
 package com.azure.cosmos.cassandra;
@@ -18,7 +19,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import org.testng.annotations.Test;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -81,7 +82,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * Side effects</h3>
  * <ol>
  * <li>Creates a keyspace in the cluster with replication factor 4, the number of replicas per partition in a Cosmos DB
- * instance. To prevent collisions especially during CI test runs, we generate a keyspace name of the form 
+ * instance. To prevent collisions especially during CI test runs, we generate a keyspace name of the form
  * <b>downgrading_</b><i>&gt;random-uuid&lt;</i>. Should a keyspace by this name already exist, it is reused.
  * <li>Creates a table within the keyspace created or reused. If a table with the given name already exists, it is
  * reused.
@@ -101,7 +102,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/configuration/">DataStax Java
  * Driver configuration</a>
  */
-public class CosmosCassandraExtensionsExample {
+public class CosmosCassandraApplication {
 
     // region Fields
 
@@ -135,9 +136,12 @@ public class CosmosCassandraExtensionsExample {
 
     /**
      * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-driver-4-extensions.
+     *
+     * @param args An array of command line arguments.
      */
-    @Test(groups = { "examples" }, timeOut = TIMEOUT_IN_MILLIS)
-    public void canIntegrateWithCosmos() {
+    @SuppressFBWarnings({ "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" })
+    @SuppressWarnings({ "checkstyle:InnerAssignment", "checkstyle:RedundantModifier" })
+    public static void main(final String[] args) {
 
         //noinspection ResultOfMethodCallIgnored
         REPORTING_DIRECTORY.mkdirs();
@@ -165,15 +169,15 @@ public class CosmosCassandraExtensionsExample {
                 .convertRatesTo(TimeUnit.SECONDS)
                 .build(REPORTING_DIRECTORY)) {
 
-                assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
+                assertThatCode(() -> createSchema(session)).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 3);
 
-                assertThatCode(() -> expectedRowCount.set(this.write(session))).doesNotThrowAnyException();
+                assertThatCode(() -> expectedRowCount.set(write(session))).doesNotThrowAnyException();
                 assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 1);
 
                 assertThatCode(() -> {
-                    final List<Row> rows = this.read(session).all();
-                    this.display(rows);
+                    final List<Row> rows = read(session).all();
+                    display(rows);
                     assertThat(rows.size()).isEqualTo(expectedRowCount.get());
                 }).doesNotThrowAnyException();
 
@@ -256,7 +260,7 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
      */
-    private void createSchema(final CqlSession session) throws InterruptedException {
+    private static void createSchema(final CqlSession session) throws InterruptedException {
 
         session.execute(SimpleStatement.newInstance(
             "CREATE KEYSPACE IF NOT EXISTS " + KEYSPACE_NAME + " WITH replication = {"
@@ -283,7 +287,7 @@ public class CosmosCassandraExtensionsExample {
      *
      * @param rows the results to display.
      */
-    private void display(final List<Row> rows) {
+    private static void display(final List<Row> rows) {
 
         final int width1 = 38;
         final int width2 = 12;
@@ -326,7 +330,7 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Queries data, retrying if necessary with a downgraded CL.
      */
-    private ResultSet read(final CqlSession session) {
+    private static ResultSet read(final CqlSession session) {
 
         System.out.printf("Read from %s.sensor_data at %s ... ", KEYSPACE_NAME, CONSISTENCY_LEVEL);
 
@@ -348,7 +352,7 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      */
-    private long write(final CqlSession session) {
+    private static long write(final CqlSession session) {
 
         System.out.printf("Write to %s.sensor_data at %s ... ", KEYSPACE_NAME, CONSISTENCY_LEVEL);
 

@@ -16,7 +16,7 @@ Licensed under the MIT License.
   <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
   <groupId>com.azure</groupId>
   <packaging>pom</packaging>
-  <version>0.1.0-beta.1</version>
+  <version>0.1.0-beta.2</version>
 
   <developers>
     <developer>
@@ -38,15 +38,18 @@ Licensed under the MIT License.
 
   <modules>
     <module>package</module>
-    <module>examples</module>
+    <module>examples/java-driver-app</module>
+    <module>examples/spring-boot-app</module>
   </modules>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
-    <!-- Main dependency version numbers -->
+    <!-- Package dependency version numbers -->
     <version.cassandra-driver>[4.7,4.11)</version.cassandra-driver>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
+    <!-- Examples dependency version numbers -->
+    <version.spring-boot-starter-data-cassandra>[2.4.4]</version.spring-boot-starter-data-cassandra>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.log4j>2.13.3</version.log4j>
@@ -107,6 +110,11 @@ Licensed under the MIT License.
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${version.slf4j-api}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-cassandra</artifactId>
+        <version>${version.spring-boot-starter-data-cassandra}</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
