@@ -4,4 +4,4 @@
 /**
  * Shows how to usethe Azure Cosmos Cassandra API extensions for DataStax Java Driver 4.
  */
-package com.azure.cosmos.cassandra;
+package com.azure.cosmos.cassandra.example;

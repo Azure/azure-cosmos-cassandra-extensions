@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-package com.azure.cosmos.cassandra.data;
+package com.azure.cosmos.cassandra.example.data;
 
 import org.springframework.data.cassandra.core.mapping.PrimaryKeyClass;
 import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
@@ -31,8 +31,8 @@ public class PersonId implements Serializable {
     @PrimaryKeyColumn(name = "first_name", type = PARTITIONED)
     private final String firstName;
 
-    @PrimaryKeyColumn(name = "person_id", ordinal = 1, ordering = DESCENDING)
-    private final UUID id;
+    @PrimaryKeyColumn(name = "uuid", ordinal = 1, ordering = DESCENDING)
+    private final UUID uuid;
 
     // endregion
 
@@ -43,12 +43,12 @@ public class PersonId implements Serializable {
      *
      * @param firstName first name of the {@linkplain Person person}.
      * @param dateOfBirth date of birth of the {@linkplain Person person}.
-     * @param id ID of the {@linkplain Person person}.
+     * @param uuid ID of the {@linkplain Person person}.
      */
-    public PersonId(final String firstName, final LocalDateTime dateOfBirth, final UUID id) {
-        this.firstName = firstName;
-        this.id = id;
+    public PersonId(final String firstName, final LocalDateTime dateOfBirth, final UUID uuid) {
         this.dateOfBirth = dateOfBirth;
+        this.firstName = firstName;
+        this.uuid = uuid;
     }
 
     // endregion
@@ -78,8 +78,8 @@ public class PersonId implements Serializable {
      *
      * @return the ID of the {@link Person} identified by this {@link PersonId}.
      */
-    public UUID getId() {
-        return this.id;
+    public UUID getUuid() {
+        return this.uuid;
     }
 
     // endregion
@@ -101,24 +101,24 @@ public class PersonId implements Serializable {
 
         return this.dateOfBirth.equals(personId.dateOfBirth)
             && this.firstName.equals(personId.firstName)
-            && this.id.equals(personId.id);
+            && this.uuid.equals(personId.uuid);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.dateOfBirth, this.firstName, this.id);
+        return Objects.hash(this.dateOfBirth, this.firstName, this.uuid);
     }
 
     @Override
     public String toString() {
-        return "PersonKey{"
+        return "{"
             + "firstName='"
             + this.firstName
             + '\''
-            + ", dateOfBirth="
+            + ",dateOfBirth="
             + this.dateOfBirth
-            + ", id="
-            + this.id
+            + ",uuid="
+            + this.uuid
             + '}';
     }
 

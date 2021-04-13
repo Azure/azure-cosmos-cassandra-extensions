@@ -35,10 +35,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.TestCommon.READ_DATACENTER;
-import static com.azure.cosmos.cassandra.TestCommon.WRITE_DATACENTER;
-import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -116,18 +112,18 @@ public class CosmosCassandraIntegrationTest {
     // region Fields
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
-        getPropertyOrEnvironmentVariable(
+        TestCommon.getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.consistency-level",
             "AZURE_COSMOS_CASSANDRA_CONSISTENCY_LEVEL",
             "QUORUM"));
 
-    private static final String KEYSPACE_NAME = getPropertyOrEnvironmentVariable(
+    private static final String KEYSPACE_NAME = TestCommon.getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.keyspace-name",
         "AZURE_COSMOS_CASSANDRA_KEYSPACE_NAME",
         "downgrading_" + UUID.randomUUID().toString().replace("-", ""));
 
     private static final File REPORTING_DIRECTORY = new File(
-        getPropertyOrEnvironmentVariable(
+        TestCommon.getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.reporting-directory",
             "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
             Paths.get(
@@ -245,22 +241,22 @@ public class CosmosCassandraIntegrationTest {
     @DataProvider(name = "test-cases")
     public static Object[][] testCases() {
 
-        final int count = READ_DATACENTER.isEmpty() ? 1 : (WRITE_DATACENTER.isEmpty() ? 2 : 3);
+        final int count = TestCommon.READ_DATACENTER.isEmpty() ? 1 : (TestCommon.WRITE_DATACENTER.isEmpty() ? 2 : 3);
         final Object[][] testCases = new Object[count][3];
 
-        testCases[0] = new Object[] { newDriverConfigLoader(GLOBAL_ENDPOINT, "", "") };
+        testCases[0] = new Object[] { newDriverConfigLoader(TestCommon.GLOBAL_ENDPOINT, "", "") };
 
-        if (READ_DATACENTER.isEmpty()) {
+        if (TestCommon.READ_DATACENTER.isEmpty()) {
             return testCases;
         }
 
-        testCases[1] = new Object[] { newDriverConfigLoader(GLOBAL_ENDPOINT, READ_DATACENTER, "") };
+        testCases[1] = new Object[] { newDriverConfigLoader(TestCommon.GLOBAL_ENDPOINT, TestCommon.READ_DATACENTER, "") };
 
-        if (WRITE_DATACENTER.isEmpty()) {
+        if (TestCommon.WRITE_DATACENTER.isEmpty()) {
             return testCases;
         }
 
-        testCases[2] = new Object[] { newDriverConfigLoader("", READ_DATACENTER, WRITE_DATACENTER) };
+        testCases[2] = new Object[] { newDriverConfigLoader("", TestCommon.READ_DATACENTER, TestCommon.WRITE_DATACENTER) };
         return testCases;
     }
 
@@ -336,7 +332,7 @@ public class CosmosCassandraIntegrationTest {
         System.out.println();
     }
 
-    private static String getFullyQualifiedPath(final CosmosLoadBalancingPolicy.Option option) {
+    private static String getFullyQualifiedPath(final CosmosLoadBalancingPolicyOption option) {
         return "datastax-java-driver." + option.getPath();
     }
 
@@ -345,9 +341,9 @@ public class CosmosCassandraIntegrationTest {
         final String readDatacenter,
         final String writeDatacenter) {
 
-        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicy.Option.GLOBAL_ENDPOINT), globalEndpoint);
-        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicy.Option.READ_DATACENTER), readDatacenter);
-        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicy.Option.WRITE_DATACENTER), writeDatacenter);
+        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT), globalEndpoint);
+        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicyOption.READ_DATACENTER), readDatacenter);
+        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER), writeDatacenter);
 
         return DriverConfigLoader.fromClasspath("cosmos-cassandra-integration-test.conf");
     }

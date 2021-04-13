@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-package com.azure.cosmos.cassandra;
+package com.azure.cosmos.cassandra.example;
 
+import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicy;
+import com.azure.cosmos.cassandra.CosmosRetryPolicy;
 import com.codahale.metrics.CsvReporter;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Timer;
@@ -102,7 +104,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/configuration/">DataStax Java
  * Driver configuration</a>
  */
-public class CosmosCassandraApplication {
+public final class Application {
+
+    private Application() {
+        throw new UnsupportedOperationException();
+    }
 
     // region Fields
 

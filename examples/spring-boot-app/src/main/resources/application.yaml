@@ -1,17 +1,14 @@
-cassandra:
-  base-packages: com.azure.cosmos.cassandra.data
-  contact-point: ${AZURE_COSMOS_CASSANDRA_HOSTNAME}
-  keyspace: ${AZURE_COSMOS_CASSANDRA_KEYSPACE}
+cosmos.cassandra:
+  base-packages: com.azure.cosmos.cassandra.example.data
+  contact-point: ${AZURE_COSMOS_CASSANDRA_CONTACT_POINT}
+  keyspace: azure_cosmos_cassandra_driver_4_examples
 
-datastax-java-driver:
-
-  advanced.auth-provider:
-
+  auth-provider:
     # By default we use the PlainTextAuthProvider (see reference.conf) and specify the username and password here.
-    username = ${AZURE_COSMOS_CASSANDRA_USERNAME:}
-    password = ${AZURE_COSMOS_CASSANDRA_PASSWORD:}
+    username: ${AZURE_COSMOS_CASSANDRA_USERNAME:}
+    password: ${AZURE_COSMOS_CASSANDRA_PASSWORD:}
 
-  basic.load-balancing-policy:
+  load-balancing-policy:
 
     # Cosmos load balancing policy parameters
     #
@@ -28,6 +25,10 @@ datastax-java-driver:
     #   Alternatively, set the environment variables referenced here to match the topology and preferences for your
     #   Cosmos DB Cassandra API instance.
 
-    global-endpoint = ${AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT:}
-    read-datacenter = ${AZURE_COSMOS_CASSANDRA_READ_DATACENTER:}
-    write-datacenter = ${AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER:}
+    global-endpoint: ${AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT}
+    read-datacenter: ${AZURE_COSMOS_CASSANDRA_READ_DATACENTER:}
+    write-datacenter: ${AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER:}
+
+  retry-policy:
+    # By default we use the CosmosRetryPolicy (see reference.conf) and accept the default configuration here.
+

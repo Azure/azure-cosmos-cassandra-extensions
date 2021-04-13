@@ -4,9 +4,7 @@
 package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
-import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
-import com.datastax.oss.driver.api.core.config.DriverOption;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -22,9 +20,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Objects;
 import java.util.Random;
-import java.util.function.BiFunction;
 
 /**
  * A {@link RetryPolicy} implementation with back-offs for {@link CoordinatorException} failures.
@@ -58,7 +54,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 1_000;
     private static final Logger LOG = LoggerFactory.getLogger(CosmosRetryPolicy.class);
-    private static final String PATH_PREFIX = DefaultDriverOption.RETRY_POLICY.getPath() + ".";
     private static final Random RANDOM = new Random();
 
     private final int fixedBackoffTimeInMillis;
@@ -80,13 +75,16 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
-        this.maxRetryCount = Option.MAX_RETRIES.getValue(profile);
-        this.fixedBackoffTimeInMillis = Option.FIXED_BACKOFF_TIME.getValue(profile);
-        this.growingBackoffTimeInMillis = Option.GROWING_BACKOFF_TIME.getValue(profile);
+        this.maxRetryCount = CosmosRetryPolicyOption.MAX_RETRIES.getValue(profile, Integer.class);
+        this.fixedBackoffTimeInMillis = CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getValue(profile, Integer.class);
+        this.growingBackoffTimeInMillis = CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getValue(profile, Integer.class);
     }
 
     CosmosRetryPolicy(final int maxRetryCount) {
-        this(maxRetryCount, Option.FIXED_BACKOFF_TIME.getDefaultValue(), Option.GROWING_BACKOFF_TIME.getDefaultValue());
+        this(
+            maxRetryCount,
+            CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getDefaultValue(Integer.class),
+            CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getDefaultValue(Integer.class));
     }
 
     CosmosRetryPolicy(
@@ -252,9 +250,9 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     @Override
     public String toString() {
         return "CosmosRetryPolicy({"
-            + Option.FIXED_BACKOFF_TIME.getName() + ':' + this.fixedBackoffTimeInMillis + ','
-            + Option.GROWING_BACKOFF_TIME.getName() + ':' + this.growingBackoffTimeInMillis + ','
-            + Option.MAX_RETRIES.getName() + ':' + this.maxRetryCount + "})";
+            + CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getName() + ':' + this.fixedBackoffTimeInMillis + ','
+            + CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getName() + ':' + this.growingBackoffTimeInMillis + ','
+            + CosmosRetryPolicyOption.MAX_RETRIES.getName() + ':' + this.maxRetryCount + "})";
     }
 
     // endregion
@@ -294,57 +292,6 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // endregion
 
     // region Types
-
-    enum Option implements DriverOption {
-
-        FIXED_BACKOFF_TIME("fixed-backoff-time", (option, profile) ->
-            profile.getInt(option, option.getDefaultValue()),
-            5_000),
-
-        GROWING_BACKOFF_TIME("growing-backoff-time", (option, profile) ->
-            profile.getInt(option, option.getDefaultValue()),
-            1_000),
-
-        MAX_RETRIES("max-retries", (option, profile) ->
-            profile.getInt(option, option.getDefaultValue()),
-            5);
-
-        private final Object defaultValue;
-        private final BiFunction<Option, DriverExecutionProfile, ?> getter;
-        private final String name;
-        private final String path;
-
-        <T, R> Option(
-            final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
-
-            this.defaultValue = defaultValue;
-            this.getter = getter;
-            this.name = name;
-            this.path = PATH_PREFIX + name;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T getDefaultValue() {
-            return (T) this.defaultValue;
-        }
-
-        @NonNull
-        public String getName() {
-            return this.name;
-        }
-
-        @NonNull
-        @Override
-        public String getPath() {
-            return this.path;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T getValue(@NonNull final DriverExecutionProfile profile) {
-            Objects.requireNonNull(profile, "expected non-null profile");
-            return (T) this.getter.apply(this, profile);
-        }
-    }
 
     // endregion
 }

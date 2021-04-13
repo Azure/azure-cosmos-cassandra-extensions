@@ -3,7 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.CosmosRetryPolicy.Option;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -36,17 +35,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 
-import static com.azure.cosmos.cassandra.TestCommon.CONTACT_POINTS;
-import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
-import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
-import static com.azure.cosmos.cassandra.TestCommon.createSchema;
-import static com.azure.cosmos.cassandra.TestCommon.display;
-import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
-import static com.azure.cosmos.cassandra.TestCommon.matchSocketAddress;
-import static com.azure.cosmos.cassandra.TestCommon.read;
-import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
-import static com.azure.cosmos.cassandra.TestCommon.write;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
@@ -103,7 +91,7 @@ public final class CosmosRetryPolicyTest {
 
     // region Fields
 
-    static final String LOCAL_DATACENTER = getPropertyOrEnvironmentVariable(
+    static final String LOCAL_DATACENTER = TestCommon.getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.local-datacenter",
         "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
         "localhost");
@@ -111,10 +99,10 @@ public final class CosmosRetryPolicyTest {
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
-    private static final int FIXED_BACK_OFF_TIME = Option.FIXED_BACKOFF_TIME.getDefaultValue();
-    private static final int GROWING_BACK_OFF_TIME = Option.GROWING_BACKOFF_TIME.getDefaultValue();
-    private static final String KEYSPACE_NAME = uniqueName("downgrading");
-    private static final int MAX_RETRIES = CosmosRetryPolicy.Option.MAX_RETRIES.getDefaultValue();
+    private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getDefaultValue(Integer.class);
+    private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getDefaultValue(Integer.class);
+    private static final String KEYSPACE_NAME = TestCommon.uniqueName("downgrading");
+    private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
     private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT_IN_MILLIS = 30_0000;
 
@@ -131,16 +119,16 @@ public final class CosmosRetryPolicyTest {
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() ->
-            createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
+            TestCommon.createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() ->
-            write(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
+            TestCommon.write(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            final ResultSet rows = read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
-            display(rows);
+            final ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
+            TestCommon.display(rows);
         }).doesNotThrowAnyException();
     }
 
@@ -189,9 +177,9 @@ public final class CosmosRetryPolicyTest {
 
         this.session = checkState(CqlSession.builder().withConfigLoader(
             DriverConfigLoader.programmaticBuilder()
-                .withStringList(DefaultDriverOption.CONTACT_POINTS, CONTACT_POINTS)
-                .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, USERNAME)
-                .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, PASSWORD)
+                .withStringList(DefaultDriverOption.CONTACT_POINTS, TestCommon.CONTACT_POINTS)
+                .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, TestCommon.USERNAME)
+                .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, TestCommon.PASSWORD)
                 .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
                 .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DATACENTER)
                 .build())
@@ -226,13 +214,13 @@ public final class CosmosRetryPolicyTest {
         assertThat(retryPolicy.getClass()).isEqualTo(CosmosRetryPolicy.class);
 
         assertThat(((CosmosRetryPolicy) retryPolicy).getFixedBackoffTimeInMillis())
-            .isEqualTo(profile.getInt(Option.FIXED_BACKOFF_TIME));
+            .isEqualTo(profile.getInt(CosmosRetryPolicyOption.FIXED_BACKOFF_TIME));
 
         assertThat(((CosmosRetryPolicy) retryPolicy).getGrowingBackoffTimeInMillis())
-            .isEqualTo(profile.getInt(Option.GROWING_BACKOFF_TIME));
+            .isEqualTo(profile.getInt(CosmosRetryPolicyOption.GROWING_BACKOFF_TIME));
 
         assertThat(((CosmosRetryPolicy) retryPolicy).getMaxRetryCount())
-            .isEqualTo(profile.getInt(Option.MAX_RETRIES));
+            .isEqualTo(profile.getInt(CosmosRetryPolicyOption.MAX_RETRIES));
 
         final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
 
@@ -259,7 +247,7 @@ public final class CosmosRetryPolicyTest {
         final int retryNumberEnd,
         final RetryDecision expectedRetryDecision) {
 
-        final Matcher address = matchSocketAddress(GLOBAL_ENDPOINT);
+        final Matcher address = TestCommon.matchSocketAddress(TestCommon.GLOBAL_ENDPOINT);
         assertThat(address.matches()).isTrue();
 
         final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(

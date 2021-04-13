@@ -3,9 +3,7 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
-import com.datastax.oss.driver.api.core.config.DriverOption;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
@@ -42,9 +40,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.DNS_EXPIRY_TIME;
+import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.READ_DATACENTER;
+import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.WRITE_DATACENTER;
 
 /**
  * A {@link LoadBalancingPolicy} implementation with an option to specify read and write datacenters to route requests.
@@ -79,7 +81,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Fields
 
     private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
-    private static final String OPTION_PATH_PREFIX = DefaultDriverOption.LOAD_BALANCING_POLICY.getPath() + ".";
 
     private final int dnsExpiryTimeInSeconds;
     private final List<InetAddress> dnsLookupAddresses;
@@ -117,10 +118,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
-        this.dnsExpiryTimeInSeconds = Option.DNS_EXPIRY_TIME.getValue(profile);
-        this.globalEndpoint = Option.GLOBAL_ENDPOINT.getValue(profile);
-        this.readDatacenter = Option.READ_DATACENTER.getValue(profile);
-        this.writeDatacenter = Option.WRITE_DATACENTER.getValue(profile);
+        this.dnsExpiryTimeInSeconds = DNS_EXPIRY_TIME.getValue(profile, Integer.class);
+        this.globalEndpoint = GLOBAL_ENDPOINT.getValue(profile, String.class);
+        this.readDatacenter = READ_DATACENTER.getValue(profile, String.class);
+        this.writeDatacenter = WRITE_DATACENTER.getValue(profile, String.class);
 
         this.validateConfiguration();
 
@@ -343,10 +344,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public String toString() {
         return "CosmosLoadBalancingPolicy({"
             + "\"configuration\":{"
-            + '"' + Option.DNS_EXPIRY_TIME.getName() + "\":" + this.dnsExpiryTimeInSeconds + ','
-            + '"' + Option.GLOBAL_ENDPOINT.getName() + "\":\"" + this.globalEndpoint + "\","
-            + '"' + Option.READ_DATACENTER.getName() + "\":\"" + this.readDatacenter + "\","
-            + '"' + Option.WRITE_DATACENTER.getName() + "\":\"" + this.writeDatacenter + "\""
+            + '"' + DNS_EXPIRY_TIME.getName() + "\":" + this.dnsExpiryTimeInSeconds + ','
+            + '"' + GLOBAL_ENDPOINT.getName() + "\":\"" + this.globalEndpoint + "\","
+            + '"' + READ_DATACENTER.getName() + "\":\"" + this.readDatacenter + "\","
+            + '"' + WRITE_DATACENTER.getName() + "\":\"" + this.writeDatacenter + "\""
             + "},\"datacenter-nodes\":{"
             + "\"read-local\":" + toString(this.localNodesForReading) + ","
             + "\"remote\":" + toString(this.remoteNodes) + ","
@@ -376,7 +377,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 // DNS entry may be temporarily unavailable
                 if (this.localAddresses == null) {
                     throw new IllegalStateException("The DNS could not resolve "
-                        + Option.GLOBAL_ENDPOINT.getPath()
+                        + GLOBAL_ENDPOINT.getPath()
                         + " = "
                         + this.globalEndpoint
                         + " the first time.");
@@ -552,11 +553,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } else if (this.dnsLookupAddresses.contains(this.getAddress(node))) {
                 addTo(this.localNodesForWriting, node);
                 distance = NodeDistance.LOCAL;
-            } else if (distance == NodeDistance.IGNORED) {
+            } else {
+                if (distance == NodeDistance.IGNORED) {
+                    distance = NodeDistance.REMOTE;
+                }
                 addTo(this.remoteNodes, node);
-                distance = NodeDistance.REMOTE;
             }
         }
+
         LOG.debug("reportDistanceAndClassify({}) -> setting distance to {}", toString(node), distance);
         this.distanceReporter.setDistance(node, distance);
     }
@@ -576,8 +580,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @NonNull
-    private static String toString(@NonNull final Collection<? super Node> nodes) {
-        return nodes.stream().map(CosmosLoadBalancingPolicy::toString).collect(Collectors.joining(",", "[", "]"));
+    private static String toString(@Nullable final Collection<? super Node> nodes) {
+        return nodes != null
+            ? nodes.stream().map(CosmosLoadBalancingPolicy::toString).collect(Collectors.joining(",", "[", "]"))
+            : "null";
     }
 
     // endregion
@@ -589,75 +595,18 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         if (this.globalEndpoint.isEmpty()) {
 
             if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
-                throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is not specified, "
-                    + "you must specify both " + Option.READ_DATACENTER.getPath() + " and "
-                    + Option.WRITE_DATACENTER.getPath() + ".");
+                throw new IllegalArgumentException("When " + GLOBAL_ENDPOINT.getPath() + " is not specified, "
+                    + "you must specify both " + READ_DATACENTER.getPath() + " and "
+                    + WRITE_DATACENTER.getPath() + ".");
             }
 
         } else if (!this.writeDatacenter.isEmpty()) {
-            throw new IllegalArgumentException("When " + Option.GLOBAL_ENDPOINT.getPath() + " is specified, you must "
-                + "not specify " + Option.WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
-                + "when " + Option.GLOBAL_ENDPOINT.getPath() + " is specified.");
+            throw new IllegalArgumentException("When " + GLOBAL_ENDPOINT.getPath() + " is specified, you must "
+                + "not specify " + WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
+                + "when " + GLOBAL_ENDPOINT.getPath() + " is specified.");
         }
     }
 
     // endregion
 
-    enum Option implements DriverOption {
-
-        DNS_EXPIRY_TIME("dns-expiry-time", (option, profile) ->
-            profile.getInt(option, option.getDefaultValue()),
-            60),
-
-        GLOBAL_ENDPOINT("global-endpoint", (option, profile) -> {
-            final String value = profile.getString(option, option.getDefaultValue());
-            assert value != null;
-            final int index = value.lastIndexOf(':');
-            return index < 0 ? value : value.substring(0, index);
-        }, ""),
-
-        READ_DATACENTER("read-datacenter", (option, profile) ->
-            profile.getString(option, option.getDefaultValue()),
-            ""),
-
-        WRITE_DATACENTER("write-datacenter", (option, profile) ->
-            profile.getString(option, option.getDefaultValue()),
-            "");
-
-        private final Object defaultValue;
-        private final BiFunction<Option, DriverExecutionProfile, ?> getter;
-        private final String name;
-        private final String path;
-
-        <T, R> Option(
-            final String name, final BiFunction<Option, DriverExecutionProfile, R> getter, final T defaultValue) {
-
-            this.defaultValue = defaultValue;
-            this.getter = getter;
-            this.name = name;
-            this.path = OPTION_PATH_PREFIX + name;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T getDefaultValue() {
-            return (T) this.defaultValue;
-        }
-
-        @NonNull
-        public String getName() {
-            return this.name;
-        }
-
-        @NonNull
-        @Override
-        public String getPath() {
-            return this.path;
-        }
-
-        @SuppressWarnings("unchecked")
-        public <T> T getValue(@NonNull final DriverExecutionProfile profile) {
-            Objects.requireNonNull(profile, "expected non-null profile");
-            return (T) this.getter.apply(this, profile);
-        }
-    }
 }
