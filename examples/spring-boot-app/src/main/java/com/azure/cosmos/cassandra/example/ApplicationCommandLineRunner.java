@@ -6,6 +6,7 @@ package com.azure.cosmos.cassandra.example;
 import com.azure.cosmos.cassandra.example.data.Person;
 import com.azure.cosmos.cassandra.example.data.PersonId;
 import com.azure.cosmos.cassandra.example.data.PersonRepository;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -48,6 +49,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
      *
      * @param args a variable argument list.
      */
+    @SuppressFBWarnings("DM_EXIT")
     @Override
     public void run(final String... args) {
 

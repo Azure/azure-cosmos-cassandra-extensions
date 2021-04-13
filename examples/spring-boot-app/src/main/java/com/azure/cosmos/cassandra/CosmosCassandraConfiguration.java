@@ -4,6 +4,7 @@
 package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import org.springframework.context.annotation.Configuration;
@@ -21,8 +22,8 @@ import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.AUTH_P
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.AUTH_PROVIDER_USER_NAME;
 
 /**
- * Configures a Cassandra client application's {@link com.datastax.oss.driver.api.core.CqlSession CqlSession} when it's
- * connected to a Cosmos DB Cassandra API instance.
+ * Base class for configuring a {@link com.datastax.oss.driver.api.core.CqlSession CqlSession} connected to a Cosmos DB
+ * Cassandra API instance.
  */
 @Configuration
 public abstract class CosmosCassandraConfiguration extends AbstractCassandraConfiguration {
@@ -35,25 +36,55 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
 
     // region Methods
 
+    /**
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#DNS_EXPIRY_TIME}.
+     *
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#DNS_EXPIRY_TIME}.
+     */
     public int getLoadBalancingDnsExpiryTime() {
         return DNS_EXPIRY_TIME.getDefaultValue(Integer.class);
     }
 
+    /**
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#GLOBAL_ENDPOINT}.
+     *
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#GLOBAL_ENDPOINT}.
+     */
     public String getLoadBalancingGlobalEndpoint() {
         return GLOBAL_ENDPOINT.getDefaultValue(String.class);
     }
 
+    /**
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#READ_DATACENTER}.
+     *
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#READ_DATACENTER}.
+     */
     public String getLoadBalancingReadDatacenter() {
         return READ_DATACENTER.getDefaultValue(String.class);
     }
 
+    /**
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#WRITE_DATACENTER}.
+     *
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#WRITE_DATACENTER}.
+     */
     public String getLoadBalancingWriteDatacenter() {
         return WRITE_DATACENTER.getDefaultValue(String.class);
     }
 
+    /**
+     * Returns the value to set for {@link DefaultDriverOption#AUTH_PROVIDER_PASSWORD}.
+     *
+     * @return The value to set for {@link DefaultDriverOption#AUTH_PROVIDER_PASSWORD}.
+     */
     @NonNull
     protected abstract String getAuthPassword();
 
+    /**
+     * Returns the value to set for {@link DefaultDriverOption#AUTH_PROVIDER_USER_NAME}.
+     *
+     * @return The value to set for {@link DefaultDriverOption#AUTH_PROVIDER_USER_NAME}.
+     */
     @NonNull
     protected abstract String getAuthUsername();
 
@@ -62,19 +93,41 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
         return null;
     }
 
+    /**
+     * Returns the Cosmos DB Cassandra API port number.
+     * <p>
+     * The default is 10350.
+     *
+     * @return The Cosmos DB Cassandra API port number.
+     */
     @Override
     protected int getPort() {
         return PORT;
     }
 
+    /**
+     * Returns the value to set for {@link CosmosRetryPolicyOption#FIXED_BACKOFF_TIME}.
+     *
+     * @return The value to set for {@link CosmosRetryPolicyOption#FIXED_BACKOFF_TIME}.
+     */
     protected int getRetryFixedBackoffTime() {
         return FIXED_BACKOFF_TIME.getDefaultValue(Integer.class);
     }
 
+    /**
+     * Returns the value to set for {@link CosmosRetryPolicyOption#GROWING_BACKOFF_TIME}.
+     *
+     * @return The value to set for {@link CosmosRetryPolicyOption#GROWING_BACKOFF_TIME}.
+     */
     protected int getRetryGrowingBackoffTime() {
         return GROWING_BACKOFF_TIME.getDefaultValue(Integer.class);
     }
 
+    /**
+     * Returns the value to set for {@link CosmosRetryPolicyOption#MAX_RETRIES}.
+     *
+     * @return The value to set for {@link CosmosRetryPolicyOption#MAX_RETRIES}.
+     */
     protected int getRetryMaxRetries() {
         return MAX_RETRIES.getDefaultValue(Integer.class);
     }

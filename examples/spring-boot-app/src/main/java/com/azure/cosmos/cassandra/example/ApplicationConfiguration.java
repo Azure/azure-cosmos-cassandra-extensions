@@ -18,6 +18,9 @@ import org.springframework.data.cassandra.repository.config.EnableCassandraRepos
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Spring Data Cassandra configuration that reads settings values from application.yaml.
+ */
 @Configuration
 @EnableCassandraRepositories
 public class ApplicationConfiguration extends CosmosCassandraConfiguration {
@@ -163,7 +166,8 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
     @Override
     @NonNull
     protected List<CreateKeyspaceSpecification> getKeyspaceCreations() {
-        return Collections.singletonList(CreateKeyspaceSpecification.createKeyspace(this.getKeyspaceName()).ifNotExists());
+        return
+            Collections.singletonList(CreateKeyspaceSpecification.createKeyspace(this.getKeyspaceName()).ifNotExists());
     }
 
     @Override
