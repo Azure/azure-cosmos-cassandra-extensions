@@ -25,8 +25,8 @@ public class PersonId implements Serializable {
 
     private static final long serialVersionUID = 5609379476555574274L;
 
-    @PrimaryKeyColumn(name = "date_of_birth", ordinal = 0)
-    private final LocalDateTime dateOfBirth;
+    @PrimaryKeyColumn(name = "birth_date", ordinal = 0)
+    private final LocalDateTime birthDate;
 
     @PrimaryKeyColumn(name = "first_name", type = PARTITIONED)
     private final String firstName;
@@ -42,11 +42,11 @@ public class PersonId implements Serializable {
      * Initializes a new {@link PersonId}.
      *
      * @param firstName first name of the {@linkplain Person person}.
-     * @param dateOfBirth date of birth of the {@linkplain Person person}.
+     * @param birthDate date of birth of the {@linkplain Person person}.
      * @param uuid ID of the {@linkplain Person person}.
      */
-    public PersonId(final String firstName, final LocalDateTime dateOfBirth, final UUID uuid) {
-        this.dateOfBirth = dateOfBirth;
+    public PersonId(final String firstName, final LocalDateTime birthDate, final UUID uuid) {
+        this.birthDate = birthDate;
         this.firstName = firstName;
         this.uuid = uuid;
     }
@@ -60,8 +60,8 @@ public class PersonId implements Serializable {
      *
      * @return the date of birth of the {@link Person} identified by this {@link PersonId}.
      */
-    public LocalDateTime getDateOfBirth() {
-        return this.dateOfBirth;
+    public LocalDateTime getBirthDate() {
+        return this.birthDate;
     }
 
     /**
@@ -99,14 +99,14 @@ public class PersonId implements Serializable {
 
         final PersonId personId = (PersonId) other;
 
-        return this.dateOfBirth.equals(personId.dateOfBirth)
+        return this.birthDate.equals(personId.birthDate)
             && this.firstName.equals(personId.firstName)
             && this.uuid.equals(personId.uuid);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.dateOfBirth, this.firstName, this.uuid);
+        return Objects.hash(this.birthDate, this.firstName, this.uuid);
     }
 
     @Override
@@ -115,8 +115,8 @@ public class PersonId implements Serializable {
             + "firstName='"
             + this.firstName
             + '\''
-            + ",dateOfBirth="
-            + this.dateOfBirth
+            + ",birthDate="
+            + this.birthDate
             + ",uuid="
             + this.uuid
             + '}';

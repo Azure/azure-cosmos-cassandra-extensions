@@ -3,18 +3,19 @@
 
 package com.azure.cosmos.cassandra.example.data;
 
-import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.data.cassandra.repository.Query;
+import org.springframework.data.cassandra.repository.ReactiveCassandraRepository;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
-import java.util.List;
+
 
 /**
  * Represents a database with methods for looking up people.
  */
 @Repository
-public interface PersonRepository extends CassandraRepository<Person, PersonId> {
+public interface ReactiveCassandraPersonRepository extends ReactiveCassandraRepository<Person, PersonId> {
 
     /**
      * Finds all {@linkplain Person people} with the same first name.
@@ -23,7 +24,7 @@ public interface PersonRepository extends CassandraRepository<Person, PersonId> 
      *
      * @return A list of {@linkplain Person people} with the same first name.
      */
-    List<Person> findByIdFirstName(String firstName);
+    Flux<Person> findByIdFirstName(String firstName);
 
     /**
      * Finds all {@linkplain Person people} born after the given local {@code date} time.
@@ -33,7 +34,7 @@ public interface PersonRepository extends CassandraRepository<Person, PersonId> 
      * @return The list of {@linkplain Person people} born after the given {@code date}.
      */
     @Query(allowFiltering = true)
-    List<Person> findByIdBirthDateGreaterThan(LocalDateTime dateTime);
+    Flux<Person> findByIdBirthDateGreaterThan(LocalDateTime dateTime);
 
     /**
      * Finds all {@linkplain Person people} with the same first name and a birth date after the given local date time.
@@ -43,7 +44,7 @@ public interface PersonRepository extends CassandraRepository<Person, PersonId> 
      *
      * @return The list of {@linkplain Person people} found.
      */
-    List<Person> findByIdFirstNameAndIdBirthDateGreaterThan(String firstName, LocalDateTime birthDate);
+    Flux<Person> findByIdFirstNameAndIdBirthDateGreaterThan(String firstName, LocalDateTime birthDate);
 
     /**
      * Finds all {@linkplain Person people} with the same last name.
@@ -53,7 +54,7 @@ public interface PersonRepository extends CassandraRepository<Person, PersonId> 
      * @return The list of {@linkplain Person people} found.
      */
     @Query(allowFiltering = true)
-    List<Person> findByLastName(String lastName);
+    Flux<Person> findByLastName(String lastName);
 
     /**
      * Finds all {@linkplain Person people} with the same occupation.
@@ -63,5 +64,5 @@ public interface PersonRepository extends CassandraRepository<Person, PersonId> 
      * @return The list of {@linkplain Person people} found.
      */
     @Query(allowFiltering = true)
-    List<Person> findByOccupation(String occupation);
+    Flux<Person> findByOccupation(String occupation);
 }

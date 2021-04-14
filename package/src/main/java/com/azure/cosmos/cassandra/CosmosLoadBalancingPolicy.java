@@ -439,14 +439,28 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private InetAddress getAddress(final Node node) {
 
-        final SocketAddress address = node.getEndPoint().resolve();
+        final SocketAddress socketAddress = node.getEndPoint().resolve();
 
-        if (address instanceof InetSocketAddress) {
-            return ((InetSocketAddress) address).getAddress();
+        if (!(socketAddress instanceof InetSocketAddress)) {
+            throw new IllegalArgumentException("expected node with InetSocketAddress, not " + socketAddress.getClass());
         }
 
-        throw new IllegalArgumentException("expected node endpoint address to resolve to InetSocketAddress, not "
-            + address.getClass());
+        final InetSocketAddress inetSocketAddress = (InetSocketAddress) socketAddress;
+
+        if (inetSocketAddress.isUnresolved()) {
+
+            // No guarantee that the datastax-java-driver has resolved the host name before this method is called
+
+            final String hostName = inetSocketAddress.getHostName();
+
+            try {
+                return InetAddress.getByName(hostName);
+            } catch (final UnknownHostException error) {
+                throw new IllegalArgumentException("cannot determine InetAddress of node: " + toString(node), error);
+            }
+        }
+
+        return inetSocketAddress.getAddress();
     }
 
     private static boolean isReadRequest(final String query) {
@@ -473,8 +487,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     private void reclassifyNodes(
-        final List<Node> nodes, final List<Node> localNodes, final List<Node> remoteNodes,
-        final InetAddress[] localAddresses) {
+        @NonNull final List<Node> nodes,
+        @NonNull final List<Node> localNodes,
+        @NonNull final List<Node> remoteNodes,
+        @NonNull final InetAddress[] localAddresses) {
+
+        Objects.requireNonNull(nodes, "expected non-null nodes");
+        Objects.requireNonNull(localNodes, "expected non-null localNodes");
+        Objects.requireNonNull(remoteNodes, "expected non-null remoteNodes");
+        Objects.requireNonNull(localAddresses, "expected non-null localAddresses");
 
         for (final Node node : nodes) {
 

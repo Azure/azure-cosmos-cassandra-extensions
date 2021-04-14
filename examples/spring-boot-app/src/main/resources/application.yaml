@@ -32,3 +32,12 @@ cosmos.cassandra:
   retry-policy:
     # By default we use the CosmosRetryPolicy (see reference.conf) and accept the default configuration here.
 
+logging:
+  pattern:
+    console:
+  file:
+    name: ${user.home}/.local/var/log/azure-cosmos-cassandra-driver-4.log
+
+spring:
+  main:
+    banner-mode: log # Because the Spring Boot banner nicely separates runs in the log file
