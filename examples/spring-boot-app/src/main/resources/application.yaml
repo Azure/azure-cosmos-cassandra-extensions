@@ -33,10 +33,13 @@ cosmos.cassandra:
     # By default we use the CosmosRetryPolicy (see reference.conf) and accept the default configuration here.
 
 logging:
-  pattern:
-    console:
   file:
     name: ${user.home}/.local/var/log/azure-cosmos-cassandra-driver-4.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10GB
+  pattern:
+    console:
 
 spring:
   main:

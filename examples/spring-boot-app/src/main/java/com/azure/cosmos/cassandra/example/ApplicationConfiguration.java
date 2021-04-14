@@ -173,7 +173,7 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
     @Override
     @NonNull
     protected List<DropKeyspaceSpecification> getKeyspaceDrops() {
-        return Collections.singletonList(DropKeyspaceSpecification.dropKeyspace(this.getKeyspaceName()).ifExists());
+        return Collections.emptyList(); //Collections.singletonList(DropKeyspaceSpecification.dropKeyspace(this.getKeyspaceName()).ifExists());
     }
 
     // endregion

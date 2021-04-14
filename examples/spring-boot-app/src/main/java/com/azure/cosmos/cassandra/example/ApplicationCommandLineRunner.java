@@ -6,6 +6,7 @@ package com.azure.cosmos.cassandra.example;
 import com.azure.cosmos.cassandra.example.data.Person;
 import com.azure.cosmos.cassandra.example.data.PersonId;
 import com.azure.cosmos.cassandra.example.data.PersonRepository;
+import com.azure.cosmos.cassandra.example.data.ReactivePersonRepository;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -13,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -24,8 +27,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Runs the application with output written the standard output device.
@@ -34,14 +41,19 @@ import java.util.UUID;
 public class ApplicationCommandLineRunner implements CommandLineRunner {
 
     private final PersonRepository personRepository;
+    private final ReactivePersonRepository reactivePersonRepository;
 
     /**
      * Initializes a new instance of the {@link ApplicationCommandLineRunner application}.
      *
      * @param personRepository a reference to a repository instance containing people.
      */
-    public ApplicationCommandLineRunner(@Autowired final PersonRepository personRepository) {
+    public ApplicationCommandLineRunner(
+        @Autowired final PersonRepository personRepository,
+        @Autowired final ReactivePersonRepository reactivePersonRepository) {
+
         this.personRepository = personRepository;
+        this.reactivePersonRepository = reactivePersonRepository;
     }
 
     /**
@@ -54,10 +66,8 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
     }
 
     /**
-     * Runs the {@linkplain ApplicationCommandLineRunner application} logic.
-     *
-     * This method is called by Spring Boot after it instantiates the {@linkplain ApplicationCommandLineRunner
-     * application}.
+     * Runs the {@linkplain ApplicationCommandLineRunner application} logic. This method is called by Spring Boot after
+     * it instantiates the {@linkplain ApplicationCommandLineRunner application}.
      *
      * @param args a variable argument list.
      */
@@ -67,22 +77,24 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         try {
             this.importData();
-            this.tabulatePeopleWithSameLastName();
-            this.tabulatePeopleWithSameFirstName();
-            this.tabulatePeopleWithSameOccupation();
-            this.tabulateYoungerPeopleThanEachPerson();
+            //            this.tabulatePeopleWithSameLastName();
+            //            this.tabulatePeopleWithSameFirstName();
+            //            this.tabulatePeopleWithSameOccupation();
+            //            this.tabulateYoungerPeopleThanEachPerson();
+            for (int i = 0; i < 100; i++) {
+                this.reactivelyTabulateYoungerPeopleThanEachPerson(i);
+            }
         } catch (final Throwable error) {
             System.out.print("Application failed due to: ");
             error.printStackTrace();
             System.exit(1);
         }
-
-        System.exit(0);
     }
 
-    private Map<String, Integer> getFields(final CSVReader reader) throws IOException, CsvValidationException {
+    private Map<String, Integer> getFields(final CSVReader reader) throws IOException {
+
         final Map<String, Integer> fieldNames = new HashMap<>();
-        final String[] line = reader.readNext();
+        final String[] line = reader.readNextSilently();
 
         for (int i = 0; i < line.length; i++) {
             fieldNames.put(line[i], i);
@@ -229,5 +241,97 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
                 }
             }
         }
+    }
+
+    @SuppressWarnings("LocalCanBeFinal")
+    private void reactivelyTabulateYoungerPeopleThanEachPerson(final int iteration) throws
+        CsvValidationException, IOException, URISyntaxException {
+
+        // Setup our CSV Reader, Data dictionary, and Metrics (personCounts and errorCount)
+
+        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
+        final CSVReader reader = new CSVReader(Files.newBufferedReader(path));
+        final Map<String, Integer> dataDictionary;
+
+        try {
+            dataDictionary = this.getFields(reader);
+        } catch (Throwable error) {
+            reader.close();
+            throw error;
+        }
+
+        class Counts {
+            public int youngerPeople = 0;
+            public int requests = 0;
+            public int errors = 0;
+        }
+
+        final ConcurrentMap<Person, Counts> personCounts = new ConcurrentHashMap<>();
+        final AtomicInteger errorCount = new AtomicInteger();
+
+        Flux.fromIterable(reader).map(line -> {
+
+            final Person person = new Person(
+                new PersonId(
+                    line[dataDictionary.get("first_name")],
+                    LocalDateTime.parse(line[dataDictionary.get("birth_date")]),
+                    UUID.fromString(line[dataDictionary.get("uuid")])),
+                line[dataDictionary.get("last_name")],
+                line[dataDictionary.get("occupation")]);
+
+            final LocalDateTime date = person.getId().getBirthDate();
+            final Flux<Person> youngerPeople = this.reactivePersonRepository.findByIdBirthDateGreaterThan(date);
+
+            personCounts.compute(person, (p, c) -> {
+                if (c == null) {
+                    c = new Counts();
+                }
+                c.requests++;
+                return c;
+            });
+
+            return new Object[] { person, youngerPeople };
+
+        }).doAfterTerminate(() -> {
+
+            boolean success;
+
+            try {
+                success = reader.readNext() == null && errorCount.get() == 0;
+                reader.close();
+            } catch (Throwable error) {
+                success = false;
+            }
+
+            System.out.println("iteration: " + iteration
+                + ", success: " + success
+                + ", personCount: " + personCounts.size()
+                + ", errorCount: " + errorCount.get());
+
+        }).parallel().runOn(Schedulers.parallel()).collect().subscribe(args -> {
+
+            final Person person = (Person) args[0];
+            final Flux<?> youngerPeople = (Flux<?>) args[1];
+
+            youngerPeople.subscribe(
+                youngerPerson -> {
+                    System.out.println(person + " is older than " + youngerPerson);
+                    personCounts.compute(person, (p, c) -> {
+                        Objects.requireNonNull(c, "expected non-null counts for " + person);
+                        c.youngerPeople++;
+                        return c;
+                    });
+                },
+                error -> {
+                    System.out.println("Iteration " + iteration + ": failed to find people younger than " + person
+                        + " due to " + error);
+                    personCounts.compute(person, (p, c) -> {
+                        Objects.requireNonNull(c, "expected non-null counts for " + person);
+                        c.errors++;
+                        return c;
+                    });
+                    errorCount.incrementAndGet();
+                });
+        });
     }
 }

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * Represents a database with methods for looking up people.
  */
 @Repository
-public interface ReactiveCassandraPersonRepository extends ReactiveCassandraRepository<Person, PersonId> {
+public interface ReactivePersonRepository extends ReactiveCassandraRepository<Person, PersonId> {
 
     /**
      * Finds all {@linkplain Person people} with the same first name.
