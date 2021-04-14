@@ -308,7 +308,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
                 + ", personCount: " + personCounts.size()
                 + ", errorCount: " + errorCount.get());
 
-        }).parallel().runOn(Schedulers.parallel()).collect().subscribe(args -> {
+        }).parallel().runOn(Schedulers.parallel()).subscribe(args -> {
 
             final Person person = (Person) args[0];
             final Flux<?> youngerPeople = (Flux<?>) args[1];
