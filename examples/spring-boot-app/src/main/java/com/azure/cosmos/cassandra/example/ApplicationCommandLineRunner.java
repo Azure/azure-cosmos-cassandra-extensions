@@ -82,8 +82,8 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             //            this.tabulatePeopleWithSameFirstName();
             //            this.tabulatePeopleWithSameOccupation();
             //            this.tabulateYoungerPeopleThanEachPerson();
-            for (int i = 0; i < 1; i++) {
-                this.reactivelyTabulateYoungerPeopleThanEachPerson(i);
+            for (int iteration = 1; iteration <= 100; iteration++) {
+                this.reactivelyTabulateYoungerPeopleThanEachPerson(iteration);
             }
         } catch (final Throwable error) {
             System.out.print("Application failed due to: ");
@@ -149,8 +149,12 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         // Process each person represented in the data set
 
-        // One might be tempted to use Flux.fromIterable, but that would be a mistake. The CSVReader is an Iterable that
-        // cannot be reused and Flux.fromIterable depends on this guarantee.
+        // One might be tempted to use Flux.fromIterable, but that would be a mistake:
+        // * CSVReader is an Iterable that cannot be reused and Flux.fromIterable depends on this guarantee. It calls
+        //   Iterable.spliterator twice starting out and this causes a read past the first record in our sample data.
+        //   Consult the Flux.fromIterable code for specifics.
+        // * Flux.fromStream guarantees that our reader will be closed when our operation is complete, regardless of
+        //   how the operation finishes.
 
         Flux.fromStream(StreamSupport.stream(reader.spliterator(), false)).flatMap(line -> {
 
