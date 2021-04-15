@@ -23,16 +23,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.StreamSupport;
 
 /**
  * Runs the application with output written the standard output device.
@@ -81,7 +82,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             //            this.tabulatePeopleWithSameFirstName();
             //            this.tabulatePeopleWithSameOccupation();
             //            this.tabulateYoungerPeopleThanEachPerson();
-            for (int i = 0; i < 100; i++) {
+            for (int i = 0; i < 1; i++) {
                 this.reactivelyTabulateYoungerPeopleThanEachPerson(i);
             }
         } catch (final Throwable error) {
@@ -91,15 +92,15 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         }
     }
 
-    private Map<String, Integer> getFields(final CSVReader reader) throws IOException {
+    private Map<String, Integer> getDataDictionary(final CSVReader reader) throws IOException {
 
-        final Map<String, Integer> fieldNames = new HashMap<>();
+        final Map<String, Integer> dataDictionary = new HashMap<>();
         final String[] line = reader.readNextSilently();
 
         for (int i = 0; i < line.length; i++) {
-            fieldNames.put(line[i], i);
+            dataDictionary.put(line[i], i);
         }
-        return fieldNames;
+        return dataDictionary;
     }
 
     @SuppressWarnings("LocalCanBeFinal")
@@ -109,22 +110,100 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         try (CSVReader reader = new CSVReader(Files.newBufferedReader(path))) {
 
-            final Map<String, Integer> fieldNames = this.getFields(reader);
+            final Map<String, Integer> dataDictionary = this.getDataDictionary(reader);
             String[] line;
 
             while ((line = reader.readNext()) != null) {
 
                 final Person person = new Person(
                     new PersonId(
-                        line[fieldNames.get("first_name")],
-                        LocalDateTime.parse(line[fieldNames.get("birth_date")]),
-                        UUID.fromString(line[fieldNames.get("uuid")])),
-                    line[fieldNames.get("last_name")],
-                    line[fieldNames.get("occupation")]);
+                        line[dataDictionary.get("first_name")],
+                        LocalDateTime.parse(line[dataDictionary.get("birth_date")]),
+                        UUID.fromString(line[dataDictionary.get("uuid")])),
+                    line[dataDictionary.get("last_name")],
+                    line[dataDictionary.get("occupation")]);
 
                 this.personRepository.insert(person);
             }
         }
+    }
+
+    @SuppressWarnings("LocalCanBeFinal")
+    private void reactivelyTabulateYoungerPeopleThanEachPerson(final int iteration)
+        throws IOException, URISyntaxException {
+
+        // Setup our CSV Reader, Data dictionary, and Metrics (personCounts and errorCount)
+
+        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
+        final CSVReader reader = new CSVReader(Files.newBufferedReader(path));
+        final Map<String, Integer> dataDictionary;
+
+        try {
+            dataDictionary = this.getDataDictionary(reader);
+        } catch (Throwable error) {
+            reader.close();
+            throw error;
+        }
+
+        final ConcurrentMap<Person, Metrics> requestMetrics = new ConcurrentHashMap<>();
+
+        // Process each person represented in the data set
+
+        // One might be tempted to use Flux.fromIterable, but that would be a mistake. The CSVReader is an Iterable that
+        // cannot be reused and Flux.fromIterable depends on this guarantee.
+
+        Flux.fromStream(StreamSupport.stream(reader.spliterator(), false)).flatMap(line -> {
+
+            final Person elder = new Person(
+                new PersonId(
+                    line[dataDictionary.get("first_name")],
+                    LocalDateTime.parse(line[dataDictionary.get("birth_date")]),
+                    UUID.fromString(line[dataDictionary.get("uuid")])),
+                line[dataDictionary.get("last_name")],
+                line[dataDictionary.get("occupation")]);
+
+            final LocalDateTime date = elder.getId().getBirthDate();
+            final Flux<Person> youngerPeople = this.reactivePersonRepository.findByIdBirthDateGreaterThan(date);
+
+            requestMetrics.compute(elder, (person, metrics) -> {
+                if (metrics == null) {
+                    metrics = new Metrics();
+                }
+                metrics.incrementRequests();
+                return metrics;
+            });
+
+            return youngerPeople.map(younger -> new Object[] { elder, younger })
+                .parallel()
+                .runOn(Schedulers.parallel())
+                .doOnError(error -> requestMetrics.get(elder).addError(error));
+
+        }).subscribe(
+            result -> {
+                System.out.println("next: {elder:" + result[0] + ",younger:" + result[1] + "}");
+            },
+            error -> {
+                System.out.println("error: '" + error + "'");
+            },
+            () -> {
+                System.out.println("----------------------------");
+                System.out.println("R E Q U E S T  M E T R I C S");
+                System.out.println("----------------------------");
+
+                System.out.println("{"
+                    + "iteration:" + iteration
+                    + ",recordsRead:" + (reader.getLinesRead() - 1)
+                    + ",requestsProcessed:" + requestMetrics.size()
+                    + "}");
+
+                int number = 0;
+
+                for (Map.Entry<Person, Metrics> entry : requestMetrics.entrySet()) {
+                    System.out.println(
+                        "{number:" + ++number + ",person:" + entry.getKey() + ",metrics:" + entry.getValue() + "}");
+                }
+            }
+        );
     }
 
     @SuppressWarnings("LocalCanBeFinal")
@@ -134,7 +213,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         try (CSVReader reader = new CSVReader(Files.newBufferedReader(path))) {
 
-            final Map<String, Integer> fields = this.getFields(reader);
+            final Map<String, Integer> fields = this.getDataDictionary(reader);
             final Set<String> firstNames = new HashSet<>();
 
             String[] line;
@@ -162,7 +241,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         try (CSVReader reader = new CSVReader(Files.newBufferedReader(path))) {
 
-            final Map<String, Integer> fields = this.getFields(reader);
+            final Map<String, Integer> fields = this.getDataDictionary(reader);
             final Set<String> lastNames = new HashSet<>();
 
             String[] line;
@@ -190,7 +269,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         try (CSVReader reader = new CSVReader(Files.newBufferedReader(path))) {
 
-            final Map<String, Integer> fields = this.getFields(reader);
+            final Map<String, Integer> fields = this.getDataDictionary(reader);
             final Set<String> occupations = new HashSet<>();
 
             String[] line;
@@ -218,7 +297,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         try (CSVReader reader = new CSVReader(Files.newBufferedReader(path))) {
 
-            final Map<String, Integer> fieldNames = this.getFields(reader);
+            final Map<String, Integer> fieldNames = this.getDataDictionary(reader);
             String[] line;
 
             while ((line = reader.readNext()) != null) {
@@ -243,95 +322,58 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         }
     }
 
-    @SuppressWarnings("LocalCanBeFinal")
-    private void reactivelyTabulateYoungerPeopleThanEachPerson(final int iteration) throws
-        CsvValidationException, IOException, URISyntaxException {
+    private static class Metrics {
 
-        // Setup our CSV Reader, Data dictionary, and Metrics (personCounts and errorCount)
+        private final List<Throwable> errors;
+        private volatile int requests;
 
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-        final CSVReader reader = new CSVReader(Files.newBufferedReader(path));
-        final Map<String, Integer> dataDictionary;
-
-        try {
-            dataDictionary = this.getFields(reader);
-        } catch (Throwable error) {
-            reader.close();
-            throw error;
+        public Metrics() {
+            this.errors = new ArrayList<>();
+            this.requests = 0;
         }
 
-        class Counts {
-            public int youngerPeople = 0;
-            public int requests = 0;
-            public int errors = 0;
+        public synchronized void addError(final Throwable error) {
+            this.errors.add(error);
         }
 
-        final ConcurrentMap<Person, Counts> personCounts = new ConcurrentHashMap<>();
-        final AtomicInteger errorCount = new AtomicInteger();
+        public synchronized void incrementRequests() {
+            ++this.requests;
+        }
 
-        Flux.fromIterable(reader).map(line -> {
+        public synchronized MetricsSnapshot snapshot() {
+            return new MetricsSnapshot(this);
+        }
 
-            final Person person = new Person(
-                new PersonId(
-                    line[dataDictionary.get("first_name")],
-                    LocalDateTime.parse(line[dataDictionary.get("birth_date")]),
-                    UUID.fromString(line[dataDictionary.get("uuid")])),
-                line[dataDictionary.get("last_name")],
-                line[dataDictionary.get("occupation")]);
+        @Override
+        public String toString() {
 
-            final LocalDateTime date = person.getId().getBirthDate();
-            final Flux<Person> youngerPeople = this.reactivePersonRepository.findByIdBirthDateGreaterThan(date);
+            final MetricsSnapshot snapshot = this.snapshot();
 
-            personCounts.compute(person, (p, c) -> {
-                if (c == null) {
-                    c = new Counts();
-                }
-                c.requests++;
-                return c;
-            });
+            return "{errors: {count:" + snapshot.errors.size() + ", list:" + snapshot.errors + "},requests:"
+                + snapshot.requests + "}";
+        }
+    }
 
-            return new Object[] { person, youngerPeople };
+    private static class MetricsSnapshot {
 
-        }).doAfterTerminate(() -> {
+        private final List<Throwable> errors;
+        private final int requests;
 
-            boolean success;
+        private MetricsSnapshot(final Metrics that) {
+            this.errors = Collections.unmodifiableList(new ArrayList<>(that.errors));
+            this.requests = that.requests;
+        }
 
-            try {
-                success = reader.readNext() == null && errorCount.get() == 0;
-                reader.close();
-            } catch (Throwable error) {
-                success = false;
-            }
+        public int getErrorCount() {
+            return this.errors.size();
+        }
 
-            System.out.println("iteration: " + iteration
-                + ", success: " + success
-                + ", personCount: " + personCounts.size()
-                + ", errorCount: " + errorCount.get());
+        public List<Throwable> getErrors() {
+            return this.errors;
+        }
 
-        }).parallel().runOn(Schedulers.parallel()).subscribe(args -> {
-
-            final Person person = (Person) args[0];
-            final Flux<?> youngerPeople = (Flux<?>) args[1];
-
-            youngerPeople.subscribe(
-                youngerPerson -> {
-                    System.out.println(person + " is older than " + youngerPerson);
-                    personCounts.compute(person, (p, c) -> {
-                        Objects.requireNonNull(c, "expected non-null counts for " + person);
-                        c.youngerPeople++;
-                        return c;
-                    });
-                },
-                error -> {
-                    System.out.println("Iteration " + iteration + ": failed to find people younger than " + person
-                        + " due to " + error);
-                    personCounts.compute(person, (p, c) -> {
-                        Objects.requireNonNull(c, "expected non-null counts for " + person);
-                        c.errors++;
-                        return c;
-                    });
-                    errorCount.incrementAndGet();
-                });
-        });
+        public int getRequests() {
+            return this.requests;
+        }
     }
 }
