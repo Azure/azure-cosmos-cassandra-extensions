@@ -14,7 +14,7 @@ import java.util.Objects;
  * Represents a {@linkplain Person person} identified by {@link PersonId} in a table of people.
  */
 @Table("people")
-public class Person implements Serializable {
+public class Person implements Comparable<Person>, Serializable {
 
     // region Fields
 
@@ -80,6 +80,11 @@ public class Person implements Serializable {
     // endregion
 
     // region Methods
+
+    @Override
+    public int compareTo(final Person other) {
+        return this.id.compareTo(other.id);
+    }
 
     @Override
     public boolean equals(final Object other) {

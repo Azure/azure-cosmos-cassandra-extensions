@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,8 +30,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.StreamSupport;
@@ -72,19 +76,83 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
      *
      * @param args a variable argument list.
      */
+    @SuppressWarnings("unchecked")
     @SuppressFBWarnings("DM_EXIT")
     @Override
     public void run(final String... args) {
 
         try {
-            this.importData();
+            //            this.importData();
             //            this.tabulatePeopleWithSameLastName();
             //            this.tabulatePeopleWithSameFirstName();
             //            this.tabulatePeopleWithSameOccupation();
             //            this.tabulateYoungerPeopleThanEachPerson();
-            for (int iteration = 1; iteration <= 100; iteration++) {
-                this.reactivelyTabulateYoungerPeopleThanEachPerson(iteration);
+
+            this.reactivelyImportData();
+
+            final CompletableFuture<Map<Person, ?>[]>[] iterations =
+                (CompletableFuture<Map<Person, ?>[]>[]) Array.newInstance(CompletableFuture.class, 1000);
+
+            for (int i = 0; i < iterations.length; i++) {
+                iterations[i] = this.reactivelyTabulateYoungerPeopleThanEachPerson(i);
             }
+
+            CompletableFuture.allOf(iterations).whenComplete((result, error) -> {
+
+                if (error != null) {
+                    System.out.println("failed due to " + error);
+                    System.exit(1);
+                }
+
+                for (int i = 0; i < iterations.length; i++) {
+
+                    if (iterations[i].isCompletedExceptionally()) {
+                        continue;
+                    }
+
+                    final Map<Person, ?>[] results = Objects.requireNonNull(iterations[i].getNow(null));
+                    final Map<Person, List<Person>> youngerPeople = (Map<Person, List<Person>>) results[0];
+                    final Map<Person, Metrics> requestMetrics = (Map<Person, Metrics>) results[1];
+
+                    System.out.println("----------------------------");
+                    System.out.println("Y O U N G E R  P E O P L E");
+                    System.out.println("----------------------------");
+
+                    System.out.printf("Iteration %03d%n%n", i);
+                    int j = 0;
+
+                    for (final Map.Entry<Person, List<Person>> entry : youngerPeople.entrySet()) {
+
+                        System.out.printf("Elder-%03d. %s%n", ++j, entry.getKey());
+                        int k = 0;
+
+                        for (final Person younger : entry.getValue()) {
+                            System.out.printf("  Younger-%03d. %s%n", ++k, younger);
+                        }
+                    }
+
+                    System.out.println("----------------------------");
+                    System.out.println("R E Q U E S T  M E T R I C S");
+                    System.out.println("----------------------------");
+
+                    System.out.println("{"
+                        + "iteration:" + i
+                        + ",requestsSent:" + requestMetrics.size()
+                        + ",errorsReceived:" + Flux.fromIterable(requestMetrics.values())
+                        .reduce(0, (subtotal, metrics) -> subtotal + metrics.snapshot().getErrorCount()).block()
+                        + "}");
+
+                    int number = 0;
+
+                    for (final Map.Entry<Person, Metrics> entry : requestMetrics.entrySet()) {
+                        System.out.println(
+                            "{number:" + ++number + ",person:" + entry.getKey() + ",metrics:" + entry.getValue() + "}");
+                    }
+                }
+
+                System.exit(0);
+            });
+
         } catch (final Throwable error) {
             System.out.print("Application failed due to: ");
             error.printStackTrace();
@@ -128,8 +196,55 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         }
     }
 
-    @SuppressWarnings("LocalCanBeFinal")
-    private void reactivelyTabulateYoungerPeopleThanEachPerson(final int iteration)
+    private void reactivelyImportData() throws IOException, URISyntaxException, CsvValidationException {
+
+        // Setup our CSV Reader, Data dictionary, and Metrics (personCounts and errorCount)
+
+        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
+        final CSVReader reader = new CSVReader(Files.newBufferedReader(path));
+        final Map<String, Integer> dataDictionary;
+
+        try {
+            dataDictionary = this.getDataDictionary(reader);
+        } catch (final Throwable error) {
+            reader.close();
+            throw error;
+        }
+
+        // Process each person represented in the data set
+
+        // One might be tempted to use Flux.fromIterable, but that would be a mistake:
+        // * CSVReader is an Iterable that cannot be reused and Flux.fromIterable depends on this guarantee. It calls
+        //   Iterable.spliterator twice starting out and this causes a read past the first record in our sample data.
+        //   Consult the Flux.fromIterable code for specifics.
+        // * Flux.fromStream guarantees that our reader will be closed when our operation is complete, regardless of
+        //   how the operation finishes.
+
+        final Optional<Integer> recordCount = Flux.fromStream(StreamSupport.stream(reader.spliterator(), false))
+            .flatMap(
+                line -> {
+
+                    final Person person = new Person(
+                        new PersonId(
+                            line[dataDictionary.get("first_name")],
+                            LocalDateTime.parse(line[dataDictionary.get("birth_date")]),
+                            UUID.fromString(line[dataDictionary.get("uuid")])),
+                        line[dataDictionary.get("last_name")],
+                        line[dataDictionary.get("occupation")]);
+
+                    return this.reactivePersonRepository.insert(person)
+                        .doOnError(error -> System.out.println("failed to insert " + person + " due to " + error));
+
+                })
+            .parallel().runOn(Schedulers.parallel())
+            .sequential().reduce(0, (subtotal, person) -> subtotal + 1)
+            .blockOptional();
+
+        System.out.println("Imported " + recordCount.orElse(0) + " person records from " + path);
+    }
+
+    @SuppressWarnings({ "LocalCanBeFinal", "unchecked" })
+    private CompletableFuture<Map<Person, ?>[]> reactivelyTabulateYoungerPeopleThanEachPerson(final int iteration)
         throws IOException, URISyntaxException {
 
         // Setup our CSV Reader, Data dictionary, and Metrics (personCounts and errorCount)
@@ -146,6 +261,8 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         }
 
         final ConcurrentMap<Person, Metrics> requestMetrics = new ConcurrentHashMap<>();
+        final ConcurrentMap<Person, List<Person>> results = new ConcurrentHashMap<>();
+        final CompletableFuture<Map<Person, ?>[]> future = new CompletableFuture<>();
 
         // Process each person represented in the data set
 
@@ -177,37 +294,24 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
                 return metrics;
             });
 
-            return youngerPeople.map(younger -> new Object[] { elder, younger })
-                .parallel()
-                .runOn(Schedulers.parallel())
+            return youngerPeople.collectSortedList()
+                .map(sortedList -> new Object[] { elder, sortedList })
                 .doOnError(error -> requestMetrics.get(elder).addError(error));
 
-        }).subscribe(
-            result -> {
-                System.out.println("next: {elder:" + result[0] + ",younger:" + result[1] + "}");
-            },
-            error -> {
-                System.out.println("error: '" + error + "'");
-            },
+        }).parallel().runOn(Schedulers.parallel()).subscribe(
+            result ->
+                results.compute((Person) result[0], (elder, youngerPeople) -> (List<Person>) result[1]),
+            error ->
+                System.out.println("Iteration " + iteration + " error: '" + error + "'"),
             () -> {
-                System.out.println("----------------------------");
-                System.out.println("R E Q U E S T  M E T R I C S");
-                System.out.println("----------------------------");
-
-                System.out.println("{"
-                    + "iteration:" + iteration
-                    + ",recordsRead:" + (reader.getLinesRead() - 1)
-                    + ",requestsProcessed:" + requestMetrics.size()
-                    + "}");
-
-                int number = 0;
-
-                for (Map.Entry<Person, Metrics> entry : requestMetrics.entrySet()) {
-                    System.out.println(
-                        "{number:" + ++number + ",person:" + entry.getKey() + ",metrics:" + entry.getValue() + "}");
-                }
+                Map<Person, ?>[] value = (Map<Person, ?>[]) Array.newInstance(Map.class, 2);
+                value[0] = results;
+                value[1] = requestMetrics;
+                future.complete(value);
             }
         );
+
+        return future;
     }
 
     @SuppressWarnings("LocalCanBeFinal")

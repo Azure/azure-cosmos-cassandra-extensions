@@ -8,6 +8,7 @@ import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -19,7 +20,7 @@ import static org.springframework.data.cassandra.core.cql.PrimaryKeyType.PARTITI
  * birth, and a UUID. This enables fast lookups of a person by first name and data of birth, or UUID.
  */
 @PrimaryKeyClass
-public class PersonId implements Serializable {
+public class PersonId implements Comparable<PersonId>, Serializable {
 
     // region Fields
 
@@ -85,6 +86,24 @@ public class PersonId implements Serializable {
     // endregion
 
     // region Methods
+
+    @Override
+    public int compareTo(final PersonId other) {
+
+        int result = this.birthDate.compareTo(other.birthDate);
+
+        if (result != 0) {
+            return result;
+        }
+
+        result = this.firstName.compareTo(other.firstName);
+
+        if (result != 0) {
+            return result;
+        }
+
+        return this.uuid.compareTo(other.uuid);
+    }
 
     @Override
     public boolean equals(final Object other) {
