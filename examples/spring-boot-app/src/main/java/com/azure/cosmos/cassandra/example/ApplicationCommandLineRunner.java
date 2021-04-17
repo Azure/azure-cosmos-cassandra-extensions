@@ -4,8 +4,6 @@
 package com.azure.cosmos.cassandra.example;
 
 import com.azure.cosmos.cassandra.example.data.Person;
-import com.azure.cosmos.cassandra.example.data.PersonId;
-import com.azure.cosmos.cassandra.example.data.PersonRepository;
 import com.azure.cosmos.cassandra.example.data.ReactivePersonRepository;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
@@ -32,14 +30,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -52,19 +46,14 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(ApplicationCommandLineRunner.class);
 
-    private final PersonRepository personRepository;
     private final ReactivePersonRepository reactivePersonRepository;
 
     /**
      * Initializes a new instance of the {@link ApplicationCommandLineRunner application}.
      *
-     * @param personRepository a reference to a repository instance containing people.
+     * @param reactivePersonRepository a reference to a repository instance containing people.
      */
-    public ApplicationCommandLineRunner(
-        @Autowired final PersonRepository personRepository,
-        @Autowired final ReactivePersonRepository reactivePersonRepository) {
-
-        this.personRepository = personRepository;
+    public ApplicationCommandLineRunner(@Autowired final ReactivePersonRepository reactivePersonRepository) {
         this.reactivePersonRepository = reactivePersonRepository;
     }
 
@@ -74,7 +63,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
      * @param args an array of arguments.
      */
     public static void main(final String[] args) {
-        SpringApplication.run(ApplicationCommandLineRunner.class);
+        SpringApplication.run(ApplicationCommandLineRunner.class, args);
     }
 
     /**
@@ -83,79 +72,57 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
      *
      * @param args a variable argument list.
      */
-    @SuppressWarnings("unchecked")
     @SuppressFBWarnings("DM_EXIT")
     @Override
     public void run(final String... args) {
 
         try {
-            //            this.importData();
-            //            this.tabulatePeopleWithSameLastName();
-            //            this.tabulatePeopleWithSameFirstName();
-            //            this.tabulatePeopleWithSameOccupation();
-            //            this.tabulateYoungerPeopleThanEachPerson();
+            final int iterations = args.length == 0 ? 1 : Integer.parseUnsignedInt(args[0]);
+            MetricsSnapshot metricsSnapshot;
+            int errorCount = 0;
 
-            this.reactivelyImportData();
-            this.reactivelyTabulatePeopleYoungerThanEachPerson(1);
+            metricsSnapshot = this.importData();
+            errorCount += metricsSnapshot.getErrorCount();
+            System.out.println("Import request metrics: " + metricsSnapshot);
 
-            System.exit(0);
+            metricsSnapshot = this.tabulatePeopleYoungerThanEachPerson(iterations);
+            errorCount += metricsSnapshot.getErrorCount();
+            System.out.println("Tabulation request metrics: " + metricsSnapshot);
+
+            System.exit(errorCount == 0 ? 0 : 1);
 
         } catch (final Throwable error) {
             System.out.print("Application failed due to: ");
             error.printStackTrace();
-            System.exit(1);
+            System.exit(2);
         }
     }
 
-    @SuppressWarnings("LocalCanBeFinal")
-    private void importData() throws IOException, URISyntaxException, CsvValidationException {
-
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-
-        try (CsvRecordReader reader = new CsvRecordReader(path)) {
-
-            final Set<String> firstNames = new HashSet<>();
-
-            for (Map<String, String> row : reader) {
-
-                final Person person = new Person(
-                    new PersonId(
-                        row.get("first_name"),
-                        LocalDateTime.parse(row.get("birth_date")),
-                        UUID.fromString(row.get("uuid"))),
-                    row.get("last_name"),
-                    row.get("occupation"));
-
-                this.personRepository.insert(person);
-            }
-        }
-    }
-
-    private void reactivelyImportData() throws IOException, URISyntaxException, CsvValidationException {
+    private MetricsSnapshot importData() throws IOException, URISyntaxException, CsvValidationException {
 
         // Process each person represented in the data set
 
         final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
         final CsvRecordReader reader = new CsvRecordReader(path);
+        final Metrics metrics = new Metrics();
 
         final Optional<Integer> recordCount = Flux.fromStream(reader.stream()).flatMap(
             record -> {
-                final Person person = new Person(record);
-                return this.reactivePersonRepository
-                    .insert(person)
-                    .doOnError(error -> LOG.error("Failed to insert {} due to:", person, error));
+                final Person person = Person.from(record);
+                return this.reactivePersonRepository.insert(person)
+                    .doOnSuccess(insertedPerson -> metrics.incrementRequests())
+                    .doOnError(error -> LOG.error("Failed to insert {} due to:", person, metrics.addError(error)));
             })
             .parallel().runOn(Schedulers.parallel())
             .sequential().reduce(0, (subtotal, person) -> subtotal + 1).blockOptional();
 
-        System.out.println("Imported " + recordCount.orElse(0) + " person records from " + path);
+        return metrics.snapshot();
     }
 
     @SuppressWarnings({ "Convert2MethodRef", "LocalCanBeFinal", "unchecked" })
-    private void reactivelyTabulatePeopleYoungerThanEachPerson(final int iterations) {
+    private MetricsSnapshot tabulatePeopleYoungerThanEachPerson(final int iterations) {
 
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        Mono<?> complete = Mono.fromFuture(future);
+        final Metrics metrics = new Metrics();
 
         Flux.range(1, iterations).concatMap(iteration -> {
 
@@ -170,16 +137,17 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
             return Flux.fromStream(reader.stream()).flatMap(record -> {
 
-                final Person elder = new Person(record);
+                final Person elder = Person.from(record);
                 final LocalDateTime date = elder.getId().getBirthDate();
                 final Flux<Person> youngerPeople = this.reactivePersonRepository.findByIdBirthDateGreaterThan(date);
 
                 return youngerPeople.collectSortedList()
                     .map(sortedList -> Tuples.of(elder, sortedList))
-                    .doOnError(error -> LOG.error("[Iteration {}]failed to tabulate results for {} due to:",
+                    .doOnSuccess(person -> metrics.incrementRequests())
+                    .doOnError(error -> LOG.error("[Iteration {}] failed to tabulate results for {} due to:",
                         iteration,
                         elder,
-                        error));
+                        metrics.addError(error)));
 
             }).parallel().runOn(Schedulers.parallel()).sequential().collect(
 
@@ -187,143 +155,37 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
                     new ConcurrentHashMap<Person, List<Person>>(),
 
                 (concurrentMap, elderYoungerPeople) -> concurrentMap.compute(
-                    (Person) elderYoungerPeople.getT1(),
-                    (elder, youngerPeople) -> (List<Person>) elderYoungerPeople.getT2())
+                    elderYoungerPeople.getT1(),
+                    (elder, youngerPeople) -> elderYoungerPeople.getT2())
 
             ).map(concurrentMap -> Tuples.of(iteration, Collections.unmodifiableMap(concurrentMap)));
 
-        }).subscribe(
+        }).cast(Tuple2.class).reduce(0, (subtotal, result) -> {
 
-            result -> {
+            final int iteration = (int) result.getT1();
+            final Map<Person, List<Person>> youngerPeople = (Map<Person, List<Person>>) result.getT2();
 
-                final Tuple2<Integer, Map<Person, List<Person>>> item = (Tuple2<Integer, Map<Person, List<Person>>>) result;
-                final int iteration = item.getT1();
-                final Map<Person, List<Person>> youngerPeople = item.getT2();
+            System.out.println("----------------------------");
+            System.out.println("Y O U N G E R  P E O P L E");
+            System.out.println("----------------------------");
 
-                System.out.println("----------------------------");
-                System.out.println("Y O U N G E R  P E O P L E");
-                System.out.println("----------------------------");
+            System.out.printf("Iteration: %03d, people: %d%n%n", iteration, youngerPeople.size());
+            int i = 0;
 
-                System.out.printf("Iteration: %03d, people: %d%n%n", iteration, youngerPeople.size());
-                int i = 0;
+            for (final Map.Entry<Person, List<Person>> entry : youngerPeople.entrySet()) {
 
-                for (final Map.Entry<Person, List<Person>> entry : youngerPeople.entrySet()) {
+                System.out.printf("Elder-%03d. %s%n", ++i, entry.getKey());
+                int j = 0;
 
-                    System.out.printf("Elder-%03d. %s%n", ++i, entry.getKey());
-                    int j = 0;
-
-                    for (final Person younger : entry.getValue()) {
-                        System.out.printf("  Younger-%03d. %s%n", ++j, younger);
-                    }
-                }
-            },
-            null, () -> future.complete(null));
-
-        complete.block();
-    }
-
-    @SuppressWarnings("LocalCanBeFinal")
-    private void tabulatePeopleWithSameFirstName() throws CsvValidationException, IOException, URISyntaxException {
-
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-
-        try (CsvRecordReader reader = new CsvRecordReader(path)) {
-
-            final Set<String> firstNames = new HashSet<>();
-
-            for (Map<String, String> row : reader) {
-
-                final String firstName = row.get("first_name");
-
-                if (firstNames.add(firstName)) {
-
-                    System.out.println("People with first name: " + firstName);
-
-                    for (final Person person : this.personRepository.findByIdFirstName(firstName)) {
-                        System.out.println("  " + person);
-                    }
+                for (final Person younger : entry.getValue()) {
+                    System.out.printf("  Younger-%03d. %s%n", ++j, younger);
                 }
             }
-        }
-    }
+            return subtotal + 1;
 
-    @SuppressWarnings("LocalCanBeFinal")
-    private void tabulatePeopleWithSameLastName() throws CsvValidationException, IOException, URISyntaxException {
+        }).block();
 
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-
-        try (CsvRecordReader reader = new CsvRecordReader(path)) {
-
-            final Set<String> lastNames = new HashSet<>();
-
-            for (Map<String, String> row : reader) {
-
-                final String lastName = row.get("last_name");
-
-                if (lastNames.add(lastName)) {
-
-                    System.out.println("People with last name: " + lastName);
-
-                    for (final Person person : this.personRepository.findByLastName(lastName)) {
-                        System.out.println("  " + person);
-                    }
-                }
-            }
-        }
-    }
-
-    @SuppressWarnings("LocalCanBeFinal")
-    private void tabulatePeopleWithSameOccupation() throws IOException, URISyntaxException {
-
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-
-        try (CsvRecordReader reader = new CsvRecordReader(path)) {
-
-            final Set<String> occupations = new HashSet<>();
-
-            for (Map<String, String> row : reader) {
-
-                final String occupation = row.get("occupation");
-
-                if (occupations.add(occupation)) {
-
-                    System.out.println("People with occupation: " + occupation);
-
-                    for (final Person person : this.personRepository.findByOccupation(occupation)) {
-                        System.out.println("  " + person);
-                    }
-                }
-            }
-        }
-    }
-
-    @SuppressWarnings("LocalCanBeFinal")
-    private void tabulateYoungerPeopleThanEachPerson() throws IOException, URISyntaxException {
-
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-
-        try (CsvRecordReader reader = new CsvRecordReader(path)) {
-
-            for (Map<String, String> row : reader) {
-
-                final Person person = new Person(
-                    new PersonId(
-                        row.get("first_name"),
-                        LocalDateTime.parse(row.get("birth_date")),
-                        UUID.fromString(row.get("uuid"))),
-                    row.get("last_name"),
-                    row.get("occupation"));
-
-                final LocalDateTime dateTime = person.getId().getBirthDate();
-                final List<Person> youngerPeople = this.personRepository.findByIdBirthDateGreaterThan(dateTime);
-
-                System.out.println("People younger than: " + person);
-
-                for (final Person youngerPerson : youngerPeople) {
-                    System.out.println("  " + youngerPerson);
-                }
-            }
-        }
+        return metrics.snapshot();
     }
 
     private static class CsvRecordReader implements AutoCloseable, Iterable<Map<String, String>> {
@@ -397,12 +259,14 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             this.requests = 0;
         }
 
-        public synchronized void addError(final Throwable error) {
+        public synchronized Throwable addError(final Throwable error) {
             this.errors.add(error);
+            return error;
         }
 
-        public synchronized void incrementRequests() {
-            ++this.requests;
+        @SuppressWarnings("UnusedReturnValue")
+        public synchronized int incrementRequests() {
+            return ++this.requests;
         }
 
         public synchronized MetricsSnapshot snapshot() {
@@ -411,11 +275,8 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         @Override
         public String toString() {
-
             final MetricsSnapshot snapshot = this.snapshot();
-
-            return "{errors: {count:" + snapshot.errors.size() + ", list:" + snapshot.errors + "},requests:"
-                + snapshot.requests + "}";
+            return snapshot.toString();
         }
     }
 
@@ -424,6 +285,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         private final List<Throwable> errors;
         private final int requests;
 
+        @SuppressWarnings("Java9CollectionFactory")
         private MetricsSnapshot(final Metrics that) {
             this.errors = Collections.unmodifiableList(new ArrayList<>(that.errors));
             this.requests = that.requests;
@@ -439,6 +301,12 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         public int getRequests() {
             return this.requests;
+        }
+
+        @Override
+        public String toString() {
+            return
+                "{requests:" + this.requests + ",errors:{count:" + this.errors.size() + ",list:" + this.errors + "}}";
         }
     }
 }
