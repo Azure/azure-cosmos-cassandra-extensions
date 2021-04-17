@@ -83,11 +83,11 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
             metricsSnapshot = this.importData();
             errorCount += metricsSnapshot.getErrorCount();
-            System.out.println("Import request metrics: " + metricsSnapshot);
+            System.out.println("\nImport request metrics: " + metricsSnapshot);
 
             metricsSnapshot = this.tabulatePeopleYoungerThanEachPerson(iterations);
             errorCount += metricsSnapshot.getErrorCount();
-            System.out.println("Tabulation request metrics: " + metricsSnapshot);
+            System.out.println("\nTabulation request metrics: " + metricsSnapshot);
 
             System.exit(errorCount == 0 ? 0 : 1);
 

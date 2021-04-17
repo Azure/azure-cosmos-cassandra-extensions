@@ -146,7 +146,6 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
             : this.growingBackoffTime;
     }
 
-
     protected int getRetryMaxRetries() {
         return this.maxRetries == null
             ? CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class)
@@ -173,7 +172,7 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
     @Override
     @NonNull
     protected List<DropKeyspaceSpecification> getKeyspaceDrops() {
-        return Collections.emptyList(); //Collections.singletonList(DropKeyspaceSpecification.dropKeyspace(this.getKeyspaceName()).ifExists());
+        return Collections.emptyList();
     }
 
     // endregion
