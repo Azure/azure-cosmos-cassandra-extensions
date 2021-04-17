@@ -8,7 +8,10 @@ import org.springframework.data.cassandra.core.mapping.PrimaryKey;
 import org.springframework.data.cassandra.core.mapping.Table;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Represents a {@linkplain Person person} identified by {@link PersonId} in a table of people.
@@ -36,14 +39,29 @@ public class Person implements Comparable<Person>, Serializable {
     /**
      * Initializes a new {@link Person} entity.
      *
-     * @param id the {@linkplain Person person's} ID.
-     * @param lastName the {@linkplain Person person's} last name.
+     * @param id         the {@linkplain Person person's} ID.
+     * @param lastName   the {@linkplain Person person's} last name.
      * @param occupation the {@linkplain Person person's} occupation.
      */
     public Person(final PersonId id, final String lastName, final String occupation) {
         this.id = id;
         this.lastName = lastName;
         this.occupation = occupation;
+    }
+
+    /**
+     * Initializes a new {@link Person} entity.
+     *
+     * @param record a {@linkplain java.util.Map Map} with these string values: {@code "uuid"}, {@code "first_name"},
+     *               {@code "last_name"}, {@code "birth_date"},{@code "occupation"}
+     */
+    public Person(final Map<String, String> record) {
+        this(new PersonId(
+                record.get("first_name"),
+                LocalDateTime.parse(record.get("birth_date")),
+                UUID.fromString(record.get("uuid"))),
+            record.get("last_name"),
+            record.get("occupation"));
     }
 
     // endregion
