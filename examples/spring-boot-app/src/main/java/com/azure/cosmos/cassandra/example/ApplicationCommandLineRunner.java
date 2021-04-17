@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -106,7 +105,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         final CsvRecordReader reader = new CsvRecordReader(path);
         final Metrics metrics = new Metrics();
 
-        final Optional<Integer> recordCount = Flux.fromStream(reader.stream()).flatMap(
+        Flux.fromStream(reader.stream()).flatMap(
             record -> {
                 final Person person = Person.from(record);
                 return this.reactivePersonRepository.insert(person)
@@ -193,7 +192,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         private final String[] header;
         private final CSVReader reader;
 
-        public CsvRecordReader(final Path path) throws IOException {
+        CsvRecordReader(final Path path) throws IOException {
             this.reader = new CSVReader(Files.newBufferedReader(path));
             this.header = this.reader.readNextSilently();
         }
@@ -219,7 +218,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             return StreamSupport.stream(this.spliterator(), false);
         }
 
-        private static class CsvIterator implements Iterator<Map<String, String>> {
+        private static final class CsvIterator implements Iterator<Map<String, String>> {
 
             private final String[] header;
             private final Iterator<String[]> iterator;
@@ -254,7 +253,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         private final List<Throwable> errors;
         private volatile int requests;
 
-        public Metrics() {
+        Metrics() {
             this.errors = new ArrayList<>();
             this.requests = 0;
         }
@@ -280,7 +279,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         }
     }
 
-    private static class MetricsSnapshot {
+    private static final class MetricsSnapshot {
 
         private final List<Throwable> errors;
         private final int requests;

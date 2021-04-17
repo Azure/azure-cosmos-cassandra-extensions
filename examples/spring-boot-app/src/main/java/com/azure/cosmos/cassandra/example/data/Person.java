@@ -54,6 +54,8 @@ public class Person implements Comparable<Person>, Serializable {
      *
      * @param record a {@linkplain java.util.Map Map} with these string values: {@code "uuid"}, {@code "first_name"},
      *               {@code "last_name"}, {@code "birth_date"},{@code "occupation"}
+     *
+     * @return a new {@link Person} entity created from a person {@code record}.
      */
     public static Person from(final Map<String, String> record) {
         return new Person(
