@@ -1,12 +1,17 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-package com.azure.cosmos.cassandra;
+package com.azure.cosmos.cassandra.config;
 
+import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicy;
+import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption;
+import com.azure.cosmos.cassandra.CosmosRetryPolicy;
+import com.azure.cosmos.cassandra.CosmosRetryPolicyOption;
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
 import org.springframework.data.cassandra.config.SessionBuilderConfigurer;
@@ -22,8 +27,17 @@ import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.AUTH_P
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.AUTH_PROVIDER_USER_NAME;
 
 /**
- * Base class for configuring a {@link com.datastax.oss.driver.api.core.CqlSession CqlSession} connected to a Cosmos DB
- * Cassandra API instance.
+ * Spring Configuration class used to configure a Cassandra client application {@link
+ * com.datastax.oss.driver.api.core.CqlSession CqlSession} connected to an Azure Cosmos DB Cassandra API instance. In
+ * addition to the capabilities offered by {@link
+ * org.springframework.data.cassandra.config.AbstractCassandraConfiguration AbstractCassandraConfiguration} it enables
+ * you to configure credentials and Cosmos DB aware load balancing and retry policy. Through its dependency on
+ * the {@code azure-cosmos-cassandra-driver-4-extensions} package, it also offers a sensible set of default
+ * {@code datastax-java-driver} options for efficiently accessing a Cosmos DB Cassandra API instance.
+ *
+ * @see CosmosLoadBalancingPolicy
+ * @see CosmosRetryPolicy
+ * @see <a href="https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/develop/java-driver-4/driver-4/">reference.conf</a>
  */
 @Configuration
 public abstract class CosmosCassandraConfiguration extends AbstractCassandraConfiguration {
@@ -50,6 +64,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosLoadBalancingPolicyOption#GLOBAL_ENDPOINT}.
      */
+    @Nullable
     public String getLoadBalancingGlobalEndpoint() {
         return GLOBAL_ENDPOINT.getDefaultValue(String.class);
     }
@@ -59,6 +74,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosLoadBalancingPolicyOption#READ_DATACENTER}.
      */
+    @Nullable
     public String getLoadBalancingReadDatacenter() {
         return READ_DATACENTER.getDefaultValue(String.class);
     }
@@ -68,6 +84,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosLoadBalancingPolicyOption#WRITE_DATACENTER}.
      */
+    @Nullable
     public String getLoadBalancingWriteDatacenter() {
         return WRITE_DATACENTER.getDefaultValue(String.class);
     }
@@ -89,6 +106,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
     protected abstract String getAuthUsername();
 
     @Override
+    @Nullable
     protected String getLocalDataCenter() {
         return null;
     }
@@ -133,6 +151,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
     }
 
     @Override
+    @Nullable
     protected SessionBuilderConfigurer getSessionBuilderConfigurer() {
         return new CosmosCassandraSessionBuilderConfigurer(this);
     }

@@ -3,7 +3,7 @@
 
 package com.azure.cosmos.cassandra.example;
 
-import com.azure.cosmos.cassandra.CosmosCassandraConfiguration;
+import com.azure.cosmos.cassandra.config.CosmosCassandraConfiguration;
 import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption;
 import com.azure.cosmos.cassandra.CosmosRetryPolicyOption;
 import edu.umd.cs.findbugs.annotations.NonNull;

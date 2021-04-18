@@ -1,16 +1,21 @@
 # Known issues
 
-This file describes known issues in Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra version 0.0.1-beta.2.
+This file describes known issues in Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra version 
+0.0.1-beta.2.
 
 ## Hostname verification fails when accessing a multi-region Cosmos Cassandra API instance.
 
-You must disable hostname verification when accessing a multi-region Cosmos Cassandra API instance with this package. Code that uses raw TLS without doing a server identity check is insecure. It allows man-in-the-middle (MITM) attacks by anyone who can obtain a certificate from a trusted root CA. 
+You must disable hostname verification when accessing a multi-region Cosmos Cassandra API instance with this package. 
+Code that uses raw TLS without doing a server identity check is insecure. It allows man-in-the-middle (MITM) attacks 
+by anyone who can obtain a certificate from a trusted root CA. 
 
-We will address this issue before exiting beta. Until then exercise caution when hostname verification is turned off. We provide a mitigation here.
+We will address this issue before exiting beta. Until then exercise caution when hostname verification is turned off. We 
+provide a mitigation here.
 
 ### Mitigation
 
-Disable hostname verification and use a custom trust store that contains only the certificates you need to run your app. This would include the certificate for your multi-region Cosmos Cassandra API instance.
+Disable hostname verification and use a custom trust store that contains only the certificates you need to run your 
+app. This would include the certificate for your multi-region Cosmos Cassandra API instance.
 
 Do this by setting these values in your `application.conf`:
 ```yml

@@ -7,9 +7,9 @@ Licensed under the MIT License.
 
   <modelVersion>4.0.0</modelVersion>
 
-  <name>Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra</name>
+  <name>Azure Cosmos Extensions for Apache Cassandra</name>
   <description>
-    Extends the DataStax Java Driver 4 for Apache Cassandra client library with Azure Cosmos awareness features.
+    Extends Apache Cassandra client libraries with Azure Cosmos awareness features.
   </description>
   <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
 
@@ -37,7 +37,8 @@ Licensed under the MIT License.
   </licenses>
 
   <modules>
-    <module>package</module>
+    <module>driver-4</module>
+    <module>spring-data</module>
     <module>examples/java-driver-app</module>
     <module>examples/spring-boot-app</module>
   </modules>
@@ -48,6 +49,7 @@ Licensed under the MIT License.
     <!-- Package dependency version numbers -->
     <version.cassandra-driver>[4.7,4.11)</version.cassandra-driver>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
+    <version.spring-data-cassandra>[3.2,3.3)</version.spring-data-cassandra>
     <!-- Examples dependency version numbers -->
     <version.spring-boot-starter-data-cassandra>[2.4.4]</version.spring-boot-starter-data-cassandra>
     <!-- Test dependency version numbers -->
@@ -69,6 +71,11 @@ Licensed under the MIT License.
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-cosmos-cassandra-spring-data-extensions</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -115,6 +122,11 @@ Licensed under the MIT License.
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-data-cassandra</artifactId>
         <version>${version.spring-boot-starter-data-cassandra}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.data</groupId>
+        <artifactId>spring-data-cassandra</artifactId>
+        <version>${version.spring-data-cassandra}</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
