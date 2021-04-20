@@ -22,10 +22,10 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,7 +44,6 @@ import java.util.stream.StreamSupport;
 public class ApplicationCommandLineRunner implements CommandLineRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(ApplicationCommandLineRunner.class);
-
     private final ReactivePersonRepository reactivePersonRepository;
 
     /**
@@ -78,21 +77,26 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         try {
             final int iterations = args.length == 0 ? 1 : Integer.parseUnsignedInt(args[0]);
             MetricsSnapshot metricsSnapshot;
+            int requestCount = 0;
             int errorCount = 0;
 
             metricsSnapshot = this.importData();
             errorCount += metricsSnapshot.getErrorCount();
+            requestCount += metricsSnapshot.getRequestCount();
             System.out.println("\nImport request metrics: " + metricsSnapshot);
 
             metricsSnapshot = this.tabulatePeopleYoungerThanEachPerson(iterations);
             errorCount += metricsSnapshot.getErrorCount();
+            requestCount += metricsSnapshot.getRequestCount();
             System.out.println("\nTabulation request metrics: " + metricsSnapshot);
 
+            LOG.info("Requests: {}, Errors: {}", requestCount, errorCount);
             System.exit(errorCount == 0 ? 0 : 1);
 
         } catch (final Throwable error) {
-            System.out.print("Application failed due to: ");
+            System.out.print("Application startup failed due to: ");
             error.printStackTrace();
+            LOG.error("Application startup failed due to: ", error);
             System.exit(2);
         }
     }
@@ -101,19 +105,28 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
 
         // Process each person represented in the data set
 
-        final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-        final CsvRecordReader reader = new CsvRecordReader(path);
+        final InputStream stream = ApplicationCommandLineRunner.class
+            .getClassLoader()
+            .getResourceAsStream("people.csv");
+
+        final CsvRecordReader reader = new CsvRecordReader(stream);
         final Metrics metrics = new Metrics();
 
-        Flux.fromStream(reader.stream()).flatMap(
-            record -> {
-                final Person person = Person.from(record);
-                return this.reactivePersonRepository.insert(person)
-                    .doOnSuccess(insertedPerson -> metrics.incrementRequests())
-                    .doOnError(error -> LOG.error("Failed to insert {} due to:", person, metrics.addError(error)));
-            })
-            .parallel().runOn(Schedulers.parallel())
-            .sequential().reduce(0, (subtotal, person) -> subtotal + 1).blockOptional();
+        Flux.fromStream(reader.stream())
+            .flatMap(
+                record -> {
+                    final Person person = Person.from(record);
+                    return this.reactivePersonRepository.insert(person)
+                        .doOnSuccess(insertedPerson -> metrics.incrementRequests())
+                        .doOnError(error ->
+                            LOG.error("Request to insert {} failed due to:", person, metrics.addError(error)));
+                })
+            .parallel()
+            .runOn(Schedulers.parallel())
+            .doOnError(error -> LOG.error("Insert failed due to: ", error))
+            .sequential()
+            .reduce(0, (subtotal, person) -> subtotal + 1)
+            .blockOptional();
 
         return metrics.snapshot();
     }
@@ -128,8 +141,10 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             final CsvRecordReader reader;
 
             try {
-                final Path path = Paths.get(ClassLoader.getSystemResource("people.csv").toURI());
-                reader = new CsvRecordReader(path);
+                final InputStream stream = ApplicationCommandLineRunner.class
+                    .getClassLoader()
+                    .getResourceAsStream("people.csv");
+                reader = new CsvRecordReader(stream);
             } catch (Throwable error) {
                 return Mono.just(error);
             }
@@ -192,8 +207,8 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
         private final String[] header;
         private final CSVReader reader;
 
-        CsvRecordReader(final Path path) throws IOException {
-            this.reader = new CSVReader(Files.newBufferedReader(path));
+        CsvRecordReader(final InputStream inputStream) throws IOException {
+            this.reader = new CSVReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
             this.header = this.reader.readNextSilently();
         }
 
@@ -298,7 +313,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             return this.errors;
         }
 
-        public int getRequests() {
+        public int getRequestCount() {
             return this.requests;
         }
 

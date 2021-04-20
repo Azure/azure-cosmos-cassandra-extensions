@@ -12,9 +12,13 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
 import org.springframework.data.cassandra.config.SessionBuilderConfigurer;
+
+import java.util.Arrays;
 
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.DNS_EXPIRY_TIME;
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT;
@@ -29,21 +33,24 @@ import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.AUTH_P
 /**
  * Spring Configuration class used to configure a Cassandra client application {@link
  * com.datastax.oss.driver.api.core.CqlSession CqlSession} connected to an Azure Cosmos DB Cassandra API instance. In
- * addition to the capabilities offered by {@link
- * org.springframework.data.cassandra.config.AbstractCassandraConfiguration AbstractCassandraConfiguration} it enables
- * you to configure credentials and Cosmos DB aware load balancing and retry policy. Through its dependency on
- * the {@code azure-cosmos-cassandra-driver-4-extensions} package, it also offers a sensible set of default
- * {@code datastax-java-driver} options for efficiently accessing a Cosmos DB Cassandra API instance.
+ * addition to the capabilities offered by
+ * {@link org.springframework.data.cassandra.config.AbstractCassandraConfiguration
+ * AbstractCassandraConfiguration} it enables you to configure credentials and Cosmos DB aware load balancing and retry
+ * policy. Through its dependency on the {@code azure-cosmos-cassandra-driver-4-extensions} package, it also offers a
+ * sensible set of default {@code datastax-java-driver} options for efficiently accessing a Cosmos DB Cassandra API
+ * instance.
  *
  * @see CosmosLoadBalancingPolicy
  * @see CosmosRetryPolicy
- * @see <a href="https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/develop/java-driver-4/driver-4/">reference.conf</a>
+ * @see
+ * <a href="https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/develop/java-driver-4/driver-4/">reference.conf</a>
  */
 @Configuration
 public abstract class CosmosCassandraConfiguration extends AbstractCassandraConfiguration {
 
     // region Fields
 
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraConfiguration.class);
     private static final int PORT = 10350;
 
     // endregion
@@ -87,6 +94,30 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
     @Nullable
     public String getLoadBalancingWriteDatacenter() {
         return WRITE_DATACENTER.getDefaultValue(String.class);
+    }
+
+    @Override
+    public String toString() {
+
+        final char[] password = new char[this.getAuthPassword().length()];
+        Arrays.fill(password, '*');
+
+        return "azure.cosmos.cassandra:\n"
+            + "  base-packages: " + Arrays.toString(this.getEntityBasePackages()) + '\n'
+            + "  keyspace: " + this.getKeyspaceName() + '\n'
+            + "  contact-point: " + this.getContactPoints() + '\n'
+            + "  auth-provider: \n"
+            + "    username: " + this.getAuthUsername() + '\n'
+            + "    password: " + new String(password) + '\n'
+            + "  load-balancing-policy:\n"
+            + "    dns-expiry-time: " + this.getLoadBalancingDnsExpiryTime() + '\n'
+            + "    global-endpoint: " + this.getLoadBalancingGlobalEndpoint() + '\n'
+            + "    read-datacenter: " + this.getLoadBalancingReadDatacenter() + '\n'
+            + "    write-datacenter: " + this.getLoadBalancingWriteDatacenter() + '\n'
+            + "  retry-policy:\n"
+            + "     max-retries: " + this.getRetryMaxRetries() + '\n'
+            + "     fixed-backoff-time: " + this.getRetryFixedBackoffTime() + '\n'
+            + "     growing-backoff-time: " + this.getRetryGrowingBackoffTime();
     }
 
     /**
@@ -172,20 +203,32 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
         @NonNull
         public CqlSessionBuilder configure(final CqlSessionBuilder builder) {
 
+            LOG.debug("{}({})", this.configuration.getClass().getName(), this.configuration);
+
             return builder.withConfigLoader(DriverConfigLoader.programmaticBuilder()
+
                 // Credentials
+
                 .withString(AUTH_PROVIDER_USER_NAME, this.configuration.getAuthUsername())
                 .withString(AUTH_PROVIDER_PASSWORD, this.configuration.getAuthPassword())
+
                 // Load balancing policy options
+
                 .withInt(DNS_EXPIRY_TIME, this.configuration.getLoadBalancingDnsExpiryTime())
-                .withString(GLOBAL_ENDPOINT, this.configuration.getLoadBalancingGlobalEndpoint())
-                .withString(READ_DATACENTER, this.configuration.getLoadBalancingReadDatacenter())
-                .withString(WRITE_DATACENTER, this.configuration.getLoadBalancingWriteDatacenter())
+                .withString(GLOBAL_ENDPOINT, nonNullOrElse(this.configuration.getLoadBalancingGlobalEndpoint(), ""))
+                .withString(READ_DATACENTER, nonNullOrElse(this.configuration.getLoadBalancingReadDatacenter(), ""))
+                .withString(WRITE_DATACENTER, nonNullOrElse(this.configuration.getLoadBalancingWriteDatacenter(), ""))
+
                 // Retry policy options
+
                 .withInt(MAX_RETRIES, this.configuration.getRetryMaxRetries())
                 .withInt(FIXED_BACKOFF_TIME, this.configuration.getRetryFixedBackoffTime())
                 .withInt(GROWING_BACKOFF_TIME, this.configuration.getRetryGrowingBackoffTime())
                 .build());
+        }
+
+        private static <T> T nonNullOrElse(final T value, final T defaultValue) {
+            return value != null ? value : defaultValue;
         }
     }
 

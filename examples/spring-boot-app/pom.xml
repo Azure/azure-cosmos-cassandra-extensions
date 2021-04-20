@@ -23,6 +23,10 @@ Licensed under the MIT License.
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
+  <properties>
+    <main-class>com.azure.cosmos.cassandra.example.ApplicationCommandLineRunner</main-class>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.azure</groupId>
@@ -46,28 +50,31 @@ Licensed under the MIT License.
       <artifactId>spring-boot-starter-data-cassandra</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
     <plugins>
       <plugin>
-        <artifactId>maven-assembly-plugin</artifactId>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
-          <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
-          </descriptorRefs>
-          <archive>
-            <manifest>
-              <mainClass>com.azure.cosmos.cassandra.example.ApplicationCommandLineRunner</mainClass>
-            </manifest>
-          </archive>
+          <mainClass>${main-class}</mainClass>
+          <fork>true</fork>
         </configuration>
         <executions>
           <execution>
-            <id>make-assembly</id>
-            <phase>package</phase>
             <goals>
-              <goal>single</goal>
+              <goal>repackage</goal>
             </goals>
           </execution>
         </executions>

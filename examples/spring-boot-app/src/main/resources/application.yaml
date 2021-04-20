@@ -25,7 +25,7 @@ cosmos.cassandra:
     #   Alternatively, set the environment variables referenced here to match the topology and preferences for your
     #   Cosmos DB Cassandra API instance.
 
-    global-endpoint: ${AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT}
+    global-endpoint: ${AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT:}
     read-datacenter: ${AZURE_COSMOS_CASSANDRA_READ_DATACENTER:}
     write-datacenter: ${AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER:}
 
@@ -34,7 +34,7 @@ cosmos.cassandra:
 
 logging:
   file:
-    name: ${user.home}/.local/var/log/azure-cosmos-cassandra-driver-4.log
+    name: ${AZURE_COSMOS_CASSANDRA_LOG_FILE:${user.home}/.local/var/log/azure-cosmos-cassandra-spring-data.log}
   logback:
     rollingpolicy:
       max-file-size: 10GB

@@ -54,6 +54,7 @@ Licensed under the MIT License.
     <version.spring-boot-starter-data-cassandra>[2.4.4]</version.spring-boot-starter-data-cassandra>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
+    <version.junit-jupiter>5.7.1</version.junit-jupiter>
     <version.log4j>2.13.3</version.log4j>
     <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
@@ -112,6 +113,11 @@ Licensed under the MIT License.
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${version.assertj-core}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${version.junit-jupiter}</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -191,6 +197,11 @@ Licensed under the MIT License.
           <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
           <version>${version.spotbugs}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>2.4.5</version>
         </plugin>
       </plugins>
     </pluginManagement>
