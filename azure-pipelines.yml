@@ -10,8 +10,6 @@ pr:
 - develop/java-driver-4
 - release/java-driver-4/*
 
-variables:
-
 - name: Log.Filename
   value: $(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4.log
   readonly: true
@@ -22,27 +20,30 @@ variables:
 
 - name: Package.ArgLine
   value: >
-    -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
-    -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
     -Dazure.cosmos.cassandra.contact-point='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
+    -Dazure.cosmos.cassandra.hostname='$(AZURE_COSMOS_CASSANDRA_HOSTNAME)'
+    -Dazure.cosmos.cassandra.port='$(AZURE_COSMOS_CASSANDRA_PORT)'
     -Dazure.cosmos.cassandra.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
     -Dazure.cosmos.cassandra.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
-    -Dazure.cosmos.cassandra.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
+    -Dazure.cosmos.cassandra.global-endpoint='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
+    -Dazure.cosmos.cassandra.regional-endpoints='$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS)'
     -Dazure.cosmos.cassandra.local-datacenter='$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)'
     -Dazure.cosmos.cassandra.read-datacenter='$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)'
     -Dazure.cosmos.cassandra.write-datacenter='$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)'
-    -Dazure.cosmos.cassandra.nodes='$(AZURE_COSMOS_CASSANDRA_NODES)'
+    -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
+    -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
   readonly: true
 
 - name: Examples.ArgLine
   value: >
     -DAZURE_COSMOS_CASSANDRA_CONTACT_POINT='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
-    -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
-    -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
-    -Ddatastax-java-driver.advanced.auth-provider.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
-    -Ddatastax-java-driver.advanced.auth-provider.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
-    -Ddatastax-java-driver.basic.load-balancing-policy.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
-    -Ddatastax-java-driver.basic.load-balancing-policy.read-datacenter='$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)'
+    -DAZURE_COSMOS_CASSANDRA_USERNAME='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
+    -DAZURE_COSMOS_CASSANDRA_PASSWORD='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
+    -DAZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
+    -DAZURE_COSMOS_CASSANDRA_READ_DATACENTER='$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)'
+    -DAZURE_COSMOS_CASSANDRA_READ_DATACENTER='$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)'
+    -DAZURE_COSMOS_CASSANDRA_LOG_PATH='$(Build.ArtifactStagingDirectory)'
+    -Dazure.cosmos.cassandra.java-options='-Ddatastax-java-driver.basic.request.timeout=60000 -Dlogging.level.com.datastax=DEBUG -Dlogging.level.com.azure.cosmos.cassandra=DEBUG -Dlogging.level.com.azure.cosmos.cassandra.config=DEBUG'
   readonly: true
 
 - name: Stage-Artifacts
@@ -88,7 +89,7 @@ jobs:
   - task: Maven@3
     displayName: 'Verify package'
     inputs:
-      mavenPomFile: 'package/pom.xml'
+      mavenPomFile: 'driver-4/pom.xml'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
@@ -100,7 +101,7 @@ jobs:
   - task: Maven@3
     displayName: 'Verify examples'
     inputs:
-      mavenPomFile: 'examples/pom.xml'
+      mavenPomFile: 'examples/spring-boot-app/pom.xml'
       mavenOptions: '-Xmx3072m'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.8'
@@ -115,7 +116,7 @@ jobs:
       targetType: 'inline'
       script: $(Stage-Artifacts)
       pwsh: true
-      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
+      workingDirectory: '$(Build.Repository.LocalPath)/driver-4/target'
   - task: PublishPipelineArtifact@1
     displayName: 'Publish staged artifacts'
     inputs:
@@ -150,7 +151,7 @@ jobs:
   - task: Maven@3
     displayName: 'Verify package'
     inputs:
-      mavenPomFile: 'package/pom.xml'
+      mavenPomFile: 'driver-4/pom.xml'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
@@ -162,13 +163,13 @@ jobs:
   - task: Maven@3
     displayName: 'Verify examples'
     inputs:
-      mavenPomFile: 'examples/pom.xml'
+      mavenPomFile: 'examples/spring-boot-app/pom.xml'
       mavenOptions: '-Xmx3072m'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-DargLine="$(Examples.ArgLine)"'
+      options: '-DargLine="-Dazure-cosmos-cassandra-jar=$(Build.Repository.LocalPath)/examples/spring-boot-app/target/azure-cosmos-cassandra-spring-boot-app-example-\${project.version}.jar $(Examples.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: PowerShell@2
@@ -177,7 +178,7 @@ jobs:
       targetType: 'inline'
       script: $(Stage-Artifacts)
       pwsh: true
-      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
+      workingDirectory: '$(Build.Repository.LocalPath)/driver-4/target'
   - task: PublishPipelineArtifact@1
     displayName: 'Publish staged artifacts'
     inputs:

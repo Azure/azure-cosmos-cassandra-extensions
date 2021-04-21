@@ -7,6 +7,10 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,7 +19,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
@@ -34,12 +40,19 @@ public class ApplicationCommandLineRunnerTest {
 
     private static final List<String> COMMAND;
 
+    private static final List<String> EXPECTED_OUTPUT;
+
     private static final String JAR = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.jar",
         "AZURE_COSMOS_CASSANDRA_JAR",
         System.getProperty("java.classpath"));
 
     private static final String JAVA = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+
+    private static final String LOG_PATH = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.log-path",
+        "AZURE_COSMOS_CASSANDRA_LOG_PATH",
+        Paths.get(System.getProperty("user.home"), ".local", "var", "log").toString());
 
     private static final String OPTIONS = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.java.options",
@@ -58,6 +71,20 @@ public class ApplicationCommandLineRunnerTest {
         command.add(JAR);
 
         COMMAND = Collections.unmodifiableList(command);
+
+        List<String> expectedOutput = null;
+
+        try (final BufferedReader reader = new BufferedReader(
+            new InputStreamReader(
+                Objects.requireNonNull(ApplicationCommandLineRunner.class
+                    .getClassLoader()
+                    .getResourceAsStream("expected.output")), StandardCharsets.UTF_8))) {
+            expectedOutput = reader.lines().collect(Collectors.toList());
+        } catch (final IOException error) {
+            expectedOutput = null;
+        }
+
+        EXPECTED_OUTPUT = expectedOutput;
     }
 
     // endregion
@@ -65,13 +92,16 @@ public class ApplicationCommandLineRunnerTest {
     // region Methods
 
     @BeforeAll
-    public static void validateJar() {
+    public static void checkExpectedOutputAndJar() {
+        assertThat(EXPECTED_OUTPUT).isNotEmpty();
         assertThat(JAR).isNotBlank();
         assertThat(Paths.get(JAR)).exists();
     }
 
     /**
      * Starts the spring-boot-app and ensures that it completes with status code zero.
+     *
+     * CosmosLoadBalancingPolicy is configured with a global endpoint.
      */
     @Test
     public void withGlobalEndpoint() {
@@ -83,9 +113,14 @@ public class ApplicationCommandLineRunnerTest {
         environment.remove("AZURE_COSMOS_CASSANDRA_READ_DATACENTER");
         environment.remove("AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER");
 
-        this.exec("global-endpoint", builder);
+        this.exec("withGlobalEndpoint", builder);
     }
 
+    /**
+     * Starts the spring-boot-app and ensures that it completes with status code zero.
+     *
+     * CosmosLoadBalancingPolicy is configured with a global endpoint and a read datacenter.
+     */
     @Test
     public void withGlobalEndpointAndReadDatacenter() {
 
@@ -94,9 +129,14 @@ public class ApplicationCommandLineRunnerTest {
         final Map<String, String> environment = builder.environment();
         environment.remove("AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER");
 
-        this.exec("global-endpoint-and-read-datacenter", builder);
+        this.exec("withGlobalEndpointAndReadDatacenter", builder);
     }
 
+    /**
+     * Starts the spring-boot-app and ensures that it completes with status code zero.
+     *
+     * CosmosLoadBalancingPolicy is configured with read and write datacenters.
+     */
     @Test
     public void withReadDatacenterAndWriteDatacenter() {
 
@@ -105,7 +145,7 @@ public class ApplicationCommandLineRunnerTest {
         final Map<String, String> environment = builder.environment();
         environment.remove("AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT");
 
-        this.exec("read-datacenter-and-write-datacenter", builder);
+        this.exec("withReadDatacenterAndWriteDatacenter", builder);
     }
 
     // endregion
@@ -113,21 +153,14 @@ public class ApplicationCommandLineRunnerTest {
     // region Privates
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void exec(final String testCase, final ProcessBuilder processBuilder) {
+    private void exec(final String testName, final ProcessBuilder processBuilder) {
 
-        processBuilder.command(COMMAND)
-            .redirectInput(ProcessBuilder.Redirect.INHERIT)
-            .redirectOutput(ProcessBuilder.Redirect.INHERIT);
-
-        final Path path = Paths.get(System.getProperty("user.home"),
-            ".local",
-            "var",
-            "log",
-            "azure-cosmos-cassandra-spring-data.test.load-balancing-policy." + testCase + ".log");
+        final Path path = Paths.get(LOG_PATH,
+            "azure-cosmos-cassandra-spring-boot-app.CosmosLoadBalancingPolicy." + testName + ".log");
 
         assertThatCode(() -> Files.deleteIfExists(path)).doesNotThrowAnyException();
 
-        processBuilder.environment().put("AZURE_COSMOS_CASSANDRA_LOG_FILE", path.toString());
+        processBuilder.command(COMMAND).environment().put("AZURE_COSMOS_CASSANDRA_LOG_FILE", path.toString());
 
         final Process process;
 
@@ -137,6 +170,21 @@ public class ApplicationCommandLineRunnerTest {
             fail("failed to execute command '%s' due to %s", COMMAND, error);
             return;
         }
+
+        final List<String> output;
+
+        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.toList());
+        } catch (final IOException error) {
+            fail("failed to execute command '%s' due to %s", COMMAND, error);
+            return;
+        }
+
+        for (final String line : output) {
+            System.out.println(line);
+        }
+
+        assertThat(output).isNotEmpty();  // more to come...
 
         try {
             assertThat(process.waitFor(TIMEOUT_IN_MINUTES, TimeUnit.MINUTES)).isTrue();

@@ -8,7 +8,7 @@ Licensed under the MIT License.
 
   <modelVersion>4.0.0</modelVersion>
 
-  <artifactId>azure-cosmos-cassandra-spring-data-example</artifactId>
+  <artifactId>azure-cosmos-cassandra-spring-boot-app-example</artifactId>
   <packaging>jar</packaging>
   <version>0.1.0-beta.2</version>
 

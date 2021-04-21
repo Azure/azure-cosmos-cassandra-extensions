@@ -34,7 +34,7 @@ cosmos.cassandra:
 
 logging:
   file:
-    name: ${AZURE_COSMOS_CASSANDRA_LOG_FILE:${user.home}/.local/var/log/azure-cosmos-cassandra-spring-data.log}
+    name: ${AZURE_COSMOS_CASSANDRA_LOG_FILE:${user.home}/.local/var/log/azure-cosmos-cassandra-spring-boot-app.log}
   logback:
     rollingpolicy:
       max-file-size: 10GB
