@@ -180,18 +180,16 @@ public class ApplicationCommandLineRunnerTest {
             return;
         }
 
-        for (final String line : output) {
-            System.out.println(line);
-        }
-
-        assertThat(output).isNotEmpty();  // more to come...
-
         try {
             assertThat(process.waitFor(TIMEOUT_IN_MINUTES, TimeUnit.MINUTES)).isTrue();
         } catch (final InterruptedException error) {
             fail("command '%s timed out after %d minutes", COMMAND, TIMEOUT_IN_MINUTES);
             return;
         }
+
+        assertThat(output).startsWith(EXPECTED_OUTPUT.get(0), EXPECTED_OUTPUT.get(1));
+        assertThat(output).endsWith(EXPECTED_OUTPUT.get(EXPECTED_OUTPUT.size() - 1));
+        assertThat(output.size()).isEqualTo(EXPECTED_OUTPUT.size());
 
         assertThat(process.exitValue()).isEqualTo(0);
     }
