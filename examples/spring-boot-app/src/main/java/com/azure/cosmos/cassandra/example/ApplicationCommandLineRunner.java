@@ -94,9 +94,9 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             System.exit(errorCount == 0 ? 0 : 1);
 
         } catch (final Throwable error) {
-            System.out.print("Application startup failed due to: ");
-            error.printStackTrace();
             LOG.error("Application startup failed due to: ", error);
+            System.out.print("Application startup failed due to: ");
+            error.printStackTrace(System.out);
             System.exit(2);
         }
     }

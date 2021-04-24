@@ -28,6 +28,7 @@ Licensed under the MIT License.
   </properties>
 
   <dependencies>
+    <!-- Main dependencies -->
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-cosmos-cassandra-spring-data-extensions</artifactId>
@@ -50,6 +51,7 @@ Licensed under the MIT License.
       <artifactId>spring-boot-starter-data-cassandra</artifactId>
       <scope>compile</scope>
     </dependency>
+    <!-- Test dependencies -->
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>

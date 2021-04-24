@@ -15,6 +15,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -36,10 +37,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -85,7 +88,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private final int dnsExpiryTimeInSeconds;
     private final List<InetAddress> dnsLookupAddresses;
     private final InternalDriverContext driverContext;
-    private final String globalEndpoint;
+    private final AtomicReference<String> globalEndpoint;
     private final AtomicInteger index;
     private final Object lock;
     private final String readDatacenter;
@@ -119,11 +122,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
 
         this.dnsExpiryTimeInSeconds = DNS_EXPIRY_TIME.getValue(profile, Integer.class);
-        this.globalEndpoint = GLOBAL_ENDPOINT.getValue(profile, String.class);
+        this.globalEndpoint = new AtomicReference<>(GLOBAL_ENDPOINT.getValue(profile, String.class));
         this.readDatacenter = READ_DATACENTER.getValue(profile, String.class);
         this.writeDatacenter = WRITE_DATACENTER.getValue(profile, String.class);
-
-        this.validateConfiguration();
 
         this.driverContext = (InternalDriverContext) driverContext;
         this.index = new AtomicInteger();
@@ -131,7 +132,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.localAddresses = null;
         this.lock = new Object();
 
-        this.dnsLookupAddresses = this.globalEndpoint.isEmpty()
+        this.dnsLookupAddresses = this.getGlobalEndpoint().isEmpty()
             ? Collections.emptyList()
             : Collections.unmodifiableList(Arrays.asList(this.getLocalAddresses()));
     }
@@ -155,7 +156,23 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @return the global endpoint in use by this {@link CosmosLoadBalancingPolicy CosmosLoadBalancingPolicy} object.
      */
     public String getGlobalEndpoint() {
-        return this.globalEndpoint;
+
+        return this.globalEndpoint.updateAndGet(globalEndpoint -> {
+
+            if (globalEndpoint.isEmpty() && this.writeDatacenter.isEmpty()) {
+
+                final Set<DefaultNode> contactPoints = this.driverContext.getMetadataManager().getContactPoints();
+
+                if (contactPoints != null && contactPoints.size() > 0) {
+                    for (final DefaultNode contactPoint : contactPoints) {
+                        final InetSocketAddress address = (InetSocketAddress) contactPoint.getEndPoint().resolve();
+                        return address.getHostName();
+                    }
+                }
+            }
+
+            return globalEndpoint;
+        });
     }
 
     /**
@@ -371,7 +388,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (this.localAddresses == null || this.dnsExpired()) {
             try {
-                this.localAddresses = InetAddress.getAllByName(this.globalEndpoint);
+                this.localAddresses = InetAddress.getAllByName(this.getGlobalEndpoint());
                 this.lastDnsLookupTime = System.currentTimeMillis() / 1000;
             } catch (final UnknownHostException error) {
                 // DNS entry may be temporarily unavailable
@@ -523,7 +540,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private void refreshNodesIfDnsExpired() {
 
-        if (this.globalEndpoint.isEmpty()) {
+        final String globalEndpoint = this.getGlobalEndpoint();
+
+        if (globalEndpoint == null || globalEndpoint.isEmpty()) {
             return;
         }
 
@@ -607,27 +626,24 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             : "null";
     }
 
-    // endregion
-
-    // region Types
-
-    private void validateConfiguration() {
-
-        if (this.globalEndpoint.isEmpty()) {
-
-            if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
-                throw new IllegalArgumentException("When " + GLOBAL_ENDPOINT.getPath() + " is not specified, "
-                    + "you must specify both " + READ_DATACENTER.getPath() + " and "
-                    + WRITE_DATACENTER.getPath() + ".");
-            }
-
-        } else if (!this.writeDatacenter.isEmpty()) {
-            throw new IllegalArgumentException("When " + GLOBAL_ENDPOINT.getPath() + " is specified, you must "
-                + "not specify " + WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
-                + "when " + GLOBAL_ENDPOINT.getPath() + " is specified.");
-        }
-    }
+//    private void validateConfiguration() {
+//
+//        final String globalEndpoint = this.getGlobalEndpoint();
+//
+//        if (globalEndpoint == null || globalEndpoint.isEmpty()) {
+//
+//            if (this.writeDatacenter.isEmpty() || this.readDatacenter.isEmpty()) {
+//                throw new IllegalArgumentException("When " + GLOBAL_ENDPOINT.getPath() + " is not specified, "
+//                    + "you must specify both " + READ_DATACENTER.getPath() + " and "
+//                    + WRITE_DATACENTER.getPath() + ".");
+//            }
+//
+//        } else if (!this.writeDatacenter.isEmpty()) {
+//            throw new IllegalArgumentException("When " + GLOBAL_ENDPOINT.getPath() + " is specified, you must "
+//                + "not specify " + WRITE_DATACENTER.getPath() + ". Writes will go to the default write region "
+//                + "when " + GLOBAL_ENDPOINT.getPath() + " is specified.");
+//        }
+//    }
 
     // endregion
-
 }
