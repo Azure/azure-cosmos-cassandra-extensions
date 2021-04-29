@@ -48,6 +48,7 @@ import java.util.function.Function;
 
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES;
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A {@link LoadBalancingPolicy} implementation with an option to specify read and write datacenters to route requests.
@@ -375,7 +376,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @NonNull
     private Set<Node> getContactPointsOrException() {
-        return Objects.requireNonNull(this.getContactPoints(), "expected non-null contactPoints");
+        return requireNonNull(this.getContactPoints(), "expected non-null contactPoints");
     }
 
     // endregion
@@ -432,9 +433,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             @NonNull final JsonGenerator generator,
             @NonNull final SerializerProvider serializerProvider) throws IOException {
 
-            Objects.requireNonNull(value, "expected non-null value");
-            Objects.requireNonNull(value, "expected non-null generator");
-            Objects.requireNonNull(value, "expected non-null serializerProvider");
+            requireNonNull(value, "expected non-null value");
+            requireNonNull(value, "expected non-null generator");
+            requireNonNull(value, "expected non-null serializerProvider");
 
             generator.writeStartObject();
             generator.writeStringField("endPoint", value.getEndPoint().toString());
@@ -465,10 +466,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             @NonNull final MetadataManager metadataManager,
             @NonNull final List<String> preferredRegions) {
 
-            this.metadataManager = Objects.requireNonNull(metadataManager, "expected non-null contactPoints");
+            this.metadataManager = requireNonNull(metadataManager, "expected non-null contactPoints");
 
             this.indexes = new HashMap<>(
-                Objects.requireNonNull(preferredRegions, "expected non-null preferredRegions").size());
+                requireNonNull(preferredRegions, "expected non-null preferredRegions").size());
 
             int index = 0;
 
@@ -496,8 +497,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         @Override
         public int compare(@NonNull final Node x, @NonNull final Node y) {
 
-            Objects.requireNonNull(x, "expected non-null x");
-            Objects.requireNonNull(y, "expected non-null y");
+            requireNonNull(x, "expected non-null x");
+            requireNonNull(y, "expected non-null y");
 
             if (x == y) {
                 return 0;
@@ -506,8 +507,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             final String xDatacenter = x.getDatacenter();
             final String yDatacenter = y.getDatacenter();
 
-            Objects.requireNonNull(xDatacenter, "expected non-null x::datacenter");
-            Objects.requireNonNull(yDatacenter, "expected non-null y::datacenter");
+            requireNonNull(xDatacenter, "expected non-null x::datacenter");
+            requireNonNull(yDatacenter, "expected non-null y::datacenter");
 
             final int compareDatacenterNames = xDatacenter.compareTo(yDatacenter);
 
@@ -554,8 +555,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             final UUID xHostId = x.getHostId();
             final UUID yHostId = y.getHostId();
 
-            Objects.requireNonNull(xHostId, "expected non-null x::hostId");
-            Objects.requireNonNull(yHostId, "expected non-null y::hostId");
+            requireNonNull(xHostId, "expected non-null x::hostId");
+            requireNonNull(yHostId, "expected non-null y::hostId");
 
             return Objects.compare(x.getHostId(), y.getHostId(), UUID::compareTo);
         }
@@ -586,9 +587,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             @NonNull final JsonGenerator generator,
             @NonNull final SerializerProvider serializerProvider) throws IOException {
 
-            Objects.requireNonNull(value, "expected non-null value");
-            Objects.requireNonNull(value, "expected non-null generator");
-            Objects.requireNonNull(value, "expected non-null serializerProvider");
+            requireNonNull(value, "expected non-null value");
+            requireNonNull(value, "expected non-null generator");
+            requireNonNull(value, "expected non-null serializerProvider");
 
             generator.writeStartObject();
 

@@ -10,8 +10,9 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Describes an option for a Cosmos Cassandra extension.
- * It includes methods for getting and parsing option values, including default values. This interface should be
- * implemented as an enum.
+ * <p>
+ * This class includes methods for getting and parsing option values, including default values. This interface is
+ * implemented by {@link CosmosLoadBalancingPolicyOption} and {@link CosmosRetryPolicyOption}.
  */
 public interface CosmosDriverOption extends DriverOption {
 
