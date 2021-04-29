@@ -3,9 +3,8 @@
 
 package com.azure.cosmos.cassandra.example;
 
-import com.azure.cosmos.cassandra.config.CosmosCassandraConfiguration;
-import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption;
 import com.azure.cosmos.cassandra.CosmosRetryPolicyOption;
+import com.azure.cosmos.cassandra.config.CosmosCassandraConfiguration;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,17 +49,11 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
 
     // region Load balancing policy options
 
-    @Value("${cosmos.cassandra.load-balancing-policy.dns-expiry-time:#{null}}")
-    private Integer dnsExpiryTime;
+    @Value("${cosmos.cassandra.load-balancing-policy.multi-region-writes:#{false}}")
+    private boolean multiRegionWrites;
 
-    @Value("${cosmos.cassandra.load-balancing-policy.global-endpoint:}")
-    private String globalEndpoint;
-
-    @Value("${cosmos.cassandra.load-balancing-policy.read-datacenter:}")
-    private String readDatacenter;
-
-    @Value("${cosmos.cassandra.load-balancing-policy.write-datacenter:}")
-    private String writeDatacenter;
+    @Value("${cosmos.cassandra.load-balancing-policy.preferred-regions:#{null}")
+    private List<String> preferredRegions;
 
     // endregion
 
@@ -97,29 +90,17 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
         return new String[] { this.basePackages };
     }
 
+
     @Override
-    public int getLoadBalancingDnsExpiryTime() {
-        return this.dnsExpiryTime == null
-            ? CosmosLoadBalancingPolicyOption.DNS_EXPIRY_TIME.getDefaultValue(Integer.class)
-            : this.dnsExpiryTime;
+    @Nullable
+    public boolean getLoadBalancingPolicyMultiRegionWrites() {
+        return this.multiRegionWrites;
     }
 
     @Override
     @Nullable
-    public String getLoadBalancingGlobalEndpoint() {
-        return this.globalEndpoint;
-    }
-
-    @Override
-    @Nullable
-    public String getLoadBalancingReadDatacenter() {
-        return this.readDatacenter;
-    }
-
-    @Override
-    @Nullable
-    public String getLoadBalancingWriteDatacenter() {
-        return this.writeDatacenter;
+    public List<String> getLoadBalancingPolicyPreferredRegions() {
+        return this.preferredRegions;
     }
 
     @Override

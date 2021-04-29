@@ -30,11 +30,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
 
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
@@ -177,9 +176,6 @@ public final class CosmosRetryPolicyTest {
 
         this.session = checkState(CqlSession.builder().withConfigLoader(
             DriverConfigLoader.programmaticBuilder()
-                .withStringList(DefaultDriverOption.CONTACT_POINTS, TestCommon.CONTACT_POINTS)
-                .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, TestCommon.USERNAME)
-                .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, TestCommon.PASSWORD)
                 .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
                 .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DATACENTER)
                 .build())
@@ -247,13 +243,8 @@ public final class CosmosRetryPolicyTest {
         final int retryNumberEnd,
         final RetryDecision expectedRetryDecision) {
 
-        final Matcher address = TestCommon.matchSocketAddress(TestCommon.GLOBAL_ENDPOINT);
-        assertThat(address.matches()).isTrue();
-
         final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
-            new DefaultEndPoint(new InetSocketAddress(
-                address.group("hostname"),
-                Integer.parseInt(address.group("port")))),
+            new DefaultEndPoint(GLOBAL_ENDPOINT),
             (InternalDriverContext) this.session.getContext()));
 
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");

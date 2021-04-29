@@ -8,7 +8,9 @@ import com.codahale.metrics.Timer;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
@@ -18,16 +20,23 @@ import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
-import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -45,42 +54,17 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * Best practices for configuring DataStax Java Driver 4 to access a Cosmos DB Cassandra API instance are also
  * demonstrated. See the settings in <a href="../../../../doc-files/application.conf.html">{@code application.conf}</a>
  * and <a href="../../../../doc-files/reference.conf.html">{@code reference.conf}</a>.
+ * <p>
+ * Ensure that your test runner does not set the module path when running this test. If you see a -p option on the
+ * {@code java} command line, remote it. The test classes in this suite will not load the {@code referenc.conf} that
+ * is included with azure-cosmos-cassandra-driver-4-extensions.
  * <h3>
  * Preconditions</h3>
  * <ol>
- * <li>A Cosmos DB Cassandra API account is required.
- * <li>These system variables or--alternatively--environment variables must be set.
- * <table><caption></caption>
- * <thead>
- * <tr>
- * <th>System variable</th>
- * <th>Environment variable</th>
- * <th>Description</th></tr>
- * </thead>
- * <tbody>
- * <tr>
- * <td>datastax-java-driver.basic.load-balancing-policy.global-endpoint</td>
- * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
- * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td></tr>
- * <tr>
- * <td>azure.cosmos.cassandra.read-datacenter</td>
- * <td>AZURE_COSMOS_CASSANDRA_READ_DATACENTER</td>
- * <td>Read datacenter name (e.g., "East US")</td></tr>
- * <tr>
- * <td>azure.cosmos.cassandra.write-datacenter</td>
- * <td>AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER</td>
- * <td>Write datacenter name (e.g., "West US")</td></tr>
- * <tr>
- * <td>datastax-java-driver.advanced.auth-provider.username</td>
- * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
- * <td>Username for authentication</td></tr>
- * <tr>
- * <td>datastax-java-driver.advanced.auth-provider.password</td>
- * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
- * <td>Password for authentication</td></tr>
- * </tbody>
- * </table>
- * </ol>
+ * <li> A Cosmos DB Cassandra API account is required. It should have at least two regions and may be configured for
+ * multi-region writes or not. A number of system or--alternatively--environment variables must be set. See {@code
+ * src/test/resources/application.conf} and {@link TestCommon} for a complete list. Their use and meaning should be
+ * apparent from the relevant sections of the configuration and code.
  * <h3>
  * Side effects</h3>
  * <ol>
@@ -106,10 +90,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/configuration/">DataStax Java
  * Driver configuration</a>
  */
-
 public class CosmosCassandraIntegrationTest {
 
     // region Fields
+
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
         TestCommon.getPropertyOrEnvironmentVariable(
@@ -131,9 +116,9 @@ public class CosmosCassandraIntegrationTest {
                 ".local",
                 "var",
                 "lib",
-                "azure-cosmos-cassandra-driver-4").toString()));
+                "azure-cosmos-cassandra-driver-4-extensions").toString()));
 
-    private static final int TIMEOUT_IN_MILLIS = 30_000;
+    private static final int TIMEOUT_IN_SECONDS = 30;
 
     // endregion
 
@@ -141,14 +126,18 @@ public class CosmosCassandraIntegrationTest {
 
     /**
      * Verify that the extensions integrate with DataStax Java Driver 4 and its configuration system.
-     *
-     * @param loader A {@linkplain DriverConfigLoader loader} of the configuration under test.
      */
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration" }, dataProvider = "test-cases", timeOut = TIMEOUT_IN_MILLIS)
-    public void canIntegrate(@NonNull final DriverConfigLoader loader) {
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    public void canIntegrate(final boolean multiRegionWrites) {
 
-        try (final CqlSession session = CqlSession.builder().withConfigLoader(loader).build()) {
+        final CqlSessionBuilder builder = CqlSession.builder().withConfigLoader(newConfigLoader(multiRegionWrites));
+
+        try (final CqlSession session = builder.build()) {
 
             //noinspection SimplifyOptionalCallChains
             if (!session.getMetrics().isPresent()) {
@@ -229,35 +218,19 @@ public class CosmosCassandraIntegrationTest {
 
     @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    @BeforeClass
-    public void init() {
-        REPORTING_DIRECTORY.mkdirs();
-    }
+    @BeforeAll
+    public static void init(final TestInfo info) {
 
-    /** Provides the list of {@link CosmosCassandraIntegrationTest} cases.
-     *
-     * @return The list of {@link CosmosCassandraIntegrationTest} cases.
-     */
-    @DataProvider(name = "test-cases")
-    public static Object[][] testCases() {
+        LOG.info("---------------------------------------------------------------------------------------------------");
+        LOG.info("{}", info.getTestClass().orElseThrow());
+        LOG.info("---------------------------------------------------------------------------------------------------");
 
-        final int count = TestCommon.READ_DATACENTER.isEmpty() ? 1 : (TestCommon.WRITE_DATACENTER.isEmpty() ? 2 : 3);
-        final Object[][] testCases = new Object[count][3];
-
-        testCases[0] = new Object[] { newDriverConfigLoader(TestCommon.GLOBAL_ENDPOINT, "", "") };
-
-        if (TestCommon.READ_DATACENTER.isEmpty()) {
-            return testCases;
+        if (REPORTING_DIRECTORY.exists()) {
+            final Path path = REPORTING_DIRECTORY.toPath();
+            assertThatCode(() -> Files.walk(path).map(Path::toFile).forEach(File::delete)).doesNotThrowAnyException();
         }
 
-        testCases[1] = new Object[] { newDriverConfigLoader(TestCommon.GLOBAL_ENDPOINT, TestCommon.READ_DATACENTER, "") };
-
-        if (TestCommon.WRITE_DATACENTER.isEmpty()) {
-            return testCases;
-        }
-
-        testCases[2] = new Object[] { newDriverConfigLoader("", TestCommon.READ_DATACENTER, TestCommon.WRITE_DATACENTER) };
-        return testCases;
+        assertThatCode(REPORTING_DIRECTORY::mkdirs).doesNotThrowAnyException();
     }
 
     // region Privates
@@ -282,7 +255,7 @@ public class CosmosCassandraIntegrationTest {
                 + "timestamp timestamp,"
                 + "value double,"
                 + "PRIMARY KEY ((sensor_id,date),timestamp)"
-                + ")"));
+                + ")"));;
 
         Thread.sleep(5_000L);  // gives time for the table creation to sync across regions
     }
@@ -332,20 +305,12 @@ public class CosmosCassandraIntegrationTest {
         System.out.println();
     }
 
-    private static String getFullyQualifiedPath(final CosmosLoadBalancingPolicyOption option) {
-        return "datastax-java-driver." + option.getPath();
-    }
-
-    private static DriverConfigLoader newDriverConfigLoader(
-        final String globalEndpoint,
-        final String readDatacenter,
-        final String writeDatacenter) {
-
-        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT), globalEndpoint);
-        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicyOption.READ_DATACENTER), readDatacenter);
-        System.setProperty(getFullyQualifiedPath(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER), writeDatacenter);
-
-        return DriverConfigLoader.fromClasspath("cosmos-cassandra-integration-test.conf");
+    private static DriverConfigLoader newConfigLoader(final boolean multiRegionWrites) {
+        return DriverConfigLoader.programmaticBuilder()
+            .withBoolean(CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES, multiRegionWrites)
+            .withStringList(DefaultDriverOption.METRICS_NODE_ENABLED, Collections.singletonList("cql-messages"))
+            .withStringList(DefaultDriverOption.METRICS_SESSION_ENABLED, Collections.singletonList("cql-requests"))
+            .build();
     }
 
     /**

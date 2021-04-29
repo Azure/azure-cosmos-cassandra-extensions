@@ -10,7 +10,7 @@ Licensed under the MIT License.
 
   <artifactId>azure-cosmos-cassandra-spring-boot-app-example</artifactId>
   <packaging>jar</packaging>
-  <version>0.1.0-beta.2</version>
+  <version>1.0.0</version>
 
   <description>
     Illustrates use of Spring Data for Apache Cassandra with Azure Cosmos awareness features.
@@ -19,7 +19,7 @@ Licensed under the MIT License.
   <parent>
     <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
     <groupId>com.azure</groupId>
-    <version>0.1.0-beta.2</version>
+    <version>1.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
@@ -59,7 +59,12 @@ Licensed under the MIT License.
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

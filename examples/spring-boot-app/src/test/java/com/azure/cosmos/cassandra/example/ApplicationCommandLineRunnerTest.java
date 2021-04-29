@@ -4,32 +4,25 @@
 package com.azure.cosmos.cassandra.example;
 
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.CqlSessionBuilder;
-import com.datastax.oss.driver.api.core.cql.ResultSet;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
-import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.FileAttribute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -42,19 +35,14 @@ import static org.assertj.core.api.Fail.fail;
  * Verifies that the spring-boot-app example runs and exits with status code zero.
  * <p>
  * Three permutations of load balancing policy are tested to ensure there are no surprises based on a valid
- * specification of load balancing policy options. This test should be run against single-region, multi-region,
- * and multi-master accounts.
+ * specification of load balancing policy options. This test should be run against single-region, multi-region, and
+ * multi-master accounts.
  */
 public class ApplicationCommandLineRunnerTest {
 
     // region Fields
 
     private static final List<String> COMMAND;
-
-    private static final String CONTACT_POINT = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.contact-point",
-        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
-        null);
 
     private static final List<String> EXPECTED_OUTPUT;
 
@@ -65,34 +53,24 @@ public class ApplicationCommandLineRunnerTest {
 
     private static final String JAVA = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
 
+    private static final String JAVA_OPTIONS = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.java.options",
+        "AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS",
+        "");
+
     private static final String LOG_PATH = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.log-path",
         "AZURE_COSMOS_CASSANDRA_LOG_PATH",
         Paths.get(System.getProperty("user.home"), ".local", "var", "log").toString());
 
-    private static final String OPTIONS = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.java.options",
-        "AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS",
-        "");
-
-    private static final String PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.password",
-        "AZURE_COSMOS_CASSANDRA_PASSWORD",
-        null);
-
     private static final long TIMEOUT_IN_MINUTES = 2;
-
-    private static final String USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.username",
-        "AZURE_COSMOS_CASSANDRA_USERNAME",
-        null);
 
     static {
 
         final List<String> command = new ArrayList<>();
 
         command.add(JAVA);
-        command.addAll(Arrays.asList(OPTIONS.split("\\s+")));
+        command.addAll(Arrays.asList(JAVA_OPTIONS.split("\\s+")));
         command.add("-jar");
         command.add(JAR);
 
@@ -129,12 +107,7 @@ public class ApplicationCommandLineRunnerTest {
     @BeforeEach
     public void recreateKeyspace() {
 
-        final CqlSessionBuilder builder = CqlSession.builder()
-            .withApplicationName(ApplicationCommandLineRunnerTest.class.getName())
-            .addContactEndPoint(parseEndPoint(CONTACT_POINT))
-            .withAuthCredentials(USERNAME, PASSWORD);
-
-        try (final CqlSession session = builder.build()) {
+        try (final CqlSession session = CqlSession.builder().build()) {
 
             session.execute("DROP KEYSPACE IF EXISTS azure_cosmos_cassandra_driver_4_examples");
 
@@ -153,61 +126,31 @@ public class ApplicationCommandLineRunnerTest {
                 + "WITH CLUSTERING ORDER BY (birth_date ASC, uuid DESC) AND default_time_to_live=3600;");
 
         } catch (final Throwable error) {
-            fail("could not recreate keyspace azure_cosmos_cassandra_driver_4_examples due to %s", error);
+            fail("could not recreate table azure_cosmos_cassandra_driver_4_examples.people", error);
         }
     }
 
     /**
-     * Starts the spring-boot-app and ensures that it completes with status code zero.
-     * CosmosLoadBalancingPolicy is configured with a global endpoint.
+     * Runs the spring-boot-app and ensures that it completes with status code zero.
+     * <p>
+     * CosmosLoadBalancingPolicy is configured with and without multi-region writes.
      */
-    @Test
-    public void withGlobalEndpoint() {
-
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    public void run(final boolean multiRegionWrites) {
         final ProcessBuilder builder = new ProcessBuilder();
-
-        final Map<String, String> environment = builder.environment();
-
-        environment.remove("AZURE_COSMOS_CASSANDRA_READ_DATACENTER");
-        environment.remove("AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER");
-
-        this.exec("withGlobalEndpoint", builder);
+        builder.environment().put("AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITE", "true");
+        this.exec("run.withMultiRegionWrites(" + multiRegionWrites + ")", builder);
     }
 
-    /**
-     * Starts the spring-boot-app and ensures that it completes with status code zero.
-     * CosmosLoadBalancingPolicy is configured with a global endpoint and a read datacenter.
-     */
-    @Test
-    public void withGlobalEndpointAndReadDatacenter() {
+    // endregion
 
-        final ProcessBuilder builder = new ProcessBuilder();
-
-        final Map<String, String> environment = builder.environment();
-        environment.remove("AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER");
-
-        this.exec("withGlobalEndpointAndReadDatacenter", builder);
-    }
-
-    /**
-     * Starts the spring-boot-app and ensures that it completes with status code zero.
-     * CosmosLoadBalancingPolicy is configured with read and write datacenters.
-     */
-    @Test
-    public void withReadDatacenterAndWriteDatacenter() {
-
-        final ProcessBuilder builder = new ProcessBuilder();
-
-        final Map<String, String> environment = builder.environment();
-        environment.remove("AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT");
-
-        this.exec("withReadDatacenterAndWriteDatacenter", builder);
-    }
+    // region Privates
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private void exec(final String testName, final ProcessBuilder processBuilder) {
 
-        final String baseFilename = "azure-cosmos-cassandra-spring-boot-app.CosmosLoadBalancingPolicy." + testName;
+        final String baseFilename = "azure-cosmos-cassandra-spring-boot-app." + testName;
         final Path logPath = Paths.get(LOG_PATH, baseFilename + ".log");
         final Path outputPath = Paths.get(LOG_PATH, baseFilename + ".output");
 
@@ -259,10 +202,6 @@ public class ApplicationCommandLineRunnerTest {
         assertThat(process.exitValue()).isEqualTo(0);
     }
 
-    // endregion
-
-    // region Privates
-
     /**
      * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
      * <p>
@@ -290,18 +229,6 @@ public class ApplicationCommandLineRunnerTest {
         }
 
         return value;
-    }
-
-    private static EndPoint parseEndPoint(final String value) {
-
-        final int index = value.indexOf(':');
-
-        final String hostname = value.substring(0, index);
-        final int port = Integer.parseUnsignedInt(value.substring(index + 1));
-
-        final InetSocketAddress address = new InetSocketAddress(hostname, port);
-
-        return new DefaultEndPoint(address);
     }
 
     // endregion

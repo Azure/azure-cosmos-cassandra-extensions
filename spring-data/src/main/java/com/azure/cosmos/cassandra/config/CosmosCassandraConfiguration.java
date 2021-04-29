@@ -19,11 +19,11 @@ import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
 import org.springframework.data.cassandra.config.SessionBuilderConfigurer;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
-import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.DNS_EXPIRY_TIME;
-import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.READ_DATACENTER;
-import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.WRITE_DATACENTER;
+import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES;
+import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.FIXED_BACKOFF_TIME;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.GROWING_BACKOFF_TIME;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.MAX_RETRIES;
@@ -58,42 +58,23 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
     // region Methods
 
     /**
-     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#DNS_EXPIRY_TIME}.
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
      *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#DNS_EXPIRY_TIME}.
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
      */
-    public int getLoadBalancingDnsExpiryTime() {
-        return DNS_EXPIRY_TIME.getDefaultValue(Integer.class);
+    public boolean getLoadBalancingPolicyMultiRegionWrites() {
+        return MULTI_REGION_WRITES.getDefaultValue(Boolean.class);
     }
 
     /**
-     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#GLOBAL_ENDPOINT}.
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
      *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#GLOBAL_ENDPOINT}.
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
      */
+    @SuppressWarnings("unchecked")
     @Nullable
-    public String getLoadBalancingGlobalEndpoint() {
-        return GLOBAL_ENDPOINT.getDefaultValue(String.class);
-    }
-
-    /**
-     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#READ_DATACENTER}.
-     *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#READ_DATACENTER}.
-     */
-    @Nullable
-    public String getLoadBalancingReadDatacenter() {
-        return READ_DATACENTER.getDefaultValue(String.class);
-    }
-
-    /**
-     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#WRITE_DATACENTER}.
-     *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#WRITE_DATACENTER}.
-     */
-    @Nullable
-    public String getLoadBalancingWriteDatacenter() {
-        return WRITE_DATACENTER.getDefaultValue(String.class);
+    public List<String> getLoadBalancingPolicyPreferredRegions() {
+        return PREFERRED_REGIONS.getDefaultValue(List.class);
     }
 
     @Override
@@ -110,10 +91,8 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
             + "    username: " + this.getAuthUsername() + '\n'
             + "    password: " + new String(password) + '\n'
             + "  load-balancing-policy:\n"
-            + "    dns-expiry-time: " + this.getLoadBalancingDnsExpiryTime() + '\n'
-            + "    global-endpoint: " + this.getLoadBalancingGlobalEndpoint() + '\n'
-            + "    read-datacenter: " + this.getLoadBalancingReadDatacenter() + '\n'
-            + "    write-datacenter: " + this.getLoadBalancingWriteDatacenter() + '\n'
+            + "    multi-region-writes: " + this.getLoadBalancingPolicyMultiRegionWrites() + '\n'
+            + "    preferred-regions: " + this.getLoadBalancingPolicyPreferredRegions() + '\n'
             + "  retry-policy:\n"
             + "     max-retries: " + this.getRetryMaxRetries() + '\n'
             + "     fixed-backoff-time: " + this.getRetryFixedBackoffTime() + '\n'
@@ -214,10 +193,11 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
 
                 // Load balancing policy options
 
-                .withInt(DNS_EXPIRY_TIME, this.configuration.getLoadBalancingDnsExpiryTime())
-                .withString(GLOBAL_ENDPOINT, nonNullOrElse(this.configuration.getLoadBalancingGlobalEndpoint(), ""))
-                .withString(READ_DATACENTER, nonNullOrElse(this.configuration.getLoadBalancingReadDatacenter(), ""))
-                .withString(WRITE_DATACENTER, nonNullOrElse(this.configuration.getLoadBalancingWriteDatacenter(), ""))
+                .withBoolean(MULTI_REGION_WRITES, this.configuration.getLoadBalancingPolicyMultiRegionWrites())
+
+                .withStringList(PREFERRED_REGIONS, nonNullOrElse(
+                    this.configuration.getLoadBalancingPolicyPreferredRegions(),
+                    Collections.emptyList()))
 
                 // Retry policy options
 

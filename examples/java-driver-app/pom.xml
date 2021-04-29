@@ -10,7 +10,7 @@ Licensed under the MIT License.
 
   <artifactId>azure-cosmos-cassandra-driver-4-example</artifactId>
   <packaging>jar</packaging>
-  <version>0.1.0-beta.2</version>
+  <version>1.0.0</version>
 
   <description>
     Illustrates use of the DataStax Java Driver 4 for Apache Cassandra client library with Azure Cosmos awareness features.
@@ -19,7 +19,7 @@ Licensed under the MIT License.
   <parent>
     <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
     <groupId>com.azure</groupId>
-    <version>0.1.0-beta.2</version>
+    <version>1.0.0</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 

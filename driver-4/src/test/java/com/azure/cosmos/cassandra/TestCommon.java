@@ -12,11 +12,17 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,37 +38,41 @@ public final class TestCommon {
 
     // region Fields
 
-    static final List<String> CONTACT_POINTS = Arrays.asList(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.contact-point",
-        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
-        "localhost:10350").split("\\s*,\\s*"));
+    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
-    static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
+    static final InetSocketAddress GLOBAL_ENDPOINT = parseSocketAddress(getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "localhost:10350");
+        "localhost:10350"));
 
-    static final String PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.password",
-        "AZURE_COSMOS_CASSANDRA_PASSWORD",
-        "");
+    static final List<String> PREFERRED_REGIONS = getPropertyOrEnvironmentVariableList(
+        "azure.cosmos.cassandra.preferred-region-",
+        "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
+        5);
+
+    static final List<SocketAddress> REGIONAL_ENDPOINTS = Arrays.stream(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.regional-endpoints",
+        "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS",
+        "").split("\\s*,\\s*")).map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+
+    static final boolean MULTI_REGION_WRITES = Boolean.parseBoolean(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.multi-region-writes",
+        "AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES",
+        "false"));
+
+    // region Deprecated
 
     static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.read-datacenter",
         "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
         "localhost");
 
-    static final String USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.username",
-        "AZURE_COSMOS_CASSANDRA_USERNAME",
-        "");
-
     static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.write-datacenter",
         "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "localhost");
 
-    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+    // endregion
 
     // endregion
 
@@ -82,8 +92,6 @@ public final class TestCommon {
             "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}",
             keyspaceName));
 
-        Thread.sleep(5_000);
-
         session.execute(format(
             "CREATE TABLE IF NOT EXISTS %s.%s ("
                 + "sensor_id uuid,"
@@ -95,7 +103,7 @@ public final class TestCommon {
             keyspaceName,
             tableName));
 
-        Thread.sleep(5_000);  // allows time for the table to be created in all regions
+        Thread.sleep(5_000L);  // allows time for schema to propagate to all regions
     }
 
     /**
@@ -153,25 +161,32 @@ public final class TestCommon {
     }
 
     /**
-     * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
-     * address.
+     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
      * <p>
-     * Retrieve the {@code hostname} and {@code port} from the returned {@link Matcher Matcher} like this:
-     * <pre>{@code
-     * String hostname = matcher.group("hostname")
-     * String port = matcher.group("port")
-     * }</pre>
+     * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
      *
-     * @param value a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
+     * @param property a system property name.
+     * @param variable an environment variable name.
+     * @param limit    the default value--which may be {@code null}--to be used if neither {@code property} or {@code
+     *                 variable} is set.
      *
-     * @return a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
-     * address.
+     * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
+     * {@code defaultValue}.
      */
-    @NonNull
-    static Matcher matchSocketAddress(final String value) {
-        final Matcher matcher = HOSTNAME_AND_PORT.matcher(value);
-        assertThat(matcher.matches()).isTrue();
-        return matcher;
+    static List<String> getPropertyOrEnvironmentVariableList(
+        @NonNull final String property, @NonNull final String variable, final int limit) {
+
+        final List<String> list = new ArrayList<>(limit);
+
+        for (int i = 1; i <= limit; i++) {
+            final String value = getPropertyOrEnvironmentVariable(property + i, variable + i, null);
+            if (value == null) {
+                break;
+            }
+            list.add(value);
+        }
+
+        return list;
     }
 
     /**
@@ -220,7 +235,16 @@ public final class TestCommon {
      */
     @NonNull
     static String uniqueName(@NonNull final String prefix) {
-        return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
+
+        final ByteBuffer buffer = ByteBuffer.allocate(2 * Long.BYTES);
+        final UUID uuid = UUID.randomUUID();
+
+        buffer.putLong(uuid.getLeastSignificantBits());
+        buffer.putLong(uuid.getMostSignificantBits());
+
+        return prefix + '_' + Base64.getEncoder().withoutPadding()
+            .encodeToString(buffer.array())
+            .replaceAll("[^_a-zA-Z0-9]", "");
     }
 
     // endregion
@@ -285,6 +309,38 @@ public final class TestCommon {
             System.out.print('+');
         }
         System.out.println();
+    }
+
+    /**
+     * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
+     * address.
+     * <p>
+     * Retrieve the {@code hostname} and {@code port} from the returned {@link Matcher Matcher} like this:
+     * <pre>{@code
+     * String hostname = matcher.group("hostname")
+     * String port = matcher.group("port")
+     * }</pre>
+     *
+     * @param value a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
+     *
+     * @return a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
+     * address.
+     */
+    @NonNull
+    private static Matcher matchSocketAddress(final String value) {
+        final Matcher matcher = HOSTNAME_AND_PORT.matcher(value);
+        assertThat(matcher.matches()).isTrue();
+        return matcher;
+    }
+
+    private static InetSocketAddress parseSocketAddress(final String value) {
+
+        final Matcher matcher = matchSocketAddress(value);
+
+        final String hostname = matcher.group("hostname");
+        final int port = Integer.parseUnsignedInt(matcher.group("port"));
+
+        return new InetSocketAddress(hostname, port);
     }
 
     // endregion

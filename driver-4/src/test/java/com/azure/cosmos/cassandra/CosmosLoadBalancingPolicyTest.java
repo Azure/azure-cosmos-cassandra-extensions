@@ -3,6 +3,7 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -14,95 +15,54 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
-import com.datastax.oss.driver.api.core.retry.RetryPolicy;
-import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
-import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.SkipException;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
-import java.lang.reflect.Method;
+import java.net.SocketAddress;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
+import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
+import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
+ * <p>
+ * Ensure that your test runner does not set the module path when running this test. If you see a -p option on the
+ * {@code java} command line, remote it. The test classes in this suite will not load the {@code referenc.conf} that
+ * is included with azure-cosmos-cassandra-driver-4-extensions.
  * <h3>
  * Preconditions</h3>
  * <ol>
- * <li> A Cosmos DB Cassandra API account is required. It should have two regions, one used as a read datacenter (e.g,
- * East US) and another used as a write datacenter (e.g., West US).
- * <li> These system or--alternatively--environment variables must be set.
- * <table><caption></caption>
- * <thead>
- * <tr>
- * <th>System variable</th>
- * <th>Environment variable</th>
- * <th>Description</th>
- * </tr>
- * </thead>
- * <tbody>
- * <tr>
- * <td>azure.cosmos.cassandra.global-endpoint</td>
- * <td>AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT</td>
- * <td>Global endpoint address (e.g., "database-account.cassandra.cosmos.azure.com:10350")</td>
- * </tr>
- * <tr>
- * <td>azure.cosmos.cassandra.username</td>
- * <td>AZURE_COSMOS_CASSANDRA_USERNAME</td>
- * <td>Username for authentication</td>
- * </tr>
- * <tr>
- * <td>azure.cosmos.cassandra.password</td>
- * <td>AZURE_COSMOS_CASSANDRA_PASSWORD</td>
- * <td>Password for authentication</td>
- * </tr>
- * <tr>
- * <td>azure.cosmos.cassandra.read-datacenter</td>
- * <td>AZURE_COSMOS_CASSANDRA_READ_DATACENTER</td>
- * <td>Read datacenter name (e.g., "East US")</td>
- * </tr>
- * <tr>
- * <td>azure.cosmos.cassandra.write-datacenter</td>
- * <td>AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER</td>
- * <td>Write datacenter name (e.g., "West US")</td>
- * </tr>
- * </tbody>
- * </table>
- * </ol>
- * <h3>
- * Side effects</h3>
- * <ol>
- * <li>Creates a number of keyspaces in the cluster, each with replication factor 3. To prevent collisions especially
- * during CI test runs, we generate keyspace names of the form <i>&lt;name&gt;</i><b>_</b><i>&lt;random-uuid&gt;</i>.
- * Should a keyspace by the generated name already exists, it is reused.
- * <li>Creates a table within each keyspace created or reused. If a table with a given name already exists, it is
- * reused.
- * <li>Executes all types of {@link Statement} queries.
- * <li>The keyspaces created or reused are then dropped. This prevents keyspaces from accumulating with repeated test
- * runs.
- * </ol>
+ * <li> A Cosmos DB Cassandra API account is required. It should have at least two regions and may be configured for
+ * multi-region writes or not. A number of system or--alternatively--environment variables must be set. See {@code
+ * src/test/resources/application.conf} and {@link TestCommon} for a complete list. Their use and meaning should be
+ * apparent from the relevant sections of the configuration and code.
  *
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
@@ -111,151 +71,38 @@ public final class CosmosLoadBalancingPolicyTest {
     // region Fields
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-
-    // TODO (DANOBLE) What does the Cassandra API return for the local datacenter name when it is hosted by the
-    //  emulator?
-
-    private static final int TIMEOUT_IN_MILLIS = 300_000;
+    private static final int TIMEOUT_IN_SECONDS = 45;
 
     // endregion
 
     // region Methods
 
-    @BeforeMethod
-    public void logTestName(final Method method) {
-        LOG.info("{}", method.getName());
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        LOG.info("---------------------------------------------------------------------------------------------------");
+        LOG.info("{}", info.getTestMethod().orElseThrow());
+        LOG.info("---------------------------------------------------------------------------------------------------");
     }
 
     /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying the combination of a {@code read-datacenter} and a 
-     * {@code global-endpoint} (with no {@code write-datacenter}) routes requests correctly.
-     *
+     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a {@code global-endpoint} (with no {@code
+     * read-datacenter} or {@code write-datacenter}) routes requests correctly.
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
-    public void testGlobalEndpointAndReadDatacenter() {
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    public void testPreferredRegions(final boolean multiRegionWrites) throws InterruptedException {
 
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-            .withString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
-            .withString(CosmosLoadBalancingPolicyOption.READ_DATACENTER, TestCommon.READ_DATACENTER)
-            .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, "")
+            .withBoolean(CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES, multiRegionWrites)
             .build();
 
-        try (final CqlSession session = this.connect(configLoader)) {
-            this.testAllStatements(session, TestCommon.uniqueName("globalAndRead"));
-        }
-    }
-
-    /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a {@code global-endpoint} (with no
-     * {@code read-datacenter} or {@code write-datacenter}) routes requests correctly.
-     *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
-     */
-    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
-    public void testGlobalEndpointOnly() {
-
-        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-            .withString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
-            .withString(CosmosLoadBalancingPolicyOption.READ_DATACENTER, "")
-            .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, "")
-            .build();
-
-        try (final CqlSession session = this.connect(configLoader)) {
-            this.testAllStatements(session, TestCommon.uniqueName("globalOnly"));
-        }
-    }
-
-    /**
-     * Verifies that invalid {@link CosmosLoadBalancingPolicy} configurations produce {@link IllegalArgumentException}
-     * errors.
-     */
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
-    public void testInvalidConfiguration() {
-
-        final ProgrammaticArguments programmaticArguments = ProgrammaticArguments.builder().build();
-        final String readDatacenter = "East US";
-        final String writeDatacenter = "West US";
-
-        // No configuration
-
-        assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
-            new DefaultDriverContext(newProgrammaticDriverConfigLoaderBuilder().build(), programmaticArguments),
-            "default")
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        // Read datacenter only (without a write datacenter)
-
-        assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
-            new DefaultDriverContext(
-                newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicyOption.READ_DATACENTER, readDatacenter)
-                    .build(),
-                programmaticArguments),
-            "default")
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        // Write datacenter only (without a read datacenter)
-
-        assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
-            new DefaultDriverContext(
-                newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, writeDatacenter)
-                    .build(),
-                programmaticArguments),
-            "default")
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        // Global endpoint with a write datacenter (not a read datacenter)
-
-        assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
-            new DefaultDriverContext(
-                newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
-                    .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, writeDatacenter)
-                    .build(),
-                programmaticArguments),
-            "default")
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        // Global endpoint with a read and a write datacenter (not just a read datacenter)
-
-        assertThatThrownBy(() -> new CosmosLoadBalancingPolicy(
-            new DefaultDriverContext(
-                newProgrammaticDriverConfigLoaderBuilder()
-                    .withString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT, TestCommon.GLOBAL_ENDPOINT)
-                    .withString(CosmosLoadBalancingPolicyOption.READ_DATACENTER, readDatacenter)
-                    .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, writeDatacenter)
-                    .build(),
-                programmaticArguments),
-            "default")
-        ).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a {@code read-datacenter} and a 
-     * {@code write-datacenter} (with no {@code global-endpoint}) routes requests correctly.
-     *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
-     */
-    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
-    public void testReadDatacenterAndWriteDatacenter() {
-
-        if (TestCommon.WRITE_DATACENTER.isEmpty()) {
-            throw new SkipException("WRITE_DATACENTER is empty");
-        }
-
-        final DriverConfigLoader driverConfigLoader = newProgrammaticDriverConfigLoaderBuilder()
-            .withString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT, "")
-            .withString(CosmosLoadBalancingPolicyOption.READ_DATACENTER, TestCommon.READ_DATACENTER)
-            .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, TestCommon.WRITE_DATACENTER)
-            .build();
-
-        try (final CqlSession session = this.connect(driverConfigLoader)) {
-            this.testAllStatements(session, TestCommon.uniqueName("readWriteDCv2"));
+        try (final CqlSession session = this.connect(configLoader, multiRegionWrites)) {
+            this.testAllStatements(session, uniqueName("preferred_regions"));
         }
     }
 
@@ -263,61 +110,82 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
-    private static CqlSession checkState(final CqlSession session) {
+    private static DriverConfigLoader checkState(final DriverConfigLoader configLoader) {
 
-        final DriverContext context = session.getContext();
-        final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
+        final DriverExecutionProfile profile = configLoader.getInitialConfig().getDefaultProfile();
 
-        final RetryPolicy retryPolicy = context.getRetryPolicy(profile.getName());
+        assertThat(profile.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS))
+            .isEqualTo(CosmosLoadBalancingPolicy.class.getName());
 
-        assertThat(retryPolicy.getClass()).isEqualTo(DefaultRetryPolicy.class);
+        assertThat(profile.getStringList(CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS))
+            .isEqualTo(PREFERRED_REGIONS);
 
-        final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
+        return configLoader;
+    }
 
-        assertThat(loadBalancingPolicy.getClass()).isEqualTo(CosmosLoadBalancingPolicy.class);
+    private static CqlSession checkState(final CqlSession session, final boolean multiRegionWrites) {
 
-        assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getDnsExpiryTimeInSeconds())
-            .isEqualTo(profile.getInt(CosmosLoadBalancingPolicyOption.DNS_EXPIRY_TIME));
+        final DriverContext driverContext = session.getContext();
+        final Map<UUID, Node> nodes = session.getMetadata().getNodes();
+        final String profileName = driverContext.getConfig().getDefaultProfile().getName();
 
-        final String globalEndpoint = profile.getString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT);
+        // Check that the driver has got the nodes we expect: one per region because we're connected to Cosmos DB
 
-        if (!globalEndpoint.isEmpty()) {
-            assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getGlobalEndpoint())
-                .isEqualTo(TestCommon.matchSocketAddress(globalEndpoint).group("hostname"));
+        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(REGIONAL_ENDPOINTS);
+        assertThat(REGIONAL_ENDPOINTS.size()).isEqualTo(PREFERRED_REGIONS.size()); // sanity check on test parameters
+        assertThat(nodes.size()).isEqualTo(REGIONAL_ENDPOINTS.size());
+
+        // Check that we've got the load balancing policy we think we have
+
+        final LoadBalancingPolicy loadBalancingPolicy = driverContext.getLoadBalancingPolicy(profileName);
+
+        assertThat(loadBalancingPolicy).isExactlyInstanceOf(CosmosLoadBalancingPolicy.class);
+
+        final CosmosLoadBalancingPolicy cosmosLoadBalancingPolicy = (CosmosLoadBalancingPolicy) loadBalancingPolicy;
+        final List<Node> nodesForReading = cosmosLoadBalancingPolicy.getNodesForReading();
+
+        assertThat(cosmosLoadBalancingPolicy.getMultiRegionWrites()).isEqualTo(multiRegionWrites);
+        assertThat(cosmosLoadBalancingPolicy.getPreferredRegions()).isEqualTo(PREFERRED_REGIONS);
+
+        assertThat(nodesForReading.size()).isEqualTo(PREFERRED_REGIONS.size());
+        assertThat(nodesForReading.stream().map(Node::getDatacenter)).containsSequence(PREFERRED_REGIONS);
+
+        if (multiRegionWrites) {
+            assertThat(cosmosLoadBalancingPolicy.getNodesForWriting()).isEqualTo(nodesForReading);
+        } else {
+            final List<Node> nodesForWriting = cosmosLoadBalancingPolicy.getNodesForWriting();
+            assertThat(nodesForWriting.size()).isEqualTo(1);
+            final SocketAddress address = nodesForWriting.get(0).getEndPoint().resolve();
+            assertThat(address).isEqualTo(GLOBAL_ENDPOINT);
         }
 
-        assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getReadDatacenter())
-            .isEqualTo(profile.getString(CosmosLoadBalancingPolicyOption.READ_DATACENTER));
-
-        assertThat(((CosmosLoadBalancingPolicy) loadBalancingPolicy).getWriteDatacenter())
-            .isEqualTo(profile.getString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER));
-
-        final Map<UUID, Node> nodes = session.getMetadata().getNodes();
-//        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(NODES);
-
-        LOG.info("[{}] connected to {} with {} and {}",
-            session.getName(),
-            nodes,
-            retryPolicy,
+        LOG.info("[{}] connected to nodes {} with load balancing policy {}",
+            Json.toJson(session.getName()),
+            Json.toJson(nodes),
             loadBalancingPolicy);
 
         return session;
     }
 
     @NonNull
-    private CqlSession connect(@NonNull final DriverConfigLoader configLoader) {
-        return checkState(CqlSession.builder().withConfigLoader(configLoader).build());
+    private CqlSession connect(@NonNull final DriverConfigLoader configLoader, final boolean multiRegionWrites)
+        throws InterruptedException {
+
+        final CqlSession session = CqlSession.builder().withConfigLoader(checkState(configLoader)).build();
+
+        try {
+            Thread.sleep(2_000L); // Gives the session time to enumerate peers and initialize all channel pools
+            return checkState(session, multiRegionWrites);
+        } catch (final Throwable error) {
+            session.close();
+            throw error;
+        }
     }
 
     private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
-        return DriverConfigLoader.programmaticBuilder()
-            .withStringList(DefaultDriverOption.CONTACT_POINTS, TestCommon.CONTACT_POINTS)
-            .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, TestCommon.USERNAME)
-            .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, TestCommon.PASSWORD)
-            .withClass(DefaultDriverOption.RETRY_POLICY_CLASS, DefaultRetryPolicy.class)
-            .withString(CosmosLoadBalancingPolicyOption.GLOBAL_ENDPOINT, "")
-            .withString(CosmosLoadBalancingPolicyOption.READ_DATACENTER, "")
-            .withString(CosmosLoadBalancingPolicyOption.WRITE_DATACENTER, "");
+        return DriverConfigLoader.programmaticBuilder().withClass(
+            DefaultDriverOption.RETRY_POLICY_CLASS,
+            DefaultRetryPolicy.class);
     }
 
     private void testAllStatements(@NonNull final CqlSession session, @NonNull final String keyspaceName) {

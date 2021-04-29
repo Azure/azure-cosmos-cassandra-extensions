@@ -8,6 +8,8 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -17,34 +19,24 @@ import java.util.function.Function;
  */
 public enum CosmosLoadBalancingPolicyOption implements CosmosDriverOption {
 
-    DNS_EXPIRY_TIME("dns-expiry-time",
-        (option, profile) -> profile.getInt(option, option.getDefaultValue(Integer.class)),
-        Integer::parseUnsignedInt,
-        60),
+    MULTI_REGION_WRITES("multi-region-writes",
+        (option, profile) -> profile.getBoolean(option, option.getDefaultValue(Boolean.class)),
+        Boolean::parseBoolean,
+        false),
 
-    GLOBAL_ENDPOINT("global-endpoint",
-        (option, profile) -> {
-            final String value = profile.getString(option, option.getDefaultValue(String.class));
+    @SuppressWarnings("unchecked")
+    PREFERRED_REGIONS("preferred-regions",
+        (CosmosLoadBalancingPolicyOption option, DriverExecutionProfile profile) -> {
+            final List<String> value = profile.getStringList(option, option.getDefaultValue(List.class));
             assert value != null;
-            final int index = value.lastIndexOf(':');
-            return index < 0 ? value : value.substring(0, index);
+            return value;
         },
-        Function.identity(),
-        ""),
-
-    READ_DATACENTER("read-datacenter",
-        (option, profile) -> profile.getString(option, option.getDefaultValue(String.class)),
-        Function.identity(),
-        ""),
-
-    WRITE_DATACENTER("write-datacenter",
-        (option, profile) -> profile.getString(option, option.getDefaultValue(String.class)),
-        Function.identity(),
-        "");
+        value -> value,
+        Collections.emptyList());
 
     private final Object defaultValue;
-    private final BiFunction<CosmosLoadBalancingPolicyOption, DriverExecutionProfile, ?> getter;
-    private final Function<String, ?> parser;
+    private final transient BiFunction<CosmosLoadBalancingPolicyOption, DriverExecutionProfile, ?> getter;
+    private final transient Function<String, ?> parser;
     private final String name;
     private final String path;
 
