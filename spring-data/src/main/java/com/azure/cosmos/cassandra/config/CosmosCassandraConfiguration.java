@@ -57,26 +57,6 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
 
     // region Methods
 
-    /**
-     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
-     *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
-     */
-    public boolean getLoadBalancingPolicyMultiRegionWrites() {
-        return MULTI_REGION_WRITES.getDefaultValue(Boolean.class);
-    }
-
-    /**
-     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
-     *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
-     */
-    @SuppressWarnings("unchecked")
-    @Nullable
-    public List<String> getLoadBalancingPolicyPreferredRegions() {
-        return PREFERRED_REGIONS.getDefaultValue(List.class);
-    }
-
     @Override
     public String toString() {
 
@@ -114,6 +94,26 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      */
     @NonNull
     protected abstract String getAuthUsername();
+
+    /**
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
+     *
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
+     */
+    protected boolean getLoadBalancingPolicyMultiRegionWrites() {
+        return MULTI_REGION_WRITES.getDefaultValue(Boolean.class);
+    }
+
+    /**
+     * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
+     *
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    protected List<String> getLoadBalancingPolicyPreferredRegions() {
+        return PREFERRED_REGIONS.getDefaultValue(List.class);
+    }
 
     @Override
     @Nullable

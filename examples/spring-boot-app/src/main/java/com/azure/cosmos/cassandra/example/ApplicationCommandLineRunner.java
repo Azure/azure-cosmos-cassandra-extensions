@@ -238,7 +238,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
             private final String[] header;
             private final Iterator<String[]> iterator;
 
-            private CsvIterator(final CSVReader reader, final String[] header) {
+            CsvIterator(final CSVReader reader, final String[] header) {
                 this.iterator = reader.iterator();
                 this.header = header;
             }

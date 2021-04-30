@@ -22,18 +22,22 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.display;
+import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
@@ -90,7 +94,7 @@ public final class CosmosRetryPolicyTest {
 
     // region Fields
 
-    static final String LOCAL_DATACENTER = TestCommon.getPropertyOrEnvironmentVariable(
+    static final String LOCAL_DATACENTER = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.local-datacenter",
         "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
         "localhost");
@@ -103,9 +107,9 @@ public final class CosmosRetryPolicyTest {
     private static final String KEYSPACE_NAME = TestCommon.uniqueName("downgrading");
     private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
     private static final String TABLE_NAME = "sensor_data";
-    private static final int TIMEOUT_IN_MILLIS = 30_0000;
+    private static final int TIMEOUT_IN_SECONDS = 30;
 
-    private CqlSession session = null;
+    private static CqlSession session = null;
 
     // endregion
 
@@ -114,27 +118,32 @@ public final class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class integrates with DataStax Java Driver 4.
      */
-    @Test(groups = { "integration", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
+    @Test
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() ->
-            TestCommon.createSchema(this.session, KEYSPACE_NAME, TABLE_NAME)
+            TestCommon.createSchema(session, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() ->
-            TestCommon.write(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
+            TestCommon.write(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
         ).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            final ResultSet rows = TestCommon.read(this.session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
-            TestCommon.display(rows);
+            final ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
+            display(rows);
         }).doesNotThrowAnyException();
     }
 
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with fixed backoff time.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
+    @Test
+    @Tag("checkin")
+    @Tag("unit")
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
@@ -144,7 +153,9 @@ public final class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with growing backoff time.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
+    @Test
+    @Tag("checkin")
+    @Tag("unit")
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
@@ -155,13 +166,14 @@ public final class CosmosRetryPolicyTest {
      * Closes the {@link #session} for testing {@link CosmosRetryPolicy} after dropping {@link #KEYSPACE_NAME}, if it
      * exists.
      */
-    @AfterClass(timeOut = TIMEOUT_IN_MILLIS)
-    public void cleanUp() {
-        if (this.session != null && !this.session.isClosed()) {
+    @AfterAll
+    @Timeout(TIMEOUT_IN_SECONDS)
+    public static void cleanUp() {
+        if (session != null && !session.isClosed()) {
             try {
-                this.session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
+                session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
             } finally {
-                this.session.close();
+                session.close();
             }
         }
     }
@@ -171,10 +183,10 @@ public final class CosmosRetryPolicyTest {
      *
      * This method also verifies that the resulting session is configured and connected as expected.
      */
-    @BeforeClass
-    public void connect() {
+    @BeforeAll
+    public static void connect() {
 
-        this.session = checkState(CqlSession.builder().withConfigLoader(
+        session = checkState(CqlSession.builder().withConfigLoader(
             DriverConfigLoader.programmaticBuilder()
                 .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
                 .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DATACENTER)
@@ -182,15 +194,19 @@ public final class CosmosRetryPolicyTest {
             .build());
     }
 
-    @BeforeMethod
-    public void logTestName(final Method method) {
-        LOG.info("{}", method.getName());
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        LOG.info("---------------------------------------------------------------------------------------------------");
+        LOG.info("{}", info.getTestMethod().orElseThrow());
+        LOG.info("---------------------------------------------------------------------------------------------------");
     }
 
     /**
      * Verifies that the {@link CosmosRetryPolicy} class rethrows when {@code max-retries} is exceeded.
      */
-    @Test(groups = { "unit", "checkin" }, timeOut = TIMEOUT_IN_MILLIS)
+    @Test
+    @Tag("checkin")
+    @Tag("unit")
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
         this.retry(retryPolicy, MAX_RETRIES + 1, MAX_RETRIES + 1, RetryDecision.RETHROW);
@@ -245,7 +261,7 @@ public final class CosmosRetryPolicyTest {
 
         final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
             new DefaultEndPoint(GLOBAL_ENDPOINT),
-            (InternalDriverContext) this.session.getContext()));
+            (InternalDriverContext) session.getContext()));
 
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");
 

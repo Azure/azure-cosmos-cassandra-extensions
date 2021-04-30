@@ -210,7 +210,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } else {
                 distanceReporter.setDistance(node, NodeDistance.REMOTE);
             }
-            this.nodesForReading.add(node);
+            this.nodesForReading.add(node);  // When multiRegionWrites is true, nodesForReading == nodesForWriting
         }
 
         if (!this.multiRegionWrites) {
@@ -285,6 +285,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 Json.toJson(request),
                 Json.toJson(session == null ? null : session.getName()));
         }
+
+        // TODO (DANOBLE) consider caching results so that evaluation is reduced
 
         final Function<Request, Queue<Node>> function = this.getNodes;
         final Queue<Node> nodes = function.apply(request);
@@ -384,6 +386,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Privates
 
     private Queue<Node> doGetNodes(final Request request) {
+        // TODO (DANOBLE) consider eliminating copy
         return new ConcurrentLinkedQueue<>(isReadRequest(request) ? this.nodesForReading : this.nodesForWriting);
     }
 
@@ -418,10 +421,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         public static final NodeSerializer INSTANCE = new NodeSerializer(Node.class);
         private static final long serialVersionUID = -4853942224745141238L;
-
-        NodeSerializer() {
-            this(null);
-        }
 
         NodeSerializer(final Class<Node> type) {
             super(type);
@@ -572,10 +571,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         public static final RequestSerializer INSTANCE = new RequestSerializer(Request.class);
         private static final long serialVersionUID = -6046496854932624633L;
-
-        RequestSerializer() {
-            this(null);
-        }
 
         RequestSerializer(final Class<Request> type) {
             super(type);

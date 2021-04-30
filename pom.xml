@@ -150,11 +150,6 @@ Licensed under the MIT License.
         <artifactId>spring-data-cassandra</artifactId>
         <version>${version.spring-data-cassandra}</version>
       </dependency>
-      <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <version>${version.testng}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 

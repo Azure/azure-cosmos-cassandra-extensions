@@ -9,6 +9,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.cassandra.config.SchemaAction;
 import org.springframework.data.cassandra.core.cql.keyspace.CreateKeyspaceSpecification;
 import org.springframework.data.cassandra.core.cql.keyspace.DropKeyspaceSpecification;
@@ -115,18 +117,21 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
         return this.keySpaceName;
     }
 
+    @Override
     protected int getRetryFixedBackoffTime() {
         return this.fixedBackoffTime == null
             ? CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getDefaultValue(Integer.class)
             : this.fixedBackoffTime;
     }
 
+    @Override
     protected int getRetryGrowingBackoffTime() {
         return this.growingBackoffTime == null
             ? CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getDefaultValue(Integer.class)
             : this.growingBackoffTime;
     }
 
+    @Override
     protected int getRetryMaxRetries() {
         return this.maxRetries == null
             ? CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class)
@@ -134,6 +139,11 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
     }
 
     // endregion
+
+    @Override
+    protected Resource getDriverConfigurationResource() {
+        return new ClassPathResource("application.conf");
+    }
 
     // region Methods to ensure the application runs with a low profile and with minimum fuss
 

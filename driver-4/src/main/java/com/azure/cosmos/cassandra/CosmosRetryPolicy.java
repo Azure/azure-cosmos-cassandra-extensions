@@ -290,8 +290,4 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     }
 
     // endregion
-
-    // region Types
-
-    // endregion
 }

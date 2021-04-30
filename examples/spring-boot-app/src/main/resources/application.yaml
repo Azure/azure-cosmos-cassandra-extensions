@@ -40,6 +40,5 @@ logging:
   pattern:
     console:
 
-spring:
   main:
     banner-mode: log # Because the Spring Boot banner nicely separates runs in the log file

@@ -18,7 +18,7 @@ Disable hostname verification and use a custom trust store that contains only th
 app. This would include the certificate for your multi-region Cosmos Cassandra API instance.
 
 Do this by setting these values in your `application.conf`:
-```yml
+```yaml
 datastax-java-driver.advanced.ssl-engine-factory.hostname-validation = false
 datastax-java-driver.advanced.ssl-engine-factory.truststore-path = <truststore-path>
 datastax-java-driver.advanced.ssl-engine-factory.truststore-password = <truststore-password>
