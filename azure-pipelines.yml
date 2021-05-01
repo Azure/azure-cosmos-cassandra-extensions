@@ -94,6 +94,13 @@ jobs:
       goals: 'help:active-profiles install javadoc:test-javadoc'
       findBugsRunAnalysis: true
       options: '-DskipTests'
+  - task: PowerShell@2
+    displayName: 'Create Java truststore'
+    inputs:
+      targetType: 'inline'
+      script: $(New-JavaTruststore)
+      pwsh: true
+      workingDirectory: '$(Build.ArtifactStagingDirectory)'
   - task: Maven@3
     displayName: 'Verify driver-4 extensions'
     inputs:
@@ -163,6 +170,13 @@ jobs:
       goals: 'help:active-profiles install javadoc:test-javadoc'
       findBugsRunAnalysis: true
       options: '-DskipTests'
+  - task: PowerShell@2
+    displayName: 'Create Java truststore'
+    inputs:
+      targetType: 'inline'
+      script: $(New-JavaTruststore)
+      pwsh: true
+      workingDirectory: '$(Build.ArtifactStagingDirectory)'
   - task: Maven@3
     displayName: 'Verify driver-4 extensions'
     inputs:
