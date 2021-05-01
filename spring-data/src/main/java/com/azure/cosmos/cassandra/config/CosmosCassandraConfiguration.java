@@ -12,8 +12,6 @@ import com.datastax.oss.driver.api.core.config.ProgrammaticDriverConfigLoaderBui
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
 import org.springframework.data.cassandra.config.DriverConfigLoaderBuilderConfigurer;
@@ -49,34 +47,11 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
 
     // region Fields
 
-    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraConfiguration.class);
     private static final int PORT = 10350;
 
     // endregion
 
     // region Methods
-
-    @Override
-    public String toString() {
-
-        final char[] password = new char[this.getAuthPassword() == null ? 0 : this.getAuthPassword().length()];
-        Arrays.fill(password, '*');
-
-        return "azure.cosmos.cassandra:\n"
-            + "  base-packages: " + Arrays.toString(this.getEntityBasePackages()) + '\n'
-            + "  keyspace: " + this.getKeyspaceName() + '\n'
-            + "  contact-point: " + this.getContactPoints() + '\n'
-            + "  auth-provider: \n"
-            + "    username: " + this.getAuthUsername() + '\n'
-            + "    password: " + new String(password) + '\n'
-            + "  load-balancing-policy:\n"
-            + "    multi-region-writes: " + this.getLoadBalancingPolicyMultiRegionWrites() + '\n'
-            + "    preferred-regions: " + Arrays.toString(this.getLoadBalancingPolicyPreferredRegions()) + '\n'
-            + "  retry-policy:\n"
-            + "    max-retries: " + this.getRetryMaxRetries() + '\n'
-            + "    fixed-backoff-time: " + this.getRetryFixedBackoffTime() + '\n'
-            + "    growing-backoff-time: " + this.getRetryGrowingBackoffTime();
-    }
 
     /**
      * Returns the value to set for {@link DefaultDriverOption#AUTH_PROVIDER_PASSWORD}.
@@ -138,6 +113,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosRetryPolicyOption#FIXED_BACKOFF_TIME}.
      */
+    @Nullable
     protected Integer getRetryFixedBackoffTime() {
         return null;
     }
@@ -162,6 +138,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
         return null;
     }
 
+    @Nullable
     protected DriverConfigLoaderBuilderConfigurer getDriverConfigLoaderBuilderConfigurer() {
         return new CosmosDriverConfigLoaderBuilderConfigurer(this);
     }
