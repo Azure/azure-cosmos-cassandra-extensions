@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Fail.fail;
 
@@ -49,6 +50,10 @@ public final class TestCommon {
 
     static {
 
+        out.println("------------------------------------------------------------------------------------------------");
+        out.println("T E S T  P A R A M E T E R S");
+        out.println("------------------------------------------------------------------------------------------------");
+
         // GLOBAL_ENDPOINT
 
         final String value = getPropertyOrEnvironmentVariable(
@@ -56,7 +61,7 @@ public final class TestCommon {
             "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
             null);
 
-        System.out.println("GLOBAL_ENDPOINT = " + value);
+        out.println("GLOBAL_ENDPOINT = " + value);
         assertThat(value).isNotBlank();
         GLOBAL_ENDPOINT = parseSocketAddress(value);
 
@@ -67,7 +72,7 @@ public final class TestCommon {
             "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
             3);
 
-        System.out.println("PREFERRED_REGIONS = " + list);
+        out.println("PREFERRED_REGIONS = " + list);
         assertThat(list).isNotEmpty();
         PREFERRED_REGIONS = list;
 
@@ -78,7 +83,7 @@ public final class TestCommon {
             "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_",
             3);
 
-        System.out.println("REGIONAL_ENDPOINTS = " + list);
+        out.println("REGIONAL_ENDPOINTS = " + list);
         assertThat(list).isNotEmpty();
         REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseSocketAddress).collect(Collectors.toList());
     }
@@ -128,11 +133,11 @@ public final class TestCommon {
         final int width4 = 21;
 
         final String format = "%-" + width1 + "s%-" + width2 + "s%-" + width3 + "s%-" + width4 + "s%n";
-        System.out.printf(format, "sensor_id", "date", "timestamp", "value");
+        out.printf(format, "sensor_id", "date", "timestamp", "value");
         drawLine(width1, width2, width3, width4);
 
         for (final Row row : rows) {
-            System.out.printf(format,
+            out.printf(format,
                 row.getUuid("sensor_id"),
                 row.getLocalDate("date"),
                 row.getInstant("timestamp"),
@@ -215,7 +220,7 @@ public final class TestCommon {
         @NonNull final String keyspaceName,
         @NonNull final String tableName) {
 
-        System.out.printf("Reading at %s%n", consistencyLevel);
+        out.printf("Reading at %s%n", consistencyLevel);
 
         final SimpleStatement statement = SimpleStatement.newInstance(format(
             "SELECT sensor_id, date, timestamp, value "
@@ -230,7 +235,7 @@ public final class TestCommon {
 
         final ResultSet rows = session.execute(statement);
 
-        System.out.println("Read succeeded at " + consistencyLevel);
+        out.println("Read succeeded at " + consistencyLevel);
         return rows;
     }
 
@@ -276,7 +281,7 @@ public final class TestCommon {
         @NonNull final String keyspaceName,
         @NonNull final String tableName) {
 
-        System.out.printf("Writing at %s%n", consistencyLevel);
+        out.printf("Writing at %s%n", consistencyLevel);
 
         final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED)
             .add(SimpleStatement.newInstance(format("INSERT INTO %s.%s "
@@ -303,7 +308,7 @@ public final class TestCommon {
             .setConsistencyLevel(consistencyLevel);
 
         session.execute(batch);
-        System.out.println("Write succeeded at " + consistencyLevel);
+        out.println("Write succeeded at " + consistencyLevel);
     }
 
     /**
@@ -314,11 +319,11 @@ public final class TestCommon {
     private static void drawLine(final int... widths) {
         for (final int width : widths) {
             for (int i = 1; i < width; i++) {
-                System.out.print('-');
+                out.print('-');
             }
-            System.out.print('+');
+            out.print('+');
         }
-        System.out.println();
+        out.println();
     }
 
     /**
