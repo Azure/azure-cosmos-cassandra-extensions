@@ -41,6 +41,7 @@ import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVari
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
@@ -197,7 +198,7 @@ public final class CosmosRetryPolicyTest {
     @BeforeEach
     public void logTestName(final TestInfo info) {
         LOG.info("---------------------------------------------------------------------------------------------------");
-        LOG.info("{}", info.getTestMethod().orElseThrow());
+        LOG.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
         LOG.info("---------------------------------------------------------------------------------------------------");
     }
 

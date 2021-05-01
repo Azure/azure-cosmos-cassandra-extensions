@@ -49,6 +49,7 @@ import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
@@ -80,7 +81,7 @@ public final class CosmosLoadBalancingPolicyTest {
     @BeforeEach
     public void logTestName(final TestInfo info) {
         LOG.info("---------------------------------------------------------------------------------------------------");
-        LOG.info("{}", info.getTestMethod().orElseThrow());
+        LOG.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
         LOG.info("---------------------------------------------------------------------------------------------------");
     }
 

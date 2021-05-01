@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Shows how to use the Cosmos extensions for DataStax Java Driver 4 for Apache Cassandra.
@@ -222,7 +223,7 @@ public class CosmosCassandraIntegrationTest {
     public static void init(final TestInfo info) {
 
         LOG.info("---------------------------------------------------------------------------------------------------");
-        LOG.info("{}", info.getTestClass().orElseThrow());
+        LOG.info("{}", info.getTestClass().orElseGet(() -> fail("expected test to be called with test class")));
         LOG.info("---------------------------------------------------------------------------------------------------");
 
         if (REPORTING_DIRECTORY.exists()) {
