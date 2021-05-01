@@ -7,20 +7,19 @@ import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicy;
 import com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption;
 import com.azure.cosmos.cassandra.CosmosRetryPolicy;
 import com.azure.cosmos.cassandra.CosmosRetryPolicyOption;
-import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
+import com.datastax.oss.driver.api.core.config.ProgrammaticDriverConfigLoaderBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
-import org.springframework.data.cassandra.config.SessionBuilderConfigurer;
+import org.springframework.data.cassandra.config.DriverConfigLoaderBuilderConfigurer;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES;
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS;
@@ -60,7 +59,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
     @Override
     public String toString() {
 
-        final char[] password = new char[this.getAuthPassword().length()];
+        final char[] password = new char[this.getAuthPassword() == null ? 0 : this.getAuthPassword().length()];
         Arrays.fill(password, '*');
 
         return "azure.cosmos.cassandra:\n"
@@ -72,11 +71,11 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
             + "    password: " + new String(password) + '\n'
             + "  load-balancing-policy:\n"
             + "    multi-region-writes: " + this.getLoadBalancingPolicyMultiRegionWrites() + '\n'
-            + "    preferred-regions: " + this.getLoadBalancingPolicyPreferredRegions() + '\n'
+            + "    preferred-regions: " + Arrays.toString(this.getLoadBalancingPolicyPreferredRegions()) + '\n'
             + "  retry-policy:\n"
-            + "     max-retries: " + this.getRetryMaxRetries() + '\n'
-            + "     fixed-backoff-time: " + this.getRetryFixedBackoffTime() + '\n'
-            + "     growing-backoff-time: " + this.getRetryGrowingBackoffTime();
+            + "    max-retries: " + this.getRetryMaxRetries() + '\n'
+            + "    fixed-backoff-time: " + this.getRetryFixedBackoffTime() + '\n'
+            + "    growing-backoff-time: " + this.getRetryGrowingBackoffTime();
     }
 
     /**
@@ -84,7 +83,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link DefaultDriverOption#AUTH_PROVIDER_PASSWORD}.
      */
-    @NonNull
+    @Nullable
     protected abstract String getAuthPassword();
 
     /**
@@ -92,7 +91,7 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link DefaultDriverOption#AUTH_PROVIDER_USER_NAME}.
      */
-    @NonNull
+    @Nullable
     protected abstract String getAuthUsername();
 
     /**
@@ -100,8 +99,9 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
      */
-    protected boolean getLoadBalancingPolicyMultiRegionWrites() {
-        return MULTI_REGION_WRITES.getDefaultValue(Boolean.class);
+    @Nullable
+    protected Boolean getLoadBalancingPolicyMultiRegionWrites() {
+        return null;
     }
 
     /**
@@ -109,10 +109,10 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressFBWarnings("PZLA_PREFER_ZERO_LENGTH_ARRAYS")
     @Nullable
-    protected List<String> getLoadBalancingPolicyPreferredRegions() {
-        return PREFERRED_REGIONS.getDefaultValue(List.class);
+    protected String[] getLoadBalancingPolicyPreferredRegions() {
+        return null;
     }
 
     @Override
@@ -138,8 +138,8 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosRetryPolicyOption#FIXED_BACKOFF_TIME}.
      */
-    protected int getRetryFixedBackoffTime() {
-        return FIXED_BACKOFF_TIME.getDefaultValue(Integer.class);
+    protected Integer getRetryFixedBackoffTime() {
+        return null;
     }
 
     /**
@@ -147,8 +147,9 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosRetryPolicyOption#GROWING_BACKOFF_TIME}.
      */
-    protected int getRetryGrowingBackoffTime() {
-        return GROWING_BACKOFF_TIME.getDefaultValue(Integer.class);
+    @Nullable
+    protected Integer getRetryGrowingBackoffTime() {
+        return null;
     }
 
     /**
@@ -156,59 +157,79 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
      *
      * @return The value to set for {@link CosmosRetryPolicyOption#MAX_RETRIES}.
      */
-    protected int getRetryMaxRetries() {
-        return MAX_RETRIES.getDefaultValue(Integer.class);
+    @Nullable
+    protected Integer getRetryMaxRetries() {
+        return null;
     }
 
-    @Override
-    @Nullable
-    protected SessionBuilderConfigurer getSessionBuilderConfigurer() {
-        return new CosmosCassandraSessionBuilderConfigurer(this);
+    protected DriverConfigLoaderBuilderConfigurer getDriverConfigLoaderBuilderConfigurer() {
+        return new CosmosDriverConfigLoaderBuilderConfigurer(this);
     }
 
     // endregion
 
     // region Types
 
-    private static class CosmosCassandraSessionBuilderConfigurer implements SessionBuilderConfigurer {
+    private static class CosmosDriverConfigLoaderBuilderConfigurer implements DriverConfigLoaderBuilderConfigurer {
 
         private final CosmosCassandraConfiguration configuration;
 
-        CosmosCassandraSessionBuilderConfigurer(final CosmosCassandraConfiguration configuration) {
+        CosmosDriverConfigLoaderBuilderConfigurer(final CosmosCassandraConfiguration configuration) {
             this.configuration = configuration;
         }
 
         @Override
-        @NonNull
-        public CqlSessionBuilder configure(final CqlSessionBuilder builder) {
+        public void configure(@NonNull final ProgrammaticDriverConfigLoaderBuilder builder) {
 
-            LOG.debug("{}({})", this.configuration.getClass().getName(), this.configuration);
+            // Credentials
 
-            return builder.withConfigLoader(DriverConfigLoader.programmaticBuilder()
+            final String username = this.configuration.getAuthUsername();
 
-                // Credentials
+            if (!(username == null || username.isEmpty())) {
+                builder.withString(AUTH_PROVIDER_USER_NAME, username);
+            }
 
-                .withString(AUTH_PROVIDER_USER_NAME, this.configuration.getAuthUsername())
-                .withString(AUTH_PROVIDER_PASSWORD, this.configuration.getAuthPassword())
+            final String password = this.configuration.getAuthPassword();
 
-                // Load balancing policy options
+            if (!(password == null || password.isEmpty())) {
+                builder.withString(AUTH_PROVIDER_PASSWORD, password);
+            }
 
-                .withBoolean(MULTI_REGION_WRITES, this.configuration.getLoadBalancingPolicyMultiRegionWrites())
+            // Load balancing policy options
 
-                .withStringList(PREFERRED_REGIONS, nonNullOrElse(
-                    this.configuration.getLoadBalancingPolicyPreferredRegions(),
-                    Collections.emptyList()))
+            final Boolean multiRegionWrites = this.configuration.getLoadBalancingPolicyMultiRegionWrites();
 
-                // Retry policy options
+            if (multiRegionWrites != null) {
+                builder.withBoolean(MULTI_REGION_WRITES, multiRegionWrites);
+            }
 
-                .withInt(MAX_RETRIES, this.configuration.getRetryMaxRetries())
-                .withInt(FIXED_BACKOFF_TIME, this.configuration.getRetryFixedBackoffTime())
-                .withInt(GROWING_BACKOFF_TIME, this.configuration.getRetryGrowingBackoffTime())
-                .build());
-        }
+            final String[] preferredRegions = this.configuration.getLoadBalancingPolicyPreferredRegions();
 
-        private static <T> T nonNullOrElse(final T value, final T defaultValue) {
-            return value != null ? value : defaultValue;
+            if (preferredRegions != null) {
+                builder.withStringList(PREFERRED_REGIONS, Arrays.stream(preferredRegions)
+                    .filter(region -> !(region == null || region.isEmpty()))
+                    .collect(Collectors.toList()));
+            }
+
+            // Retry policy options
+
+            final Integer maxRetries = this.configuration.getRetryMaxRetries();
+
+            if (maxRetries != null) {
+                builder.withInt(MAX_RETRIES, maxRetries);
+            }
+
+            final Integer fixedBackoffTime = this.configuration.getRetryFixedBackoffTime();
+
+            if (fixedBackoffTime != null) {
+                builder.withInt(FIXED_BACKOFF_TIME, fixedBackoffTime);
+            }
+
+            final Integer growingBackoffTime = this.configuration.getRetryGrowingBackoffTime();
+
+            if (growingBackoffTime != null) {
+                builder.withInt(GROWING_BACKOFF_TIME, this.configuration.getRetryGrowingBackoffTime());
+            }
         }
     }
 

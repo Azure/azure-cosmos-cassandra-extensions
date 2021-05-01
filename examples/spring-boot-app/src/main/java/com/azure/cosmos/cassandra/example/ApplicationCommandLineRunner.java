@@ -65,10 +65,15 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
     }
 
     /**
-     * Runs the {@linkplain ApplicationCommandLineRunner application} logic. This method is called by Spring Boot after
-     * it instantiates the {@linkplain ApplicationCommandLineRunner application}.
+     * Runs the {@linkplain ApplicationCommandLineRunner application} logic.
+     * <p>
+     * This method is called by Spring Boot after it instantiates the {@linkplain ApplicationCommandLineRunner
+     * application}.
      *
-     * @param args a variable argument list.
+     * @param args A variable argument list. The first argument, if provided, should specify the number of times to
+     *             tabulate the people who are younger than each person represented in the people table. The people
+     *             inserted into the database by the app are listed in {@code src/main/resources/people.csv}. This
+     *             file is included at the root of the class path for this application.
      */
     @SuppressFBWarnings("DM_EXIT")
     @Override

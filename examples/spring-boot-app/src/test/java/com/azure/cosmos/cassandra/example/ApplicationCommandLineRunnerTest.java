@@ -3,7 +3,9 @@
 
 package com.azure.cosmos.cassandra.example;
 
+import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeAll;
@@ -109,21 +111,15 @@ public class ApplicationCommandLineRunnerTest {
 
         try (final CqlSession session = CqlSession.builder().build()) {
 
-            session.execute("DROP KEYSPACE IF EXISTS azure_cosmos_cassandra_driver_4_examples");
-
-            session.execute("CREATE KEYSPACE azure_cosmos_cassandra_driver_4_examples WITH REPLICATION={"
-                + "'class':'SimpleStrategy',"
-                + "   'replication_factor':4"
-                + "}");
-
-            session.execute("CREATE TABLE azure_cosmos_cassandra_driver_4_examples.people ("
-                + "first_name text,"
-                + "birth_date timestamp,"
-                + "uuid uuid,"
-                + "last_name text,"
-                + "occupation text,"
-                + "PRIMARY KEY (first_name, birth_date, uuid))"
-                + "WITH CLUSTERING ORDER BY (birth_date ASC, uuid DESC) AND default_time_to_live=3600;");
+            session.execute(
+                SimpleStatement.newInstance("CREATE KEYSPACE IF NOT EXISTS "
+                    + "azure_cosmos_cassandra_driver_4_examples WITH "
+                    + "REPLICATION={"
+                    + "'class':'SimpleStrategy',"
+                    + "   'replication_factor':4"
+                    + "} AND "
+                    + "cosmosdb_provisioned_throughput=100000")
+                    .setConsistencyLevel(ConsistencyLevel.ALL));
 
         } catch (final Throwable error) {
             fail("could not recreate table azure_cosmos_cassandra_driver_4_examples.people", error);

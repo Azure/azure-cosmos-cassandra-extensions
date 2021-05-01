@@ -2,6 +2,7 @@ cosmos.cassandra:
   base-packages: com.azure.cosmos.cassandra.example.data
   contact-point: ${AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT}
   keyspace: azure_cosmos_cassandra_driver_4_examples
+  schema-action: RECREATE
 
   auth-provider:
     # By default we use the PlainTextAuthProvider (see reference.conf) and specify the username and password here.
@@ -21,12 +22,8 @@ cosmos.cassandra:
     #   Cosmos DB Cassandra API instance.
 
     multi-region-writes: ${AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES:false}
-    preferred-regions:
-      - ${AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1:}
-      - ${AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2:}
-      - ${AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3:}
-      - ${AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_4:}
-      - ${AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_5:}
+
+    preferred-regions: ${AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS:null}
 
   retry-policy:
     # By default we use the CosmosRetryPolicy (see reference.conf) and accept the default configuration here.
@@ -40,5 +37,6 @@ logging:
   pattern:
     console:
 
+spring:
   main:
-    banner-mode: log # Because the Spring Boot banner nicely separates runs in the log file
+    banner-mode: off

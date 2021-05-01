@@ -3,10 +3,10 @@
 
 package com.azure.cosmos.cassandra.example;
 
-import com.azure.cosmos.cassandra.CosmosRetryPolicyOption;
 import com.azure.cosmos.cassandra.config.CosmosCassandraConfiguration;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -18,6 +18,8 @@ import org.springframework.data.cassandra.repository.config.EnableCassandraRepos
 
 import java.util.Collections;
 import java.util.List;
+
+import static org.springframework.data.cassandra.core.cql.keyspace.CreateKeyspaceSpecification.createKeyspace;
 
 /**
  * Spring Data Cassandra configuration that reads settings values from application.yaml.
@@ -51,11 +53,11 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
 
     // region Load balancing policy options
 
-    @Value("${cosmos.cassandra.load-balancing-policy.multi-region-writes:#{false}}")
-    private boolean multiRegionWrites;
+    @Value("${cosmos.cassandra.load-balancing-policy.multi-region-writes:#{null}}")
+    private Boolean multiRegionWrites;
 
-    @Value("${cosmos.cassandra.load-balancing-policy.preferred-regions:#{null}")
-    private List<String> preferredRegions;
+    @Value("${cosmos.cassandra.load-balancing-policy.preferred-regions:#{null}}")
+    private String[] preferredRegions;
 
     // endregion
 
@@ -69,6 +71,13 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
 
     @Value("${cosmos.cassandra.retry-policy.max-retries:#{null}}")
     private Integer maxRetries;
+
+    // endregion
+
+    // region Schema creation options
+
+    @Value("${cosmos.cassandra.schema-action}")
+    private SchemaAction schemaAction;
 
     // endregion
 
@@ -95,16 +104,25 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
 
     @Override
     @Nullable
-    public boolean getLoadBalancingPolicyMultiRegionWrites() {
+    public Boolean getLoadBalancingPolicyMultiRegionWrites() {
         return this.multiRegionWrites;
     }
 
+    @SuppressFBWarnings("EI_EXPOSE_REP")
     @Override
-    @Nullable
-    public List<String> getLoadBalancingPolicyPreferredRegions() {
+    @NonNull
+    public String[] getLoadBalancingPolicyPreferredRegions() {
         return this.preferredRegions;
     }
 
+    /**
+     * Gets the contact points for the current session.
+     * <p>
+     * You should specify a single contact-point when connecting to a Cosmos DB Cassandra API instance: The global
+     * endpoint address.
+     *
+     * @return The contact points for the current session.
+     */
     @Override
     @NonNull
     protected String getContactPoints() {
@@ -118,28 +136,33 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
     }
 
     @Override
-    protected int getRetryFixedBackoffTime() {
-        return this.fixedBackoffTime == null
-            ? CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getDefaultValue(Integer.class)
-            : this.fixedBackoffTime;
+    @Nullable
+    protected Integer getRetryFixedBackoffTime() {
+        return this.fixedBackoffTime;
     }
 
     @Override
-    protected int getRetryGrowingBackoffTime() {
-        return this.growingBackoffTime == null
-            ? CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getDefaultValue(Integer.class)
-            : this.growingBackoffTime;
+    @Nullable
+    protected Integer getRetryGrowingBackoffTime() {
+        return this.growingBackoffTime;
     }
 
     @Override
-    protected int getRetryMaxRetries() {
-        return this.maxRetries == null
-            ? CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class)
-            : this.maxRetries;
+    @Nullable
+    protected Integer getRetryMaxRetries() {
+        return this.maxRetries;
     }
 
     // endregion
 
+    /**
+     * Gets a {@link ClassPathResource} for loading {@code application.conf} used to configure the DataStax Java Driver.
+     * <p>
+     * You will find this file in the source at {@code src/main/resources/application.conf}. This file is packaged with
+     * the app at the root of its class path.
+     *
+     * @return A {@link ClassPathResource ClassPathResource} for loading {@code application.conf}.
+     */
     @Override
     protected Resource getDriverConfigurationResource() {
         return new ClassPathResource("application.conf");
@@ -150,14 +173,14 @@ public class ApplicationConfiguration extends CosmosCassandraConfiguration {
     @Override
     @NonNull
     public SchemaAction getSchemaAction() {
-        return SchemaAction.CREATE_IF_NOT_EXISTS;
+        return this.schemaAction == null ? SchemaAction.NONE : this.schemaAction;
     }
 
     @Override
     @NonNull
     protected List<CreateKeyspaceSpecification> getKeyspaceCreations() {
-        return
-            Collections.singletonList(CreateKeyspaceSpecification.createKeyspace(this.getKeyspaceName()).ifNotExists());
+        final CreateKeyspaceSpecification specification = createKeyspace(this.getKeyspaceName()).ifNotExists();
+        return Collections.singletonList(specification);
     }
 
     @Override

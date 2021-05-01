@@ -213,7 +213,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.nodesForReading.add(node);  // When multiRegionWrites is true, nodesForReading == nodesForWriting
         }
 
-        if (!this.multiRegionWrites) {
+        if (this.multiRegionWrites) {
+            assert this.nodesForReading == this.nodesForWriting;
+        } else {
 
             // If you're connected to a Cosmos DB Cassandra API instance, there should be a single contact point,
             // the global endpoint. This code guards against other arrangements with this expectation: All contact
