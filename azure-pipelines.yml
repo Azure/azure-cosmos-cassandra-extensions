@@ -51,8 +51,9 @@ variables:
 
 - name: New-JavaTruststore
   value: |
-    Set-Content -Path $Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH -Value `
-        [System.Convert]::FromBase64String($Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT) -AsByteStream
+    Write-Host "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH=$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH"
+    Write-Host "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT=$ENV:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT"
+    Set-Content -Path $Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH -AsByteStream -Value ([System.Convert]::FromBase64String($Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT))
 
 - name: Stage-Artifacts
   value: |
