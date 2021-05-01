@@ -14,9 +14,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -170,7 +174,9 @@ public class ApplicationCommandLineRunnerTest {
             return;
         }
 
-        try (final FileWriter writer = new FileWriter(outputPath.toFile(), StandardCharsets.UTF_8)) {
+        final File outputFile = outputPath.toFile();
+
+        try (final Writer writer = new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
             for (final String line : output) {
                 writer.write(line);
                 writer.write('\n');
@@ -195,7 +201,7 @@ public class ApplicationCommandLineRunnerTest {
     }
 
     /**
-     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
+     * Get the value of the specified system {@code property} or--if it is unsetgit--environment {@code variable}.
      * <p>
      * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
      *
