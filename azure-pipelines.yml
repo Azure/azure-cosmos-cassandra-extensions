@@ -10,8 +10,10 @@ pr:
 - develop/java-driver-4
 - release/java-driver-4/*
 
+variables:
+
 - name: Azure.Cosmos.Cassandra.Preferred.Regions
-  value: '$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1),($AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2),$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3)'
+  value: '$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1),$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2),$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3)'
   readonly: true
 
 - name: Azure.Cosmos.Cassandra.Truststore.Content
