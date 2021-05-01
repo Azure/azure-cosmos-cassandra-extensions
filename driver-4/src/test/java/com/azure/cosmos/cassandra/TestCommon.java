@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Fail.fail;
 
 /**
  * A utility class that implements common static methods useful for writing tests.
@@ -36,39 +37,55 @@ public final class TestCommon {
         throw new UnsupportedOperationException();
     }
 
-    static {
-        System.out.println("GLOBAL_ENDPOINT = " + getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.global-endpoint",
-            "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-            "localhost:10350"));
-        System.out.println("PREFERRED_REGIONS = " + getPropertyOrEnvironmentVariableList(
-            "azure.cosmos.cassandra.preferred-region-",
-            "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
-            5));
-        System.out.println("REGIONAL_ENDPOINTS = " + getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.regional-endpoints",
-            "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS",
-            ""));
-    }
-    
     // region Fields
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
-    static final InetSocketAddress GLOBAL_ENDPOINT = parseSocketAddress(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.global-endpoint",
-        "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "localhost:10350"));
+    static final InetSocketAddress GLOBAL_ENDPOINT;
 
-    static final List<String> PREFERRED_REGIONS = getPropertyOrEnvironmentVariableList(
-        "azure.cosmos.cassandra.preferred-region-",
-        "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
-        5);
+    static final List<String> PREFERRED_REGIONS;
 
-    static final List<SocketAddress> REGIONAL_ENDPOINTS = Arrays.stream(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.regional-endpoints",
-        "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS",
-        "").split("\\s*,\\s*")).map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+    static final List<SocketAddress> REGIONAL_ENDPOINTS;
+
+    static {
+
+        try {
+            // GLOBAL_ENDPOINT
+
+            final String value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.global-endpoint",
+                "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
+                null);
+
+            assertThat(value).isNotBlank();
+            GLOBAL_ENDPOINT = parseSocketAddress(value);
+
+            // PREFERRED_REGIONS
+
+            List<String> list = getPropertyOrEnvironmentVariableList(
+                "azure.cosmos.cassandra.preferred-region-",
+                "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
+                3);
+
+            assertThat(list).isNotEmpty();
+            PREFERRED_REGIONS = list;
+
+            // REGIONAL_ENDPOINTS
+
+            list = getPropertyOrEnvironmentVariableList(
+                "azure.cosmos.cassandra.regional-endpoint_",
+                "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_",
+                3);
+
+            assertThat(list).isNotEmpty();
+            REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+
+        } catch (final Throwable error) {
+            //noinspection ResultOfMethodCallIgnored
+            fail("TestCommon could not be initialized", error);
+            throw error;
+        }
+    }
 
     // endregion
 
