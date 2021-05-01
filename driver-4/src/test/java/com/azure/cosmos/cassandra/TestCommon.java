@@ -36,6 +36,21 @@ public final class TestCommon {
         throw new UnsupportedOperationException();
     }
 
+    static {
+        System.out.println("GLOBAL_ENDPOINT = " + getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.global-endpoint",
+            "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
+            "localhost:10350"));
+        System.out.println("PREFERRED_REGIONS = " + getPropertyOrEnvironmentVariableList(
+            "azure.cosmos.cassandra.preferred-region-",
+            "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
+            5));
+        System.out.println("REGIONAL_ENDPOINTS = " + getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.regional-endpoints",
+            "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS",
+            ""));
+    }
+    
     // region Fields
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
@@ -54,25 +69,6 @@ public final class TestCommon {
         "azure.cosmos.cassandra.regional-endpoints",
         "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS",
         "").split("\\s*,\\s*")).map(TestCommon::parseSocketAddress).collect(Collectors.toList());
-
-    static final boolean MULTI_REGION_WRITES = Boolean.parseBoolean(getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.multi-region-writes",
-        "AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES",
-        "false"));
-
-    // region Deprecated
-
-    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.read-datacenter",
-        "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
-        "localhost");
-
-    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.write-datacenter",
-        "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
-        "localhost");
-
-    // endregion
 
     // endregion
 
@@ -173,6 +169,7 @@ public final class TestCommon {
      * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
      * {@code defaultValue}.
      */
+    @SuppressWarnings("SameParameterValue")
     static List<String> getPropertyOrEnvironmentVariableList(
         @NonNull final String property, @NonNull final String variable, final int limit) {
 
