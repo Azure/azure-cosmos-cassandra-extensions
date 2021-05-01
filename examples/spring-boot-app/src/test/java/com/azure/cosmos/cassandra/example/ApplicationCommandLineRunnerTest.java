@@ -110,17 +110,13 @@ public class ApplicationCommandLineRunnerTest {
     public void recreateKeyspace() {
 
         try (final CqlSession session = CqlSession.builder().build()) {
-
-            session.execute(
-                SimpleStatement.newInstance("CREATE KEYSPACE IF NOT EXISTS "
-                    + "azure_cosmos_cassandra_driver_4_examples WITH "
-                    + "REPLICATION={"
-                    + "'class':'SimpleStrategy',"
-                    + "   'replication_factor':4"
-                    + "} AND "
-                    + "cosmosdb_provisioned_throughput=100000")
-                    .setConsistencyLevel(ConsistencyLevel.ALL));
-
+            session.execute(SimpleStatement.newInstance("CREATE KEYSPACE IF NOT EXISTS "
+                + "azure_cosmos_cassandra_driver_4_examples WITH "
+                + "REPLICATION={"
+                + "'class':'SimpleStrategy',"
+                + "   'replication_factor':4"
+                + "} AND "
+                + "cosmosdb_provisioned_throughput=100000").setConsistencyLevel(ConsistencyLevel.ALL));
         } catch (final Throwable error) {
             fail("could not recreate table azure_cosmos_cassandra_driver_4_examples.people", error);
         }
