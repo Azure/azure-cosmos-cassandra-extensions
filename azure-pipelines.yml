@@ -125,7 +125,7 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-Dcheckstyle.skip -DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
+      options: '-Dcheckstyle.skip -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -209,7 +209,7 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-Dcheckstyle.skip -DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
+      options: '-Dcheckstyle.skip -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
