@@ -21,7 +21,7 @@ variables:
   readonly: true
 
 - name: Azure.Cosmos.Cassandra.Truststore.Path
-  value: $(Build.ArtifactStagingDirectory)/truststore.p12
+  value: $(Build.Repository.LocalPath)/truststore.p12
   readonly: true
 
 - name: Log.Filename
