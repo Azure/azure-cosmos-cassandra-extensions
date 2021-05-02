@@ -116,6 +116,8 @@ jobs:
       options: '-DargLine="$(Maven.Surefire.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
   - task: Maven@3
     displayName: 'Verify spring-boot-app example'
     inputs:
