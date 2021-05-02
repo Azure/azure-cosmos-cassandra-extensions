@@ -173,6 +173,9 @@ public final class CosmosRetryPolicyTest {
         if (session != null && !session.isClosed()) {
             try {
                 session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
+            } catch (final Throwable error) {
+                System.out.println("unexpected error during cleanup: " + error);
+                LOG.error("unexpected error during cleanup: ", error);
             } finally {
                 session.close();
             }

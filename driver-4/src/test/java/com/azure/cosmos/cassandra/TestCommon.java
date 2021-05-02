@@ -86,6 +86,8 @@ public final class TestCommon {
         out.println("REGIONAL_ENDPOINTS = " + list);
         assertThat(list).isNotEmpty();
         REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+
+        out.println();
     }
 
     // endregion
