@@ -54,7 +54,7 @@ variables:
     Write-Host "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH = '$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH'"
     Write-Host "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT = '$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT'"
     Set-Content -Path $Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH -AsByteStream -Value ([System.Convert]::FromBase64String("$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT"))
-    keytool -list -keystore "$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH" -storepas "$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD"
+    keytool -list -keystore "$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH" -storepass "$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD"
 - name: Stage-Artifacts
   value: |
     $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
