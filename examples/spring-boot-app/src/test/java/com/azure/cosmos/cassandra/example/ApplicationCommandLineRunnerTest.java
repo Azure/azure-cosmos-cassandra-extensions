@@ -211,6 +211,8 @@ public class ApplicationCommandLineRunnerTest {
             try (final BufferedReader reader = Files.newBufferedReader(logPath, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(System.out::println);
             } catch (final IOException error) {
+                System.out.println("L O G  D U M P  E R R O R");
+                error.printStackTrace(System.out);
                 assertionError.addSuppressed(error);
             }
 
