@@ -44,7 +44,6 @@ variables:
     -Dazure.cosmos.cassandra.regional-endpoints='$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS)'
     -Dazure.cosmos.cassandra.hostname-validation='$(AZURE_COSMOS_CASSANDRA_HOSTNAME_VALIDATION)'
     -Dazure.cosmos.cassandra.truststore-path='$(Azure.Cosmos.Cassandra.Truststore.Path)'
-    -Dazure.cosmos.cassandra.truststore-password='$(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)'
     -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
     -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
   readonly: true
@@ -130,6 +129,8 @@ jobs:
       options: '-DargLine="$(Maven.Surefire.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
   - task: PowerShell@2
     displayName: 'Stage driver-4 artifacts'
     inputs:
@@ -196,6 +197,8 @@ jobs:
       options: '-DargLine="$(Maven.Surefire.ArgLine)"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
   - task: Maven@3
     displayName: 'Verify spring-boot-app example'
     inputs:
@@ -208,6 +211,8 @@ jobs:
       options: '-DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=$(Build.Repository.LocalPath)/examples/spring-boot-app/target/azure-cosmos-cassandra-spring-boot-app-example-\${project.version}.jar"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
   - task: PowerShell@2
     displayName: 'Stage driver-4 artifacts'
     inputs:
