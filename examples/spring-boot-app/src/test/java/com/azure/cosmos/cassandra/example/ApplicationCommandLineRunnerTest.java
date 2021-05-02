@@ -15,7 +15,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -32,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.Fail.fail;
@@ -137,7 +137,7 @@ public class ApplicationCommandLineRunnerTest {
     public void run(final boolean multiRegionWrites) {
         final ProcessBuilder builder = new ProcessBuilder();
         builder.environment().put("AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITE", "true");
-        this.exec("run.withMultiRegionWrites(" + multiRegionWrites + ")", builder);
+        this.exec("run.withMultiRegionWrites-" + multiRegionWrites, builder);
     }
 
     // endregion
@@ -149,14 +149,14 @@ public class ApplicationCommandLineRunnerTest {
     private void exec(final String testName, final ProcessBuilder processBuilder) {
 
         final String baseFilename = "azure-cosmos-cassandra-spring-boot-app-example." + testName;
-        final Path logPath = Paths.get(LOG_PATH, baseFilename + ".log");
+        final Path logFile = Paths.get(LOG_PATH, baseFilename + ".log");
         final Path outputPath = Paths.get(LOG_PATH, baseFilename + ".output");
 
         assertThatCode(() -> Files.createDirectories(Paths.get(LOG_PATH))).doesNotThrowAnyException();
-        assertThatCode(() -> Files.deleteIfExists(logPath)).doesNotThrowAnyException();
+        assertThatCode(() -> Files.deleteIfExists(logFile)).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
-        processBuilder.command(COMMAND).environment().put("AZURE_COSMOS_CASSANDRA_LOG_FILE", logPath.toString());
+        processBuilder.command(COMMAND).environment().put("AZURE_COSMOS_CASSANDRA_LOG_FILE", logFile.toString());
 
         final Process process;
 
@@ -205,23 +205,28 @@ public class ApplicationCommandLineRunnerTest {
 
         } catch (final AssertionError assertionError) {
 
-            System.out.println("---------------------------------------------------------------------------------");
-            System.out.println("LOG DUMP: " + logPath);
-            System.out.println("---------------------------------------------------------------------------------");
+            out.println("---------------------------------------------------------------------------------");
+            out.println("LOG DUMP");
+            out.println("---------------------------------------------------------------------------------");
+            out.println("COMMAND: " + COMMAND);
+            out.println("ENVIRONMENT: " + processBuilder.environment());
+            out.println("LOG_FILE: " + logFile);
+            out.println("OUTPUT_FILE: " + outputFile);
+            out.println("EXIT_VALUE: " + process.exitValue());
 
-            try (final BufferedReader reader = Files.newBufferedReader(logPath, StandardCharsets.UTF_8)) {
-                reader.lines().forEach(System.out::println);
+            try (final BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
+                reader.lines().forEach(out::println);
             } catch (final IOException error) {
-                System.out.println("---------------------------------------------------------------------------------");
-                System.out.println("LOG DUMP ERROR: " + logPath);
-                System.out.println("---------------------------------------------------------------------------------");
-                error.printStackTrace(System.out);
+                out.println("---------------------------------------------------------------------------------");
+                out.println("LOG DUMP ERROR");
+                out.println("---------------------------------------------------------------------------------");
+                error.printStackTrace(out);
                 assertionError.addSuppressed(error);
             }
 
-            System.out.println("---------------------------------------------------------------------------------");
-            System.out.println("LOG DUMP END: " + logPath);
-            System.out.println("---------------------------------------------------------------------------------");
+            out.println("---------------------------------------------------------------------------------");
+            out.println("LOG DUMP END: ");
+            out.println("---------------------------------------------------------------------------------");
 
             throw assertionError;
         }
