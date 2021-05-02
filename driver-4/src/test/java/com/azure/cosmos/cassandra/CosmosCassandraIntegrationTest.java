@@ -152,9 +152,7 @@ public class CosmosCassandraIntegrationTest {
                 throw new NoSuchElementException(DefaultSessionMetric.CQL_REQUESTS + " metrics are unavailable");
             }
 
-            final Timer sessionRequestTimer = (Timer) metrics.getSessionMetric(DefaultSessionMetric.CQL_REQUESTS).get();
-            final AtomicLong expectedRowCount = new AtomicLong();
-            long expectedRequestCount = 0;
+            final AtomicLong expectedRowCount = new AtomicLong();  // updated inside lambdas
 
             try (final ScheduledReporter reporter = CsvReporter.forRegistry(metrics.getRegistry())
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
@@ -162,10 +160,7 @@ public class CosmosCassandraIntegrationTest {
                 .build(REPORTING_DIRECTORY)) {
 
                 assertThatCode(() -> this.createSchema(session)).doesNotThrowAnyException();
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 3);
-
                 assertThatCode(() -> expectedRowCount.set(this.write(session))).doesNotThrowAnyException();
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount += 1);
 
                 assertThatCode(() -> {
                     final List<Row> rows = this.read(session).all();
@@ -173,7 +168,6 @@ public class CosmosCassandraIntegrationTest {
                     assertThat(rows.size()).isEqualTo(expectedRowCount.get());
                 }).doesNotThrowAnyException();
 
-                assertThat(sessionRequestTimer.getCount()).isEqualTo(expectedRequestCount + 1);
                 reporter.report();
 
             } finally {
