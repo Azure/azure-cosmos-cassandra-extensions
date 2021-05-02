@@ -180,8 +180,8 @@ jobs:
       script: $(New-JavaTruststore)
       pwsh: true
       workingDirectory: '$(Build.ArtifactStagingDirectory)'
-      env:
-        AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
   - task: Maven@3
     displayName: 'Verify driver-4 extensions'
     inputs:
