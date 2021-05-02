@@ -127,7 +127,7 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
   - task: PowerShell@2
-    displayName: 'Stage artifacts'
+    displayName: 'Stage driver-4 artifacts'
     inputs:
       targetType: 'inline'
       script: $(Stage-Artifacts)
