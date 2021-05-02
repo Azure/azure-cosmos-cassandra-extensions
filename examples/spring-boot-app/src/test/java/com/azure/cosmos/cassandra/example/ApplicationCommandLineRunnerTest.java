@@ -221,7 +221,6 @@ public class ApplicationCommandLineRunnerTest {
                 EXPECTED_OUTPUT.get(7),
                 EXPECTED_OUTPUT.get(8));
             assertThat(output).endsWith(EXPECTED_OUTPUT.get(EXPECTED_OUTPUT.size() - 1));
-            assertThat(output.size()).isEqualTo(EXPECTED_OUTPUT.size());
             assertThat(process.exitValue()).isEqualTo(0);
 
         } catch (final AssertionError assertionError) {
