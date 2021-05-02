@@ -144,6 +144,7 @@ public class ApplicationCommandLineRunnerTest {
 
     // region Privates
 
+    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private void exec(final String testName, final ProcessBuilder processBuilder) {
 
@@ -204,10 +205,10 @@ public class ApplicationCommandLineRunnerTest {
         } catch (final AssertionError assertionError) {
 
             System.out.println("-------------------------------------------------------------------------------------");
-            System.out.println("L O G  D U M P  S T A R T");
+            System.out.println("L O G  D U M P  B E G I N");
             System.out.println(logPath);
 
-            try (final BufferedReader reader = new BufferedReader(new FileReader(logPath.toFile(), StandardCharsets.UTF_8))) {
+            try (final BufferedReader reader = Files.newBufferedReader(logPath, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(System.out::println);
             } catch (final IOException error) {
                 assertionError.addSuppressed(error);
