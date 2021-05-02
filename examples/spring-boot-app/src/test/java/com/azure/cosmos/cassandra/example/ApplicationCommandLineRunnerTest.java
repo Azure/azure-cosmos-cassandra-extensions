@@ -80,8 +80,7 @@ public class ApplicationCommandLineRunnerTest {
     static {
 
         assertThat(JAR).isNotBlank();
-        //noinspection ResultOfMethodCallIgnored
-        assertThat(Paths.get(JAR)).exists().withFailMessage("%s does not exist", JAR);
+        assertThat(Paths.get(JAR)).withFailMessage("%s does not exist", JAR).exists();
 
         // COMMAND
 
@@ -135,7 +134,7 @@ public class ApplicationCommandLineRunnerTest {
                 + "} AND "
                 + "cosmosdb_provisioned_throughput=100000").setConsistencyLevel(ConsistencyLevel.ALL));
         } catch (final Throwable error) {
-            fail("could not recreate table azure_cosmos_cassandra_driver_4_examples.people", error);
+            fail("could not create table azure_cosmos_cassandra_driver_4_examples.people", error);
         }
     }
 
