@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -67,6 +68,11 @@ public class ApplicationCommandLineRunnerTest {
         "azure.cosmos.cassandra.log-path",
         "AZURE_COSMOS_CASSANDRA_LOG_PATH",
         Paths.get(System.getProperty("user.home"), ".local", "var", "log").toString());
+
+    private static final List<String> PREFERRED_REGIONS = getPropertyOrEnvironmentVariableList(
+        "azure.cosmos.cassandra.preferred-region-",
+        "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
+        3);
 
     private static final long TIMEOUT_IN_MINUTES = 2;
 
@@ -156,7 +162,10 @@ public class ApplicationCommandLineRunnerTest {
         assertThatCode(() -> Files.deleteIfExists(logFile)).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
-        processBuilder.command(COMMAND).environment().put("AZURE_COSMOS_CASSANDRA_LOG_FILE", logFile.toString());
+        final Map<String, String> environment = processBuilder.command(COMMAND).environment();
+
+        environment.put("AZURE_COSMOS_CASSANDRA_LOG_FILE", logFile.toString());
+        environment.put("AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS", String.join(",", PREFERRED_REGIONS));
 
         final Process process;
 
@@ -259,6 +268,36 @@ public class ApplicationCommandLineRunnerTest {
         }
 
         return value;
+    }
+
+    /**
+     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
+     * <p>
+     * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
+     *
+     * @param property a system property name.
+     * @param variable an environment variable name.
+     * @param limit    the default value--which may be {@code null}--to be used if neither {@code property} or {@code
+     *                 variable} is set.
+     *
+     * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
+     * {@code defaultValue}.
+     */
+    @SuppressWarnings("SameParameterValue")
+    static List<String> getPropertyOrEnvironmentVariableList(
+        @NonNull final String property, @NonNull final String variable, final int limit) {
+
+        final List<String> list = new ArrayList<>(limit);
+
+        for (int i = 1; i <= limit; i++) {
+            final String value = getPropertyOrEnvironmentVariable(property + i, variable + i, null);
+            if (value == null) {
+                break;
+            }
+            list.add(value);
+        }
+
+        return list;
     }
 
     // endregion
