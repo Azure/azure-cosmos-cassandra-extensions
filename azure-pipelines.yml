@@ -35,7 +35,6 @@ variables:
 - name: Maven.Surefire.ArgLine
   value: >
     -Dazure.cosmos.cassandra.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
-    -Dazure.cosmos.cassandra.local-datacenter='$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)'
     -Dazure.cosmos.cassandra.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
     -Dazure.cosmos.cassandra.preferred-regions='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS)'
     -Dazure.cosmos.cassandra.preferred-region_1='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1)'
