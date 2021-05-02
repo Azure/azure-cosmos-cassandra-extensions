@@ -2,7 +2,7 @@ cosmos.cassandra:
   base-packages: com.azure.cosmos.cassandra.example.data
   contact-point: ${AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT}
   keyspace: azure_cosmos_cassandra_driver_4_examples
-  schema-action: RECREATE
+  schema-action: CREATE_IF_NOT_EXISTS
 
   auth-provider:
     # By default we use the PlainTextAuthProvider (see reference.conf) and specify the username and password here.
