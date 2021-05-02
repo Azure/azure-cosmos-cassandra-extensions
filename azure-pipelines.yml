@@ -36,7 +36,6 @@ variables:
   value: >
     -Dazure.cosmos.cassandra.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
     -Dazure.cosmos.cassandra.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
-    -Dazure.cosmos.cassandra.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
     -Dazure.cosmos.cassandra.preferred-regions='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS)'
     -Dazure.cosmos.cassandra.preferred-region_1='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1)'
     -Dazure.cosmos.cassandra.preferred-region_1='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2)'
@@ -118,6 +117,7 @@ jobs:
     env:
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH: $(Azure.Cosmos.Cassandra.Truststore.Path)
   - task: Maven@3
     displayName: 'Verify spring-boot-app example'
     inputs:
@@ -133,6 +133,7 @@ jobs:
     env:
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH: $(Azure.Cosmos.Cassandra.Truststore.Path)
   - task: PowerShell@2
     displayName: 'Stage driver-4 artifacts'
     inputs:
@@ -202,6 +203,7 @@ jobs:
     env:
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH: $(Azure.Cosmos.Cassandra.Truststore.Path)
   - task: Maven@3
     displayName: 'Verify spring-boot-app example'
     inputs:
@@ -217,6 +219,7 @@ jobs:
     env:
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH: $(Azure.Cosmos.Cassandra.Truststore.Path)
   - task: PowerShell@2
     displayName: 'Stage driver-4 artifacts'
     inputs:
