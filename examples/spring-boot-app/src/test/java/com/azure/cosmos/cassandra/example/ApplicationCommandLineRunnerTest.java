@@ -148,10 +148,11 @@ public class ApplicationCommandLineRunnerTest {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     private void exec(final String testName, final ProcessBuilder processBuilder) {
 
-        final String baseFilename = "azure-cosmos-cassandra-spring-boot-app." + testName;
+        final String baseFilename = "azure-cosmos-cassandra-spring-boot-app-example." + testName;
         final Path logPath = Paths.get(LOG_PATH, baseFilename + ".log");
         final Path outputPath = Paths.get(LOG_PATH, baseFilename + ".output");
 
+        assertThatCode(() -> Files.createDirectories(Paths.get(LOG_PATH));
         assertThatCode(() -> Files.deleteIfExists(logPath)).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
@@ -204,19 +205,23 @@ public class ApplicationCommandLineRunnerTest {
 
         } catch (final AssertionError assertionError) {
 
-            System.out.println("-------------------------------------------------------------------------------------");
+            System.out.println("---------------------------------------------------------------------------------");
             System.out.println("LOG DUMP: " + logPath);
+            System.out.println("---------------------------------------------------------------------------------");
 
             try (final BufferedReader reader = Files.newBufferedReader(logPath, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(System.out::println);
             } catch (final IOException error) {
+                System.out.println("---------------------------------------------------------------------------------");
                 System.out.println("LOG DUMP ERROR: " + logPath);
+                System.out.println("---------------------------------------------------------------------------------");
                 error.printStackTrace(System.out);
                 assertionError.addSuppressed(error);
             }
 
+            System.out.println("---------------------------------------------------------------------------------");
             System.out.println("LOG DUMP END: " + logPath);
-            System.out.println("-------------------------------------------------------------------------------------");
+            System.out.println("---------------------------------------------------------------------------------");
 
             throw assertionError;
         }
