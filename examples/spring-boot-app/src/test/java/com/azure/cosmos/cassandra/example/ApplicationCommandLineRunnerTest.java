@@ -81,7 +81,7 @@ public class ApplicationCommandLineRunnerTest {
 
         assertThat(JAR).isNotBlank();
         //noinspection ResultOfMethodCallIgnored
-        assertThat(Paths.get(JAR)).exists().withFailMessage("%s does not exist", JAR);
+        assertThat(Paths.get(JAR)).withFailMessage("%s does not exist", JAR).exists();
 
         // COMMAND
 
