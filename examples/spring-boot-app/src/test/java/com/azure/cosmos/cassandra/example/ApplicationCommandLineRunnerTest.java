@@ -8,7 +8,6 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -16,8 +15,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -29,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -73,6 +71,11 @@ public class ApplicationCommandLineRunnerTest {
 
     static {
 
+        assertThat(JAR).isNotBlank();
+        assertThat(Paths.get(JAR)).exists();
+
+        // COMMAND
+
         final List<String> command = new ArrayList<>();
 
         command.add(JAVA);
@@ -82,31 +85,29 @@ public class ApplicationCommandLineRunnerTest {
 
         COMMAND = Collections.unmodifiableList(command);
 
-        List<String> expectedOutput = null;
+        // EXPECTED_OUTPUT
 
-        try (final BufferedReader reader = new BufferedReader(
-            new InputStreamReader(
-                Objects.requireNonNull(ApplicationCommandLineRunner.class
-                    .getClassLoader()
-                    .getResourceAsStream("expected.output")), StandardCharsets.UTF_8))) {
+        final InputStream istream = ApplicationCommandLineRunnerTest.class
+            .getClassLoader()
+            .getResourceAsStream("expected.output");
+
+        assertThat(istream).isNotNull();
+
+        List<String> expectedOutput;
+
+        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(istream, StandardCharsets.UTF_8))) {
             expectedOutput = reader.lines().collect(Collectors.toList());
         } catch (final IOException error) {
             expectedOutput = null;
         }
 
+        assertThat(expectedOutput).isNotEmpty();
         EXPECTED_OUTPUT = expectedOutput;
     }
 
     // endregion
 
     // region Methods
-
-    @BeforeAll
-    public static void checkExpectedOutputAndJar() {
-        assertThat(EXPECTED_OUTPUT).isNotEmpty();
-        assertThat(JAR).isNotBlank();
-        assertThat(Paths.get(JAR)).exists();
-    }
 
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @SuppressWarnings("ResultOfMethodCallIgnored")
