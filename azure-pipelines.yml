@@ -125,7 +125,7 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-DargLine="$(Maven.Surefire.ArgLine)"'
+      options: '-DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -209,7 +209,7 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=$(Build.Repository.LocalPath)/examples/spring-boot-app/target/azure-cosmos-cassandra-spring-boot-app-example-\${project.version}.jar"'
+      options: '-DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
