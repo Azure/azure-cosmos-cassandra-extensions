@@ -44,6 +44,7 @@ import static org.assertj.core.api.Fail.fail;
  * specification of load balancing policy options. This test should be run against single-region, multi-region, and
  * multi-master accounts.
  */
+@SuppressFBWarnings("RV_RETURN_VALUE_IGNORED")
 public class ApplicationCommandLineRunnerTest {
 
     // region Fields
