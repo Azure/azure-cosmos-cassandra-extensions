@@ -53,7 +53,7 @@ public class ApplicationCommandLineRunnerTest {
     private static final String JAR = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.jar",
         "AZURE_COSMOS_CASSANDRA_JAR",
-        System.getProperty("java.classpath"));
+        null);
 
     private static final String JAVA = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
 
@@ -87,15 +87,15 @@ public class ApplicationCommandLineRunnerTest {
 
         // EXPECTED_OUTPUT
 
-        final InputStream istream = ApplicationCommandLineRunnerTest.class
+        final InputStream stream = ApplicationCommandLineRunnerTest.class
             .getClassLoader()
             .getResourceAsStream("expected.output");
 
-        assertThat(istream).isNotNull();
+        assertThat(stream).isNotNull();
 
         List<String> expectedOutput;
 
-        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(istream, StandardCharsets.UTF_8))) {
+        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             expectedOutput = reader.lines().collect(Collectors.toList());
         } catch (final IOException error) {
             expectedOutput = null;
