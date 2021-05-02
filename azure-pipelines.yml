@@ -51,8 +51,10 @@ variables:
 
 - name: New-JavaTruststore
   value: |
-    Set-Content -Path $Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH -AsByteStream -Value ([System.Convert]::FromBase64String("$(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT)"))
-    keytool -list -keystore "$Env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH" -storepass "$(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)"
+    Get-Item env:* | Sort-Object -Property Name
+    Set-Content -Path "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}" -AsByteStream -Value ([System.Convert]::FromBase64String("${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT}"))
+    keytool -list -keystore "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}" -storepass "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD}"
+
 - name: Stage-Artifacts
   value: |
     $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
