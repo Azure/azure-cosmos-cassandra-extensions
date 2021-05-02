@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.LOCAL_DATACENTER;
 import static com.azure.cosmos.cassandra.TestCommon.display;
 import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static java.lang.String.format;
@@ -94,11 +95,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 public final class CosmosRetryPolicyTest {
 
     // region Fields
-
-    static final String LOCAL_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.local-datacenter",
-        "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
-        "localhost");
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
 
@@ -173,9 +169,6 @@ public final class CosmosRetryPolicyTest {
         if (session != null && !session.isClosed()) {
             try {
                 session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
-            } catch (final Throwable error) {
-                System.out.println("unexpected error during cleanup: " + error);
-                LOG.error("unexpected error during cleanup: ", error);
             } finally {
                 session.close();
             }

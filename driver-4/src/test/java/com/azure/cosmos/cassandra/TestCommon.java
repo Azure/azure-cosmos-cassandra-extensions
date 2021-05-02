@@ -44,6 +44,8 @@ public final class TestCommon {
 
     static InetSocketAddress GLOBAL_ENDPOINT;
 
+    static String LOCAL_DATACENTER;
+
     static List<String> PREFERRED_REGIONS;
 
     static List<SocketAddress> REGIONAL_ENDPOINTS;
@@ -56,7 +58,7 @@ public final class TestCommon {
 
         // GLOBAL_ENDPOINT
 
-        final String value = getPropertyOrEnvironmentVariable(
+        String value = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.global-endpoint",
             "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
             null);
@@ -64,6 +66,17 @@ public final class TestCommon {
         out.println("GLOBAL_ENDPOINT = " + value);
         assertThat(value).isNotBlank();
         GLOBAL_ENDPOINT = parseSocketAddress(value);
+
+        // LOCAL_DATACENTER
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.global-endpoint",
+            "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
+            null);
+
+        out.println("LOCAL_DATACENTER = " + value);
+        assertThat(value).isNotBlank();
+        LOCAL_DATACENTER = value;
 
         // PREFERRED_REGIONS
 
