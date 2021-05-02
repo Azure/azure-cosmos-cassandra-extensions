@@ -205,18 +205,17 @@ public class ApplicationCommandLineRunnerTest {
         } catch (final AssertionError assertionError) {
 
             System.out.println("-------------------------------------------------------------------------------------");
-            System.out.println("L O G  D U M P  B E G I N");
-            System.out.println(logPath);
+            System.out.println("LOG DUMP: " + logPath);
 
             try (final BufferedReader reader = Files.newBufferedReader(logPath, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(System.out::println);
             } catch (final IOException error) {
-                System.out.println("L O G  D U M P  E R R O R");
+                System.out.println("LOG DUMP ERROR: " + logPath);
                 error.printStackTrace(System.out);
                 assertionError.addSuppressed(error);
             }
 
-            System.out.println("L O G  D U M P  E N D");
+            System.out.println("LOG DUMP END: " + logPath);
             System.out.println("-------------------------------------------------------------------------------------");
 
             throw assertionError;
