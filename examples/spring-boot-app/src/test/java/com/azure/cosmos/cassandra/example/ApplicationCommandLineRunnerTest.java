@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -112,8 +113,7 @@ public class ApplicationCommandLineRunnerTest {
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @BeforeEach
-    public void recreateKeyspace() {
-
+    public void createKeyspaceIfNotExists() {
         try (final CqlSession session = CqlSession.builder().build()) {
             session.execute(SimpleStatement.newInstance("CREATE KEYSPACE IF NOT EXISTS "
                 + "azure_cosmos_cassandra_driver_4_examples WITH "
@@ -194,11 +194,30 @@ public class ApplicationCommandLineRunnerTest {
             return;
         }
 
-        assertThat(output).startsWith(EXPECTED_OUTPUT.get(0), EXPECTED_OUTPUT.get(1));
-        assertThat(output).endsWith(EXPECTED_OUTPUT.get(EXPECTED_OUTPUT.size() - 1));
-        assertThat(output.size()).isEqualTo(EXPECTED_OUTPUT.size());
+        try {
 
-        assertThat(process.exitValue()).isEqualTo(0);
+            assertThat(output).startsWith(EXPECTED_OUTPUT.get(0), EXPECTED_OUTPUT.get(1));
+            assertThat(output).endsWith(EXPECTED_OUTPUT.get(EXPECTED_OUTPUT.size() - 1));
+            assertThat(output.size()).isEqualTo(EXPECTED_OUTPUT.size());
+            assertThat(process.exitValue()).isEqualTo(0);
+
+        } catch (final AssertionError assertionError) {
+
+            System.out.println("-------------------------------------------------------------------------------------");
+            System.out.println("L O G  D U M P  S T A R T");
+            System.out.println(logPath);
+
+            try (final BufferedReader reader = new BufferedReader(new FileReader(logPath.toFile(), StandardCharsets.UTF_8))) {
+                reader.lines().forEach(System.out::println);
+            } catch (final IOException error) {
+                assertionError.addSuppressed(error);
+            }
+
+            System.out.println("L O G  D U M P  E N D");
+            System.out.println("-------------------------------------------------------------------------------------");
+
+            throw assertionError;
+        }
     }
 
     /**
