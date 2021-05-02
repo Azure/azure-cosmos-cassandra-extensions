@@ -152,7 +152,7 @@ public class ApplicationCommandLineRunnerTest {
         final Path logPath = Paths.get(LOG_PATH, baseFilename + ".log");
         final Path outputPath = Paths.get(LOG_PATH, baseFilename + ".output");
 
-        assertThatCode(() -> Files.createDirectories(Paths.get(LOG_PATH)));
+        assertThatCode(() -> Files.createDirectories(Paths.get(LOG_PATH))).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(logPath)).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
