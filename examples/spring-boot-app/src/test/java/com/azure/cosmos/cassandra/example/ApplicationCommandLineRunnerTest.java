@@ -62,7 +62,7 @@ public class ApplicationCommandLineRunnerTest {
     private static final String JAVA_OPTIONS = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.java.options",
         "AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS",
-        "");
+        null);
 
     private static final String LOG_PATH = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.log-path",
@@ -86,7 +86,11 @@ public class ApplicationCommandLineRunnerTest {
         final List<String> command = new ArrayList<>();
 
         command.add(JAVA);
-        command.addAll(Arrays.asList(JAVA_OPTIONS.split("\\s+")));
+
+        if (!(JAVA_OPTIONS == null || JAVA_OPTIONS.isEmpty())) {
+            command.addAll(Arrays.asList(JAVA_OPTIONS.split("\\s+")));
+        }
+
         command.add("-jar");
         command.add(JAR);
 
@@ -206,8 +210,16 @@ public class ApplicationCommandLineRunnerTest {
         }
 
         try {
-
-            assertThat(output).startsWith(EXPECTED_OUTPUT.get(0), EXPECTED_OUTPUT.get(1));
+            assertThat(output).startsWith(
+                EXPECTED_OUTPUT.get(0),
+                EXPECTED_OUTPUT.get(1),
+                EXPECTED_OUTPUT.get(2),
+                EXPECTED_OUTPUT.get(3),
+                EXPECTED_OUTPUT.get(4),
+                EXPECTED_OUTPUT.get(5),
+                EXPECTED_OUTPUT.get(6),
+                EXPECTED_OUTPUT.get(7),
+                EXPECTED_OUTPUT.get(8));
             assertThat(output).endsWith(EXPECTED_OUTPUT.get(EXPECTED_OUTPUT.size() - 1));
             assertThat(output.size()).isEqualTo(EXPECTED_OUTPUT.size());
             assertThat(process.exitValue()).isEqualTo(0);
@@ -242,7 +254,7 @@ public class ApplicationCommandLineRunnerTest {
     }
 
     /**
-     * Get the value of the specified system {@code property} or--if it is unsetgit--environment {@code variable}.
+     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
      * <p>
      * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
      *

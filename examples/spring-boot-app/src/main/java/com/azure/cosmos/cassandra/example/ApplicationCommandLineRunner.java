@@ -28,6 +28,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -61,6 +62,7 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
      * @param args an array of arguments.
      */
     public static void main(final String[] args) {
+        System.out.println("ApplicationCommandLineRunner(args: " + Arrays.toString(args) + ") started");
         SpringApplication.run(ApplicationCommandLineRunner.class, args);
     }
 
@@ -79,8 +81,11 @@ public class ApplicationCommandLineRunner implements CommandLineRunner {
     @Override
     public void run(final String... args) {
 
+        System.out.println("ApplicationCommandLineRunner.run(args: " + Arrays.toString(args) + ") started");
+
         try {
             final int iterations = args.length == 0 ? 1 : Integer.parseUnsignedInt(args[0]);
+
             MetricsSnapshot metricsSnapshot;
             int requestCount = 0;
             int errorCount = 0;
