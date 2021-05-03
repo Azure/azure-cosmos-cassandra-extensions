@@ -88,7 +88,7 @@ public class ApplicationCommandLineRunnerTest {
         out.println("PREFERRED_REGIONS: " + PREFERRED_REGIONS);
 
         assertThat(JAR).withFailMessage("AZURE_COSMOS_CASSANDRA_JAR is unset").isNotBlank();
-        assertThat(Paths.get(JAR)).withFailMessage("%s does not exist", JAR).exists();
+        assertThat(Paths.get(JAR)).withFailMessage("Jar %s does not exist", JAR).exists();
 
         // COMMAND
 
