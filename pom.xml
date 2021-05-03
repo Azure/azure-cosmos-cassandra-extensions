@@ -7,16 +7,16 @@ Licensed under the MIT License.
 
   <modelVersion>4.0.0</modelVersion>
 
-  <name>Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra</name>
+  <name>Azure Cosmos Extensions for Apache Cassandra</name>
   <description>
-    Extends the DataStax Java Driver 4 for Apache Cassandra client library with Azure Cosmos awareness features.
+    Extends Apache Cassandra client libraries with Azure Cosmos awareness features.
   </description>
   <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
 
   <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
   <groupId>com.azure</groupId>
   <packaging>pom</packaging>
-  <version>0.1.0-beta.1</version>
+  <version>1.0.0</version>
 
   <developers>
     <developer>
@@ -37,18 +37,25 @@ Licensed under the MIT License.
   </licenses>
 
   <modules>
-    <module>package</module>
-    <module>examples</module>
+    <module>driver-4</module>
+    <module>spring-data</module>
+    <module>examples/java-driver-app</module>
+    <module>examples/spring-boot-app</module>
   </modules>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
-    <!-- Main dependency version numbers -->
+    <!-- Package dependency version numbers -->
     <version.cassandra-driver>[4.7,4.11)</version.cassandra-driver>
+    <version.jackson>[2.12,2.13)</version.jackson>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
+    <version.spring-data-cassandra>[3.2,3.3)</version.spring-data-cassandra>
+    <!-- Examples dependency version numbers -->
+    <version.spring-boot-starter-data-cassandra>[2.4.4]</version.spring-boot-starter-data-cassandra>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
+    <version.junit-jupiter>5.7.1</version.junit-jupiter>
     <version.log4j>2.13.3</version.log4j>
     <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
@@ -69,6 +76,11 @@ Licensed under the MIT License.
         <version>${project.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-cosmos-cassandra-spring-data-extensions</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.datastax.oss</groupId>
         <artifactId>java-driver-core</artifactId>
         <version>${version.cassandra-driver}</version>
@@ -82,6 +94,16 @@ Licensed under the MIT License.
         <groupId>com.datastax.oss</groupId>
         <artifactId>java-driver-query-builder</artifactId>
         <version>${version.cassandra-driver}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${version.jackson}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${version.jackson}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -104,14 +126,29 @@ Licensed under the MIT License.
         <version>${version.assertj-core}</version>
       </dependency>
       <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${version.junit-jupiter}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-params</artifactId>
+        <version>${version.junit-jupiter}</version>
+      </dependency>
+      <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${version.slf4j-api}</version>
       </dependency>
       <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <version>${version.testng}</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-cassandra</artifactId>
+        <version>${version.spring-boot-starter-data-cassandra}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.data</groupId>
+        <artifactId>spring-data-cassandra</artifactId>
+        <version>${version.spring-data-cassandra}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -172,6 +209,11 @@ Licensed under the MIT License.
           <artifactId>spotbugs-maven-plugin</artifactId>
           <version>${version.spotbugs}</version>
         </plugin>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>2.4.5</version>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -212,6 +254,12 @@ Licensed under the MIT License.
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <useModulePath>false</useModulePath>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>com.github.spotbugs</groupId>
