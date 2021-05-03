@@ -44,7 +44,6 @@ import static org.assertj.core.api.Fail.fail;
  * specification of load balancing policy options. This test should be run against single-region, multi-region, and
  * multi-master accounts.
  */
-@SuppressFBWarnings("RV_RETURN_VALUE_IGNORED")
 public class ApplicationCommandLineRunnerTest {
 
     // region Fields
@@ -103,17 +102,21 @@ public class ApplicationCommandLineRunnerTest {
             .getClassLoader()
             .getResourceAsStream("expected.output");
 
-        assertThat(stream).isNotNull();
+        assertThat(stream).withFailMessage("could not load expected.output resource").isNotNull();
+        assert stream != null;
 
         List<String> expectedOutput;
+        IOException error;
 
         try (final BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             expectedOutput = reader.lines().collect(Collectors.toList());
-        } catch (final IOException error) {
+            error = null;
+        } catch (final IOException exception) {
             expectedOutput = null;
+            error = exception;
         }
 
-        assertThat(expectedOutput).isNotEmpty();
+        assertThat(error).withFailMessage("could not read expected.output resource: ", error).isNull();
         EXPECTED_OUTPUT = expectedOutput;
     }
 
