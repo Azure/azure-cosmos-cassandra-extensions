@@ -78,15 +78,17 @@ public class ApplicationCommandLineRunnerTest {
 
     static {
 
-        System.out.println("JAVA: " + JAVA);
-        System.out.println("JAVA_OPTIONS: " + JAVA_OPTIONS);
-        System.out.println("LOG_PATH: " + LOG_PATH);
-        System.out.println("PREFERRED_REGIONS: " + PREFERRED_REGIONS);
+        out.println("--------------------------------------------------------------");
+        out.println("T E S T  P A R A M E T E R S");
+        out.println("--------------------------------------------------------------");
+        out.println("JAR = " + JAR);
+        out.println("JAVA = " + JAVA);
+        out.println("JAVA_OPTIONS: " + JAVA_OPTIONS);
+        out.println("LOG_PATH: " + LOG_PATH);
+        out.println("PREFERRED_REGIONS: " + PREFERRED_REGIONS);
 
-        assertThat(JAR).withFailMessage("AZURE_COSMOS_CASSANDRA_JAR is missing").isNotBlank();
-        System.out.println("Stop 1");
+        assertThat(JAR).withFailMessage("AZURE_COSMOS_CASSANDRA_JAR is unset").isNotBlank();
         assertThat(Paths.get(JAR)).withFailMessage("%s does not exist", JAR).exists();
-        System.out.println("Stop 2");
 
         // COMMAND
 
@@ -105,14 +107,12 @@ public class ApplicationCommandLineRunnerTest {
 
         // EXPECTED_OUTPUT
 
-        System.out.println("Stop 3");
         final InputStream stream = ApplicationCommandLineRunnerTest.class
             .getClassLoader()
             .getResourceAsStream("expected.output");
 
         assertThat(stream).withFailMessage("could not load expected.output resource").isNotNull();
         assert stream != null;
-        System.out.println("Stop 4");
 
         List<String> expectedOutput;
         IOException error;
@@ -124,11 +124,9 @@ public class ApplicationCommandLineRunnerTest {
             expectedOutput = null;
             error = exception;
         }
-        System.out.println("Stop 5");
 
         assertThat(error).withFailMessage("could not read expected.output resource: ", error).isNull();
         EXPECTED_OUTPUT = expectedOutput;
-        System.out.println("Stop 6");
     }
 
     // endregion
