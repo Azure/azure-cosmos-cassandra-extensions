@@ -24,27 +24,12 @@ variables:
   value: $(Build.Repository.LocalPath)/truststore.p12
   readonly: true
 
-- name: Log.Filename
+- name: Azure.Cosmos.Cassandra.Log.File
   value: $(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-4.log
   readonly: true
 
-- name: Reporting.Directory
+- name: Azure.Cosmos.Cassandra.Reporting.Directory
   value: $(Build.ArtifactStagingDirectory)
-  readonly: true
-
-- name: Maven.Surefire.ArgLine
-  value: >
-    -Dazure.cosmos.cassandra.global-endpoint=$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)
-    -Dazure.cosmos.cassandra.username=$(AZURE_COSMOS_CASSANDRA_USERNAME)
-    -Dazure.cosmos.cassandra.preferred-region_1='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1)'
-    -Dazure.cosmos.cassandra.preferred-region_2='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2)'
-    -Dazure.cosmos.cassandra.preferred-region_3='$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3)'
-    -Dazure.cosmos.cassandra.regional-endpoint_1=$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_1)
-    -Dazure.cosmos.cassandra.regional-endpoint_2=$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_2)
-    -Dazure.cosmos.cassandra.regional-endpoint_3=$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_3)
-    -Dazure.cosmos.cassandra.hostname-validation=$(AZURE_COSMOS_CASSANDRA_HOSTNAME_VALIDATION)
-    -Dazure.cosmos.cassandra.truststore-path=$(Azure.Cosmos.Cassandra.Truststore.Path)
-    -Dazure.cosmos.cassandra.reporting-directory=$(Reporting.Directory)
   readonly: true
 
 - name: New-JavaTruststore
@@ -110,7 +95,7 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: '-Dcheckstyle.skip -DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.log-file=$(Log.Filename)"'
+      options: -Dcheckstyle.skip
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -125,7 +110,7 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-Dcheckstyle.skip -DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
+      options: '-Dcheckstyle.skip -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -194,7 +179,7 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: '-Dcheckstyle.skip -DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.log-file=$(Log.Filename)"'
+      options: -Dcheckstyle.skip
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -209,7 +194,7 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: '-Dcheckstyle.skip -DargLine="$(Maven.Surefire.ArgLine) -Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
+      options: '-Dcheckstyle.skip -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar -Dazure.cosmos.cassandra.log-path=\${project.basedir}"'
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
