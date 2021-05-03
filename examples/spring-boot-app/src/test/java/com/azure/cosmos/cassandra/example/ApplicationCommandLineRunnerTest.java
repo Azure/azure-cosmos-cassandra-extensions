@@ -77,9 +77,11 @@ public class ApplicationCommandLineRunnerTest {
     private static final long TIMEOUT_IN_MINUTES = 2;
 
     static {
-
+        System.out.println("Stop 1");
         assertThat(JAR).isNotBlank();
+        System.out.println("Stop 2");
         assertThat(Paths.get(JAR)).withFailMessage("%s does not exist", JAR).exists();
+        System.out.println("Stop 3");
 
         // COMMAND
 
@@ -98,12 +100,14 @@ public class ApplicationCommandLineRunnerTest {
 
         // EXPECTED_OUTPUT
 
+        System.out.println("Stop 4");
         final InputStream stream = ApplicationCommandLineRunnerTest.class
             .getClassLoader()
             .getResourceAsStream("expected.output");
 
         assertThat(stream).withFailMessage("could not load expected.output resource").isNotNull();
         assert stream != null;
+        System.out.println("Stop 5");
 
         List<String> expectedOutput;
         IOException error;
@@ -115,9 +119,11 @@ public class ApplicationCommandLineRunnerTest {
             expectedOutput = null;
             error = exception;
         }
+        System.out.println("Stop 6");
 
         assertThat(error).withFailMessage("could not read expected.output resource: ", error).isNull();
         EXPECTED_OUTPUT = expectedOutput;
+        System.out.println("Stop 7");
     }
 
     // endregion
