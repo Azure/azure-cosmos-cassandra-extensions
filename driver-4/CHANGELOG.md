@@ -15,6 +15,7 @@ Maven Repository coordinates.
   <version>1.0.0</version>
 </dependency>
 ```
+You'll find the sources [here][0].
 
 Learn how to use `CosmosCassandraConfiguration`, `CosmosCassandraLoadBalancingPolicy`, and `CosmosCassandraRetryPolicy`
 with Spring Boot or a plain ordinary Java Application by taking a look at these Azure Samples on GitHub:
@@ -27,5 +28,6 @@ with Spring Boot or a plain ordinary Java Application by taking a look at these 
 This is the first preview release of the Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra. Get 
 started using this package by reviewing `README.md`.
 
+[0]: https://github.com/Azure/azure-cosmos-cassandra-extensions/tree/develop/java-driver-4
 [1]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4/
 [2]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4/
