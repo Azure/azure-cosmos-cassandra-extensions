@@ -2,7 +2,7 @@
 
 ## 1.0.0
 
-This is the first customer-ready release of the Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra.
+This is the first release of the Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra.
 Since Beta 1 we've simplified `CosmosLoadBalancingPolicy` and fixed a few bugs.
 
 Get started using this package by reviewing the `README.md` and--if you're a Spring Data Cassandra user, take a look at 
