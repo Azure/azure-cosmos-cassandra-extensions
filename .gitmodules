@@ -1,3 +1,6 @@
 [submodule "examples/spring-boot-app-new"]
 	path = examples/spring-boot-app
 	url = git@github.com:Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4.git
+[submodule "examples/java-driver-app"]
+	path = examples/java-driver-app
+	url = git@github.com:Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4.git
