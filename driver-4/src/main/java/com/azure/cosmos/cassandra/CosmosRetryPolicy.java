@@ -17,6 +17,7 @@ import com.datastax.oss.driver.api.core.servererrors.WriteFailureException;
 import com.datastax.oss.driver.api.core.servererrors.WriteType;
 import com.datastax.oss.driver.api.core.session.Request;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,6 +135,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         // nothing to do
     }
 
+    @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "false alarm")
     @Override
     public RetryDecision onErrorResponse(
         @NonNull final Request request, @NonNull final CoordinatorException error, final int retryCount) {
@@ -147,8 +149,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
                     if (retryAfterMillis == -1) {
                         retryAfterMillis = this.maxRetryCount == -1
                             ? this.fixedBackoffTimeInMillis
-                            : this.growingBackoffTimeInMillis * retryCount + RANDOM.nextInt(
-                                GROWING_BACKOFF_SALT_IN_MILLIS);
+                            : this.growingBackoffTimeInMillis * retryCount
+                                + RANDOM.nextInt(GROWING_BACKOFF_SALT_IN_MILLIS);
                     }
                     Thread.sleep(retryAfterMillis);
                     retryDecision = RetryDecision.RETRY_SAME;
