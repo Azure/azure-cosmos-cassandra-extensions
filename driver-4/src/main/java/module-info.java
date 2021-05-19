@@ -6,9 +6,14 @@ module com.azure.cosmos.cassandra {
     exports com.azure.cosmos.cassandra;
     exports com.azure.cosmos.cassandra.implementation to com.azure.cosmos.cassandra.config;
 
-    requires com.datastax.oss.driver.core;
+    // Named modules
+
     requires com.fasterxml.jackson.core;
     requires com.fasterxml.jackson.databind;
+
+    // Automatic modules
+
+    requires transitive com.datastax.oss.driver.core;
     requires com.github.spotbugs.annotations;
     requires org.slf4j;
 }

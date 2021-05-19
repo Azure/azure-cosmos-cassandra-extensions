@@ -88,6 +88,10 @@ public final class CosmosLoadBalancingPolicyTest {
     /**
      * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a {@code global-endpoint} (with no {@code
      * read-datacenter} or {@code write-datacenter}) routes requests correctly.
+     *
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled; otherwise
+     *                          {@code false}.
+     *
      * TODO (DANOBLE) Add the check that routing occurs as expected.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")

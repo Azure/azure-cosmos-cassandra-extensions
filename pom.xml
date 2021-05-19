@@ -218,12 +218,6 @@ Licensed under the MIT License.
     </pluginManagement>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <skipIfEmpty>true</skipIfEmpty>
-        </configuration>
-      </plugin>
-      <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
         <inherited>true</inherited>
         <configuration>

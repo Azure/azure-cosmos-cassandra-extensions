@@ -5,7 +5,12 @@ module com.azure.cosmos.cassandra.config {
 
     exports com.azure.cosmos.cassandra.config;
 
+    // Named modules
+
     requires com.azure.cosmos.cassandra;
+
+    // Automatic modules
+
     requires com.datastax.oss.driver.core;
     requires com.github.spotbugs.annotations;
     requires org.slf4j;

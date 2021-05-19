@@ -4,7 +4,6 @@ package com.azure.cosmos.cassandra;
 
 import com.codahale.metrics.CsvReporter;
 import com.codahale.metrics.ScheduledReporter;
-import com.codahale.metrics.Timer;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -127,6 +126,9 @@ public class CosmosCassandraIntegrationTest {
 
     /**
      * Verify that the extensions integrate with DataStax Java Driver 4 and its configuration system.
+     *
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled; otherwise
+     * {@code false}.
      */
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @ParameterizedTest

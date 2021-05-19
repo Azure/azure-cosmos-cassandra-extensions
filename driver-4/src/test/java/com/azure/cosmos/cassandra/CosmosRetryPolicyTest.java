@@ -38,7 +38,6 @@ import java.util.UUID;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.azure.cosmos.cassandra.TestCommon.LOCAL_DATACENTER;
 import static com.azure.cosmos.cassandra.TestCommon.display;
-import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;

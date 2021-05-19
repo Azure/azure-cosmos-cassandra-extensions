@@ -154,6 +154,9 @@ public class ApplicationCommandLineRunnerTest {
      * Runs the spring-boot-app and ensures that it completes with status code zero.
      * <p>
      * CosmosLoadBalancingPolicy is configured with and without multi-region writes.
+     *
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled; otherwise
+     *                          {@code false}.
      */
     @ParameterizedTest
     @ValueSource(booleans = { false, true })
