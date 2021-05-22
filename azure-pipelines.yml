@@ -98,7 +98,22 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: -Dcheckstyle.skip
+      options: -Dcheckstyle.skip -Dmaven.main.skip
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+  - task: Maven@3
+    displayName: 'Verify java-driver-app example'
+    inputs:
+      mavenPomFile: 'examples/java-driver-app/pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      goals: 'verify'
+      options: "-Dcheckstyle.skip -Dmaven.main.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -113,7 +128,7 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: "-Dcheckstyle.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
+      options: "-Dcheckstyle.skip -Dmaven.main.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -182,7 +197,22 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: -Dcheckstyle.skip
+      options: -Dcheckstyle.skip -Dmaven.main.skip
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+  - task: Maven@3
+    displayName: 'Verify java-driver-app example'
+    inputs:
+      mavenPomFile: 'examples/java-driver-app/pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      goals: 'verify'
+      options: "-Dcheckstyle.skip -Dmaven.main.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
@@ -197,7 +227,7 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       goals: 'verify'
-      options: "-Dcheckstyle.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
+      options: "-Dcheckstyle.skip -Dmaven.main.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:

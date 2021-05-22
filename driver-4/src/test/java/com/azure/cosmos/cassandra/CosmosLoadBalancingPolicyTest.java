@@ -92,7 +92,7 @@ public final class CosmosLoadBalancingPolicyTest {
      * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled; otherwise
      *                          {@code false}.
      *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     * @throws InterruptedException if the test is interrupted.
      */
     @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
     @ParameterizedTest
@@ -102,8 +102,12 @@ public final class CosmosLoadBalancingPolicyTest {
     @ValueSource(booleans = { false, true })
     public void testPreferredRegions(final boolean multiRegionWrites) throws InterruptedException {
 
+        // TODO (DANOBLE) Add check that routing occurs as expected.
+
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-            .withBoolean(CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES, multiRegionWrites)
+            .withBoolean(
+                CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES,
+                multiRegionWrites)
             .build();
 
         try (final CqlSession session = this.connect(configLoader, multiRegionWrites)) {
