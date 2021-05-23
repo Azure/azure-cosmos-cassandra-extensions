@@ -64,7 +64,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * multi-region writes or not. A number of system or--alternatively--environment variables must be set. See {@code
  * src/test/resources/application.conf} and {@link TestCommon} for a complete list. Their use and meaning should be
  * apparent from the relevant sections of the configuration and code.
- *
+ * </ol>
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
 public final class CosmosLoadBalancingPolicyTest {
@@ -78,6 +78,11 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // region Methods
 
+    /**
+     * Logs the name each test before it is executed.
+     *
+     * @param info Test info.
+     */
     @BeforeEach
     public void logTestName(final TestInfo info) {
         LOG.info("---------------------------------------------------------------------------------------------------");
@@ -94,7 +99,7 @@ public final class CosmosLoadBalancingPolicyTest {
      *
      * @throws InterruptedException if the test is interrupted.
      */
-    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11+")
     @ParameterizedTest
     @Tag("checkin")
     @Tag("integration")
@@ -110,7 +115,7 @@ public final class CosmosLoadBalancingPolicyTest {
                 multiRegionWrites)
             .build();
 
-        try (final CqlSession session = this.connect(configLoader, multiRegionWrites)) {
+        try (CqlSession session = this.connect(configLoader, multiRegionWrites)) {
             this.testAllStatements(session, uniqueName("preferred_regions"));
         }
     }

@@ -72,8 +72,10 @@ public abstract class CosmosCassandraConfiguration extends AbstractCassandraConf
     /**
      * Returns the value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
      *
-     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES}.
+     * @return The value to set for {@link CosmosLoadBalancingPolicyOption#MULTI_REGION_WRITES} or {@code null}, if the
+     * default value should be used.
      */
+    @SuppressFBWarnings("NP_BOOLEAN_RETURN_NULL")
     @Nullable
     protected Boolean getLoadBalancingPolicyMultiRegionWrites() {
         return null;

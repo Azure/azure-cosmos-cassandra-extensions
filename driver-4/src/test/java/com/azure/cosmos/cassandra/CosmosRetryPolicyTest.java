@@ -98,8 +98,13 @@ public final class CosmosRetryPolicyTest {
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
-    private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getDefaultValue(Integer.class);
-    private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getDefaultValue(Integer.class);
+
+    private static final int FIXED_BACK_OFF_TIME = CosmosRetryPolicyOption.FIXED_BACKOFF_TIME
+        .getDefaultValue(Integer.class);
+
+    private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicyOption.GROWING_BACKOFF_TIME
+        .getDefaultValue(Integer.class);
+
     private static final String KEYSPACE_NAME = TestCommon.uniqueName("downgrading");
     private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
     private static final String TABLE_NAME = "sensor_data";
@@ -190,6 +195,11 @@ public final class CosmosRetryPolicyTest {
             .build());
     }
 
+    /**
+     * Logs the name of each test before it is executed.
+     *
+     * @param info Test info.
+     */
     @BeforeEach
     public void logTestName(final TestInfo info) {
         LOG.info("---------------------------------------------------------------------------------------------------");
