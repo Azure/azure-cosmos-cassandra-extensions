@@ -54,6 +54,11 @@ variables:
     Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
   readonly: true
 
+- name: Update-GithubSubmodules
+  value: |
+    git -c "http.https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4.git.extraheader=`"AUTHORIZATION: basic ${env:GITHUB_AUTHENTICATION_TOKEN}`"" submodule update --init --recursive
+    git -c "http.https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4.git.extraheader=`"AUTHORIZATION: basic ${env:GITHUB_AUTHENTICATION_TOKEN}`"" submodule update --init --recursive
+
 jobs:
 
 - job: Build_with_Java_8
@@ -69,6 +74,15 @@ jobs:
   pool:
     vmImage: $(ImageName)
   steps:
+  - task: PowerShell@2
+    displayName: Update GitHub Submodules
+    inputs:
+      targetType: inline
+      script: $(Update-GithubSubmodules)
+      pwsh: true
+      workingDirectory: $(Build.Repository.LocalPath)
+    env:
+      GITHUB_AUTHENTICATION_TOKEN: $(Github.Authentication.Token)
   - task: Maven@3
     displayName: 'Build'
     inputs:
