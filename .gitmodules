@@ -3,4 +3,4 @@
 	url = https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4.git
 [submodule "examples/spring-boot-app"]
 	path = examples/spring-boot-app
-	url = https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4.git
+	url = https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4.git
