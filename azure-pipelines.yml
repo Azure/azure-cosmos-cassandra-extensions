@@ -56,7 +56,7 @@ variables:
 
 - name: Update-GithubSubmodules
   value: |
-    git submodule update --init --recursive
+    git submodule update --force --init --remote --recursive
     # $command = "git -c 'http.https://github.com@${env:GITHUB_USERNAME}/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4.git.extraheader=`"AUTHORIZATION: basic ${env:GITHUB_AUTHENTICATION_TOKEN}`"' submodule update --init --recursive"
     # $command
     # Invoke-Expression $command
