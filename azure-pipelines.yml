@@ -93,7 +93,6 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'install'
-      findBugsRunAnalysis: true
       options: '-DskipTests'
   - task: PowerShell@2
     displayName: 'Create Java truststore'
@@ -199,7 +198,6 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'install'
-      findBugsRunAnalysis: true
       options: '-DskipTests'
   - task: PowerShell@2
     displayName: 'Create Java truststore'
