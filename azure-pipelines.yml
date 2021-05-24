@@ -190,9 +190,6 @@ jobs:
       script: $(Update-GithubSubmodules)
       pwsh: true
       workingDirectory: $(Build.Repository.LocalPath)
-    env:
-      GITHUB_AUTHENTICATION_TOKEN: $(Github.Authentication.Token)
-      GITHUB_USERNAME: $(Github.Username)
   - task: Maven@3
     displayName: 'Build'
     inputs:
