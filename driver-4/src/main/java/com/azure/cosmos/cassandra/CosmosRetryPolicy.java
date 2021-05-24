@@ -135,7 +135,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         // nothing to do
     }
 
-    @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "false alarm")
+    @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "False alarm")
     @Override
     public RetryDecision onErrorResponse(
         @NonNull final Request request, @NonNull final CoordinatorException error, final int retryCount) {

@@ -47,7 +47,7 @@ function verify() {
     # Package tests
 
     set -o xtrace
-    if mvn --file driver-4/pom.xml --log-file driver-4.log "${options[@]}" -DargLine="${*:-}" verify; then
+    if mvn --file driver-4/pom.xml "${options[@]}" -DargLine="${*:-}" verify; then
         successes+=(driver-4)
     else
         failures+=(driver-4)
@@ -55,7 +55,7 @@ function verify() {
     set +o xtrace
 
     set -o xtrace
-    if mvn --file spring-data/pom.xml --log-file spring-data.log "${options[@]}" -DargLine="${*:-}" verify; then
+    if mvn --file spring-data/pom.xml "${options[@]}" -DargLine="${*:-}" verify; then
         successes+=(spring-data)
     else
         failures+=(spring-data)
@@ -66,7 +66,7 @@ function verify() {
 
     for app in java-driver-app spring-boot-app; do
         set -o xtrace
-        if mvn --file examples/$app/pom.xml --log-file $app.log "${options[@]}" -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar" verify; then
+        if mvn --file examples/$app/pom.xml "${options[@]}" -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar" verify; then
             successes+=("examples/$app")
         else
             failures+=("examples/$app")
