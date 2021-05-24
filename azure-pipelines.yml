@@ -56,7 +56,7 @@ variables:
 
 - name: Update-GithubSubmodules
   value: |
-    git submodule update --force --init --remote --recursive
+    git submodule update --init --recursive
   readonly: true
 
 jobs:
