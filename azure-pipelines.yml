@@ -57,12 +57,6 @@ variables:
 - name: Update-GithubSubmodules
   value: |
     git submodule update --force --init --remote --recursive
-    # $command = "git -c 'http.https://github.com@${env:GITHUB_USERNAME}/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4.git.extraheader=`"AUTHORIZATION: basic ${env:GITHUB_AUTHENTICATION_TOKEN}`"' submodule update --init --recursive"
-    # $command
-    # Invoke-Expression $command
-    # $command = "git -c 'http.https://github.com@${env:GITHUB_USERNAME}/Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4.git.extraheader=`"AUTHORIZATION: basic ${env:GITHUB_AUTHENTICATION_TOKEN}`"' submodule update --init --recursive"
-    # $command
-    # Invoke-Expression $command
   readonly: true
 
 jobs:
@@ -98,7 +92,7 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
-      goals: 'help:active-profiles install javadoc:test-javadoc'
+      goals: 'install'
       findBugsRunAnalysis: true
       options: '-DskipTests'
   - task: PowerShell@2
