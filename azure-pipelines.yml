@@ -198,7 +198,7 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
-      goals: 'help:active-profiles install javadoc:test-javadoc'
+      goals: 'install'
       findBugsRunAnalysis: true
       options: '-DskipTests'
   - task: PowerShell@2
