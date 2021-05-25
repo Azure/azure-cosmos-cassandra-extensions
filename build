@@ -1,0 +1,88 @@
+#!/usr/bin/env bash 
+
+set -o errexit -o nounset
+
+declare -ra arg_line=()
+declare -r log_directory=~/.local/var/log
+declare -r reporting_directory="$log_directory"
+
+echo -----------------------------------------------------------------------------------------------------------------------
+echo " B U I L D"
+echo -----------------------------------------------------------------------------------------------------------------------
+
+echo "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT=$AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT"
+echo "AZURE_COSMOS_CASSANDRA_HOSTNAME=$AZURE_COSMOS_CASSANDRA_HOSTNAME"
+echo "AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS=$AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS"
+echo "AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES=$AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES"
+echo "AZURE_COSMOS_CASSANDRA_PASSWORD=${AZURE_COSMOS_CASSANDRA_PASSWORD//?/*}"
+echo "AZURE_COSMOS_CASSANDRA_PORT=$AZURE_COSMOS_CASSANDRA_PORT"
+echo "AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS=$AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS"
+echo "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1=$AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1"
+echo "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2=$AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2"
+echo "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3=$AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3"
+echo "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS=$AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS"
+echo "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_1=$AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_1"
+echo "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_2=$AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_2"
+echo "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_3=$AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_3"
+echo "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD=${AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD//?/*}"
+echo "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH=$AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH"
+echo "AZURE_COSMOS_CASSANDRA_USERNAME=$AZURE_COSMOS_CASSANDRA_USERNAME"
+
+mvn clean install -DskipTests
+rm -rf ~/.local/var/log/*
+
+echo
+echo -----------------------------------------------------------------------------------------------------------------------
+echo " V E R I F Y"
+echo -----------------------------------------------------------------------------------------------------------------------
+
+rm "$reporting_directory/*{cql-requests,cql-messages}.csv" || true
+
+function verify() {
+
+    local -ra options=(-Dcheckstyle.skip -Dmaven.main.skip)
+    local successes=()
+    local failures=()
+
+    # Package tests
+
+    set -o xtrace
+    if mvn --file driver-4/pom.xml "${options[@]}" -DargLine="${*:-}" verify; then
+        successes+=(driver-4)
+    else
+        failures+=(driver-4)
+    fi
+    set +o xtrace
+
+    set -o xtrace
+    if mvn --file spring-data/pom.xml "${options[@]}" -DargLine="${*:-}" verify; then
+        successes+=(spring-data)
+    else
+        failures+=(spring-data)
+    fi
+    set +o xtrace
+
+    # Tests of examples
+
+    for app in java-driver-app spring-boot-app; do
+        set -o xtrace
+        if mvn --file examples/$app/pom.xml "${options[@]}" -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar" verify; then
+            successes+=("examples/$app")
+        else
+            failures+=("examples/$app")
+        fi
+        set +o xtrace
+    done
+    
+    if [[ ${#failures[@]} -eq 0 ]]; then
+        echo
+        echo "VERIFICATION SUCCESS"
+    else 
+        echo
+        echo "VERIFICATION FAILURE"
+        echo "  SUCCEEDED: ${successes[*]}"
+        echo "  FAILED: ${failures[*]}"
+    fi
+}
+
+time verify "${arg_line[@]}"

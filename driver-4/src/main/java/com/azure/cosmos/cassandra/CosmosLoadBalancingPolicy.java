@@ -493,7 +493,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
          * @return a negative integer, zero, or a positive integer as the first argument is less than, equal to, or
          * greater than the second.
          */
-        @SuppressFBWarnings("RC_REF_COMPARISON")
+        @SuppressFBWarnings(value = "RC_REF_COMPARISON", justification = "Reference comparison is intentional")
         @SuppressWarnings("NumberEquality")
         @Override
         public int compare(@NonNull final Node x, @NonNull final Node y) {

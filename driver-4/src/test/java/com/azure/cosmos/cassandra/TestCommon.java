@@ -16,7 +16,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -27,7 +26,6 @@ import java.util.stream.Collectors;
 import static java.lang.String.format;
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Fail.fail;
 
 /**
  * A utility class that implements common static methods useful for writing tests.
@@ -42,13 +40,10 @@ public final class TestCommon {
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
 
-    static InetSocketAddress GLOBAL_ENDPOINT;
-
-    static String LOCAL_DATACENTER;
-
-    static List<String> PREFERRED_REGIONS;
-
-    static List<SocketAddress> REGIONAL_ENDPOINTS;
+    static final InetSocketAddress GLOBAL_ENDPOINT;
+    static final String LOCAL_DATACENTER;
+    static final List<String> PREFERRED_REGIONS;
+    static final List<SocketAddress> REGIONAL_ENDPOINTS;
 
     static {
 
@@ -225,6 +220,8 @@ public final class TestCommon {
      * @param consistencyLevel the consistency level to apply or {@code null}.
      * @param keyspaceName     name of the keyspace to query.
      * @param tableName        name of the table to query.
+     *
+     * @return A {@link ResultSet result set}.
      */
     @SuppressWarnings("SameParameterValue")
     @NonNull

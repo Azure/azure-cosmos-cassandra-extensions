@@ -1,10 +1,10 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
 package com.azure.cosmos.cassandra;
 
 import com.codahale.metrics.CsvReporter;
 import com.codahale.metrics.ScheduledReporter;
-import com.codahale.metrics.Timer;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -66,6 +66,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * multi-region writes or not. A number of system or--alternatively--environment variables must be set. See {@code
  * src/test/resources/application.conf} and {@link TestCommon} for a complete list. Their use and meaning should be
  * apparent from the relevant sections of the configuration and code.
+ * </ol>
  * <h3>
  * Side effects</h3>
  * <ol>
@@ -78,7 +79,6 @@ import static org.junit.jupiter.api.Assertions.fail;
  * runs.</ol>
  * <h3>
  * Notes</h3>
- * <ul>
  * <ul>
  * <li>You should never attempt to retry a non-idempotent write. See the driver's manual page on idempotence for more
  * information.</ul>
@@ -127,8 +127,11 @@ public class CosmosCassandraIntegrationTest {
 
     /**
      * Verify that the extensions integrate with DataStax Java Driver 4 and its configuration system.
+     *
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled; otherwise
+     * {@code false}.
      */
-    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11+")
     @ParameterizedTest
     @Tag("checkin")
     @Tag("integration")
@@ -138,7 +141,7 @@ public class CosmosCassandraIntegrationTest {
 
         final CqlSessionBuilder builder = CqlSession.builder().withConfigLoader(newConfigLoader(multiRegionWrites));
 
-        try (final CqlSession session = builder.build()) {
+        try (CqlSession session = builder.build()) {
 
             //noinspection SimplifyOptionalCallChains
             if (!session.getMetrics().isPresent()) {
@@ -154,7 +157,7 @@ public class CosmosCassandraIntegrationTest {
 
             final AtomicLong expectedRowCount = new AtomicLong();  // updated inside lambdas
 
-            try (final ScheduledReporter reporter = CsvReporter.forRegistry(metrics.getRegistry())
+            try (ScheduledReporter reporter = CsvReporter.forRegistry(metrics.getRegistry())
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .convertRatesTo(TimeUnit.SECONDS)
                 .build(REPORTING_DIRECTORY)) {
@@ -211,6 +214,11 @@ public class CosmosCassandraIntegrationTest {
         }
     }
 
+    /**
+     * Initializes the {@link CosmosCassandraIntegrationTest}.
+     *
+     * @param info Test info.
+     */
     @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @BeforeAll
@@ -232,6 +240,10 @@ public class CosmosCassandraIntegrationTest {
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
+     *
+     * @param session A {@link CqlSession} instance for executing CQL commands.
+     *
+     * @throws InterruptedException if the method is interrupted.
      */
     private void createSchema(final CqlSession session) throws InterruptedException {
 
@@ -250,7 +262,7 @@ public class CosmosCassandraIntegrationTest {
                 + "timestamp timestamp,"
                 + "value double,"
                 + "PRIMARY KEY ((sensor_id,date),timestamp)"
-                + ")"));;
+                + ")"));
 
         Thread.sleep(5_000L);  // gives time for the table creation to sync across regions
     }
