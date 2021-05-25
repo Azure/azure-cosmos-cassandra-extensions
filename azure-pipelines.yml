@@ -57,6 +57,7 @@ variables:
 - name: Update-GithubSubmodules
   value: |
     git submodule update --init --recursive
+    git config core.autocrlf
   readonly: true
 
 jobs:
