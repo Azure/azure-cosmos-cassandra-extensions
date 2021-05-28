@@ -3,16 +3,7 @@
 
 package com.microsoft.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.BatchStatement;
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.PoolingOptions;
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Row;
-import com.datastax.driver.core.Session;
-import com.datastax.driver.core.SimpleStatement;
-import com.datastax.driver.core.SocketOptions;
-import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import org.testng.annotations.Test;
 
@@ -83,35 +74,35 @@ public class CosmosCassandraExtensionsExample {
 
     // region Fields
 
-    static final String[] CONTACT_POINT = { getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.contact-point",
-        "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
-        "localhost:9042") };
+    static final String[] CONTACT_POINT = {getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.contact-point",
+            "AZURE_COSMOS_CASSANDRA_CONTACT_POINT",
+            "localhost:9042")};
 
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.global-endpoint",
-        "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "localhost:9042");
+            "azure.cosmos.cassandra.global-endpoint",
+            "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
+            "localhost:9042");
 
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.password",
-        "AZURE_COSMOS_CASSANDRA_PASSWORD",
-        "");
+            "azure.cosmos.cassandra.password",
+            "AZURE_COSMOS_CASSANDRA_PASSWORD",
+            "");
 
     static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.read-datacenter",
-        "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
-        "");
+            "azure.cosmos.cassandra.read-datacenter",
+            "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
+            "");
 
     static final String USERNAME = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.username",
-        "AZURE_COSMOS_CASSANDRA_USERNAME",
-        "");
+            "azure.cosmos.cassandra.username",
+            "AZURE_COSMOS_CASSANDRA_USERNAME",
+            "");
 
     static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.write-datacenter",
-        "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
-        "");
+            "azure.cosmos.cassandra.write-datacenter",
+            "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
+            "");
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = QUORUM;
     private static final int FIXED_BACK_OFF_TIME = 5000;
@@ -160,7 +151,7 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-extensions.
      */
-    @Test(groups = { "examples" }, timeOut = TIMEOUT_IN_MILLISECONDS)
+    @Test(groups = {"examples"}, timeOut = TIMEOUT_IN_MILLISECONDS)
     public void canIntegrateWithCosmos() {
 
         final Session session = connect();
@@ -175,7 +166,7 @@ public class CosmosCassandraExtensionsExample {
             }
 
             assertThatCode(() ->
-                this.write(session, CONSISTENCY_LEVEL)
+                    this.write(session, CONSISTENCY_LEVEL)
             ).doesNotThrowAnyException();
 
             assertThatCode(() -> {
@@ -222,24 +213,21 @@ public class CosmosCassandraExtensionsExample {
                 .withReadDC(READ_DATACENTER)
                 .withWriteDC(WRITE_DATACENTER)
                 .build())
-            .withRetryPolicy(CosmosRetryPolicy.builder()
-                .withFixedBackOffTimeInMillis(FIXED_BACK_OFF_TIME)
-                .withGrowingBackOffTimeInMillis(GROWING_BACK_OFF_TIME)
-                .withMaxRetryCount(MAX_RETRY_COUNT)
-                .build())
+            // Cosmos DB load-balances requests against a large number of backend nodes. Experiments show that these
+            // values for local and remote node sizes work well in development, test, and low-volume production or
+            // staging environments. You should increase these values based on the RUs provisioned for your database.
+            //
+            //   RUs      | local.size | remote.size
+            //   ---------+------------+-------------
+            //   100,000  | 50-100     | 50-100
+            //   200,000+ | 100        | 100
             .withPoolingOptions(new PoolingOptions()
-                .setIdleTimeoutSeconds(PoolingOptions.DEFAULT_IDLE_TIMEOUT_SECONDS)
-                .setHeartbeatIntervalSeconds(PoolingOptions.DEFAULT_HEARTBEAT_INTERVAL_SECONDS)
-                .setPoolTimeoutMillis(PoolingOptions.DEFAULT_POOL_TIMEOUT_MILLIS))
-            .withSocketOptions(new SocketOptions()
-                .setConnectTimeoutMillis(SocketOptions.DEFAULT_CONNECT_TIMEOUT_MILLIS)
-                .setReadTimeoutMillis(SocketOptions.DEFAULT_READ_TIMEOUT_MILLIS))
-            .withReconnectionPolicy(new ConstantReconnectionPolicy(600_000))
-                // TODO (DANOBLE) Do we want ExponentialReconnectionPolicy or a custom ReconnectionPolicy instead?
-                //  See https://docs.datastax.com/en/developer/java-driver/3.10/manual/reconnection/
-                //  The default policy is new ExponentialReconnectionPolicy(1_000, 10 * 60 * 1000)
+                .setConnectionsPerHost(HostDistance.LOCAL, 10, 10)
+                .setConnectionsPerHost(HostDistance.REMOTE, 1, 10))
+            .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
+            .withRetryPolicy(CosmosRetryPolicy.builder().build())
             .withCredentials(USERNAME, PASSWORD)
-            .addContactPoints(CONTACT_POINT)
+            .addContactPoints(GLOBAL_ENDPOINT)
             .withPort(PORT)
             .withSSL()
             .build();
@@ -258,20 +246,20 @@ public class CosmosCassandraExtensionsExample {
     private void createSchema(final Session session) {
 
         session.execute("CREATE KEYSPACE IF NOT EXISTS "
-            + KEYSPACE_NAME
-            + " WITH replication "
-            + "= {'class': 'SimpleStrategy', 'replication_factor': 3}");
+                + KEYSPACE_NAME
+                + " WITH replication "
+                + "= {'class': 'SimpleStrategy', 'replication_factor': 3}");
 
         session.execute("CREATE TABLE IF NOT EXISTS "
-            + KEYSPACE_NAME
-            + ".sensor_data ("
-            + "sensor_id uuid,"
-            + "date date,"
-            + // emulates bucketing by day
-            "timestamp timestamp,"
-            + "value double,"
-            + "PRIMARY KEY ((sensor_id,date),timestamp)"
-            + ")");
+                + KEYSPACE_NAME
+                + ".sensor_data ("
+                + "sensor_id uuid,"
+                + "date date,"
+                + // emulates bucketing by day
+                "timestamp timestamp,"
+                + "value double,"
+                + "PRIMARY KEY ((sensor_id,date),timestamp)"
+                + ")");
     }
 
     /**
@@ -287,7 +275,7 @@ public class CosmosCassandraExtensionsExample {
         final int width4 = 21;
 
         final String format = "%-" + width1 + "s" + "%-" + width2 + "s" + "%-" + width3 + "s" + "%-" + width4 + "s"
-            + "%n";
+                + "%n";
 
         System.out.printf(format, "sensor_id", "date", "timestamp", "value");
         drawLine(width1, width2, width3, width4);
@@ -296,11 +284,11 @@ public class CosmosCassandraExtensionsExample {
 
         for (final Row row : rows) {
             System.out.printf(
-                format,
-                row.getUUID("sensor_id"),
-                row.getDate("date"),
-                sdf.format(row.getTimestamp("timestamp")),
-                row.getDouble("value"));
+                    format,
+                    row.getUUID("sensor_id"),
+                    row.getDate("date"),
+                    sdf.format(row.getTimestamp("timestamp")),
+                    row.getDouble("value"));
         }
     }
 
@@ -320,7 +308,7 @@ public class CosmosCassandraExtensionsExample {
     }
 
     private static String getPropertyOrEnvironmentVariable(
-        final String property, final String variable, final String defaultValue) {
+            final String property, final String variable, final String defaultValue) {
 
         String value = System.getProperty(property);
 
@@ -346,15 +334,15 @@ public class CosmosCassandraExtensionsExample {
         System.out.printf("Reading at %s%n", consistencyLevel);
 
         final Statement statement = new SimpleStatement(
-            "SELECT sensor_id, date, timestamp, value "
-                + "FROM "
-                + KEYSPACE_NAME
-                + ".sensor_data "
-                + "WHERE "
-                + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
-                + "date = '2018-02-26' AND "
-                + "timestamp > '2018-02-26+01:00'")
-            .setConsistencyLevel(consistencyLevel);
+                "SELECT sensor_id, date, timestamp, value "
+                        + "FROM "
+                        + KEYSPACE_NAME
+                        + ".sensor_data "
+                        + "WHERE "
+                        + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
+                        + "date = '2018-02-26' AND "
+                        + "timestamp > '2018-02-26+01:00'")
+                .setConsistencyLevel(consistencyLevel);
 
         final ResultSet rows = session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
@@ -371,33 +359,33 @@ public class CosmosCassandraExtensionsExample {
         System.out.printf("Writing at %s%n", consistencyLevel);
 
         final BatchStatement batch = new BatchStatement(UNLOGGED)
-            .add(new SimpleStatement("INSERT INTO "
-                + KEYSPACE_NAME
-                + ".sensor_data "
-                + "(sensor_id, date, timestamp, value) "
-                + "VALUES ("
-                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                + "'2018-02-26',"
-                + "'2018-02-26T13:53:46.345+01:00',"
-                + "2.34)"))
-            .add(new SimpleStatement("INSERT INTO "
-                + KEYSPACE_NAME
-                + ".sensor_data "
-                + "(sensor_id, date, timestamp, value) "
-                + "VALUES ("
-                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                + "'2018-02-26',"
-                + "'2018-02-26T13:54:27.488+01:00',"
-                + "2.47)"))
-            .add(new SimpleStatement("INSERT INTO "
-                + KEYSPACE_NAME
-                + ".sensor_data "
-                + "(sensor_id, date, timestamp, value) "
-                + "VALUES ("
-                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                + "'2018-02-26',"
-                + "'2018-02-26T13:56:33.739+01:00',"
-                + "2.52)"));
+                .add(new SimpleStatement("INSERT INTO "
+                        + KEYSPACE_NAME
+                        + ".sensor_data "
+                        + "(sensor_id, date, timestamp, value) "
+                        + "VALUES ("
+                        + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                        + "'2018-02-26',"
+                        + "'2018-02-26T13:53:46.345+01:00',"
+                        + "2.34)"))
+                .add(new SimpleStatement("INSERT INTO "
+                        + KEYSPACE_NAME
+                        + ".sensor_data "
+                        + "(sensor_id, date, timestamp, value) "
+                        + "VALUES ("
+                        + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                        + "'2018-02-26',"
+                        + "'2018-02-26T13:54:27.488+01:00',"
+                        + "2.47)"))
+                .add(new SimpleStatement("INSERT INTO "
+                        + KEYSPACE_NAME
+                        + ".sensor_data "
+                        + "(sensor_id, date, timestamp, value) "
+                        + "VALUES ("
+                        + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                        + "'2018-02-26',"
+                        + "'2018-02-26T13:56:33.739+01:00',"
+                        + "2.52)"));
 
         batch.setConsistencyLevel(consistencyLevel);
         session.execute(batch);
