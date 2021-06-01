@@ -49,9 +49,7 @@ variables:
     Copy-Item ../pom.xml $targetDirectory/$packageName.pom
 
     $packageName = $packageName.Split("-extensions-") -join "-"
-    "packageName = '$packageName'"
     $targetDirectory = New-Item -ErrorAction SilentlyContinue -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
-    "targetDirectory = '$targetDirectory'"
 
     Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
   readonly: true
