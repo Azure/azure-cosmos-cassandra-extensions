@@ -3,46 +3,74 @@
 
 - [ ] Create a release branch based on develop/java-driver-4.
   
-      ```bash
-      git pull --all
-      git checkout develop/java-driver-4
-      git checkout -b release/java-driver-4/$version
-      ```
+  ```bash
+  git pull --all
+  git checkout develop/java-driver-4
+  git checkout -b release/java-driver-4/${version}
+  ```
 
-- [ ] Update these `package` files:
+- [ ] Ensure that you are on the develop branch on each of the examples
+ 
+  ```bash
+  cd examples/java-driver-app
+  git checkout develop
+  cd examples/spring-boot-app
+  git checkout develop
+  ```
 
-      * package/CHANGELOG.md
-      * package/KNOWN_ISSUES.md
-      * package/README.md
+- [ ] Update these files:
 
-      as needed.
+  * driver-4/CHANGELOG.md
+  * driver-4/KNOWN_ISSUES.md
+  * driver-4/README.md
+  * spring-data/CHANGELOG.md
+  * spring-data/KNOWN_ISSUES.md
+  * spring/README.md
+  * examples/java-driver-app/README.md
+  * examples/spring-boot-app/README.md
+
+  as needed. Make sure that all version numbers and all links match the release.
 
 - [ ] Bump the version numbers in:
 
-      * pom.xml
-      * examples/pom.xml
-      * package/pom.xml
+  * pom.xml
+  * driver-4/pom.xml
+  * spring-data/pom.xml
+  * examples/java-driver-app/pom.xml
+  * examples/spring-boot-app/pom.xml
 
-      if required.
+  as required.
       
 - [ ] Push your changes and submit a release PR against the code on develop/java-driver-4.
 
-      Use this title text:
+  Use this title text:
+  
+  ```text
+  [CHORE] Release Azure Cosmos Cassandra Extensions for DataStax Java Driver 4
+  ```
+  
+  Start the description with this text:
 
-      `[CHORE] Release Azure Cosmos Cassandra Extensions for DataStax Java Driver 4`
-
-      Start the description with this text:
-
-      This is release <version>.
-
+  ```text
+  This is release <version>.
+  ```
+  
+  Then document any other noteworthy changes. Example: `Also: Updated the build pipeline and release instructions.`
+  
 - [ ] When your PR is complete, publish the release artifacts from the CI build to the Maven Repository.
 
-      - [ ] Retain the build to preserve the release artifacts and a record of the test results.
+  - [ ] Retain the build to preserve the release artifacts and a record of the test results.
   
-      - [ ] Verify that the parent pom has been published to:
+  - [ ] Verify that the parent pom has been published to:
 
-            https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4
+    https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4
 
-      - [ ] Verify that the package has been published to:
+  - [ ] Verify that the package has been published to:
 
-            https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4-extensions
+    https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4-extensions
+
+- [ ] Tag the release on the release branch.
+
+  ```bash
+  git tag release-driver-4-${version}
+  ```
