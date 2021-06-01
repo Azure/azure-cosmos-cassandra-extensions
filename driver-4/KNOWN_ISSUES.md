@@ -1,7 +1,7 @@
 # Known issues
 
 This file describes known issues in Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra version 
-1.0.0.
+1.0.1-SNAPSHOT.
 
 ## Hostname verification fails when accessing a multi-region Cosmos Cassandra API instance.
 
