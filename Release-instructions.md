@@ -55,7 +55,8 @@
   This is release <version>.
   ```
   
-  Then document any other noteworthy changes. Example: `Also: Updated the build pipeline and release instructions.`
+  Then document any other noteworthy changes. Example: `In addition to preparing for the release, the build pipeline and
+  release instructions were also updated.`
   
 - [ ] When your PR is complete, publish the release artifacts from the CI build to the Maven Repository.
 
