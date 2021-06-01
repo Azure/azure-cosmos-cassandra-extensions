@@ -42,6 +42,7 @@ variables:
 
 - name: Stage-Artifacts
   value: |
+    Get-Item *
     $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *[0-9].jar).Name)
     "packageName = '$packageName'"
     $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY $packageName)
