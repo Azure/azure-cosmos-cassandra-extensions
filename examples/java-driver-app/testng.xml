@@ -1,0 +1,8 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="CI" verbose="1">
+  <test name="examples">
+    <classes>
+      <class name="com.azure.cosmos.cassandra.CosmosCassandraExtensionsExample"/>
+    </classes>
+  </test>
+</suite>

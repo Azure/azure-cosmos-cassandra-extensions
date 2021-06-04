@@ -9,14 +9,14 @@ Licensed under the MIT License.
 
   <name>Azure Cosmos Extensions for DataStax Java Driver 3 for Apache Cassandra</name>
   <description>
-    Extends the DataStax Java Driver 3 for Apache Cassandra client library with Azure Cosmos awareness features.
+    Extends the DataStax Java Driver 3 client library for Apache Cassandra with Azure Cosmos DB awareness features.
   </description>
   <url>https://docs.microsoft.com/en-us/azure/cosmos-db/cassandra-introduction</url>
 
   <artifactId>azure-cosmos-cassandra-driver-3</artifactId>
-  <groupId>com.microsoft.azure</groupId>
+  <groupId>com.azure</groupId>
   <packaging>pom</packaging>
-  <version>0.14.0</version>
+  <version>1.0.0-SNAPSHOT</version>
 
   <developers>
     <developer>
@@ -37,20 +37,22 @@ Licensed under the MIT License.
   </licenses>
 
   <modules>
-    <module>package</module>
-    <module>examples</module>
+    <module>driver-3</module>
+    <module>examples/java-driver-app</module>
   </modules>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
-    <!-- Main dependency version numbers -->
-    <version.cassandra-driver>[3.8, 3.11)</version.cassandra-driver>
-    <version.slf4j-api>[1.7.0, 1.8.0-alpha0)</version.slf4j-api>
+    <!-- Package dependency version numbers -->
+    <version.cassandra-driver>[3.8,3.12)</version.cassandra-driver>
+    <version.jackson>[2.12,2.13)</version.jackson>
+    <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
+    <version.spotbugs>[4.2.3,4.3)</version.spotbugs>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
+    <version.junit-jupiter>5.7.1</version.junit-jupiter>
     <version.log4j>2.13.3</version.log4j>
-    <version.spotbugs>4.1.4</version.spotbugs>
     <version.testng>7.3.0</version.testng>
   </properties>
 
@@ -64,14 +66,29 @@ Licensed under the MIT License.
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-cosmos-cassandra-extensions</artifactId>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-cosmos-cassandra-driver-3-extensions</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.datastax.cassandra</groupId>
         <artifactId>cassandra-driver-core</artifactId>
         <version>${version.cassandra-driver}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${version.jackson}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${version.jackson}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-annotations</artifactId>
+        <version>${version.spotbugs}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -94,6 +111,16 @@ Licensed under the MIT License.
         <version>${version.assertj-core}</version>
       </dependency>
       <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${version.junit-jupiter}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-params</artifactId>
+        <version>${version.junit-jupiter}</version>
+      </dependency>
+      <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${version.slf4j-api}</version>
@@ -110,16 +137,35 @@ Licensed under the MIT License.
     <pluginManagement>
       <plugins>
         <plugin>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>3.3.0</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-checkstyle-plugin</artifactId>
-          <version>3.1.1</version>
+          <version>3.1.2</version>
+          <dependencies>
+            <dependency>
+              <groupId>com.puppycrawl.tools</groupId>
+              <artifactId>checkstyle</artifactId>
+              <version>8.42</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
         </plugin>
         <plugin>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.1.2</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-deploy-plugin</artifactId>
           <version>3.0.0-M1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>3.0.0-M5</version>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
@@ -156,21 +202,35 @@ Licensed under the MIT License.
         <plugin>
           <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
-          <version>${version.spotbugs}</version>
+          <version>4.2.3</version>
         </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
         <configuration>
-          <skipIfEmpty>true</skipIfEmpty>
+          <configLocation>azure-cosmos-style.xml</configLocation>
+          <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
+          <consoleOutput>true</consoleOutput>
+          <failsOnError>true</failsOnError>
+          <linkXRef>false</linkXRef>
         </configuration>
+        <executions>
+          <execution>
+            <id>validate</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
         <inherited>true</inherited>
         <configuration>
+          <docfilessubdirs>false</docfilessubdirs>
           <doclint>all,-html</doclint>
           <quiet>true</quiet>
           <verbose>false</verbose>
@@ -188,6 +248,12 @@ Licensed under the MIT License.
         </executions>
       </plugin>
       <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <configuration>
+          <propertiesEncoding>UTF-8</propertiesEncoding>
+        </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-source-plugin</artifactId>
         <executions>
           <execution>
@@ -199,23 +265,22 @@ Licensed under the MIT License.
         </executions>
       </plugin>
       <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <useModulePath>false</useModulePath>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
-        <dependencies>
-          <dependency>
-            <groupId>com.github.spotbugs</groupId>
-            <artifactId>spotbugs</artifactId>
-            <version>${version.spotbugs}</version>
-          </dependency>
-        </dependencies>
         <configuration>
+          <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
           <effort>max</effort>
+          <failOnError>true</failOnError>
+          <fork>true</fork>
+          <includeTests>true</includeTests>
           <threshold>Low</threshold>
           <xmlOutput>true</xmlOutput>
-          <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
-          <failOnError>true</failOnError>
-          <includeTests>true</includeTests>
-          <fork>true</fork>
         </configuration>
         <executions>
           <execution>
@@ -227,10 +292,15 @@ Licensed under the MIT License.
         </executions>
       </plugin>
     </plugins>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
   </build>
 
   <profiles>
-
     <!-- Setup for Java 8, excludes module-info.java -->
     <profile>
       <id>java-8</id>
@@ -242,34 +312,8 @@ Licensed under the MIT License.
         <maven.compiler.target>8</maven.compiler.target>
       </properties>
       <build>
-        <resources>
-          <resource>
-            <directory>src/main/resources</directory>
-            <filtering>true</filtering>
-          </resource>
-        </resources>
         <plugins>
-          <plugin>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <configuration>
-              <configLocation>azure-cosmos-style.xml</configLocation>
-              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
-              <encoding>UTF-8</encoding>
-              <consoleOutput>true</consoleOutput>
-              <failsOnError>true</failsOnError>
-              <linkXRef>false</linkXRef>
-            </configuration>
-            <executions>
-              <execution>
-                <id>validate</id>
-                <phase>validate</phase>
-                <goals>
-                  <goal>check</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <!-- Don't compile module-info.java, see java-lts profile -->
+          <!-- Don't compile module-info.java -->
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
@@ -280,7 +324,7 @@ Licensed under the MIT License.
               </excludes>
             </configuration>
           </plugin>
-          <!-- Avoid errors from module-info -->
+          <!-- Don't document module-info.java -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
             <configuration>
@@ -293,6 +337,7 @@ Licensed under the MIT License.
       </build>
       <reporting>
         <plugins>
+          <!-- Don't document module-info.java -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
             <configuration>
@@ -304,7 +349,6 @@ Licensed under the MIT License.
         </plugins>
       </reporting>
     </profile>
-
     <!-- Setup for Java LTS+, currently JDK 11 and up -->
     <profile>
       <id>java-lts</id>
@@ -312,42 +356,15 @@ Licensed under the MIT License.
         <jdk>[11,)</jdk>
       </activation>
       <build>
-        <resources>
-          <resource>
-            <directory>src/main/resources</directory>
-            <filtering>true</filtering>
-          </resource>
-        </resources>
         <plugins>
           <plugin>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <configuration>
-              <configLocation>azure-cosmos-style.xml</configLocation>
-              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
-              <encoding>UTF-8</encoding>
-              <consoleOutput>true</consoleOutput>
-              <failsOnError>true</failsOnError>
-              <linkXRef>false</linkXRef>
-            </configuration>
-            <executions>
-              <execution>
-                <id>validate</id>
-                <phase>validate</phase>
-                <goals>
-                  <goal>check</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.8.1</version>
             <configuration>
               <source>11</source>
               <target>11</target>
             </configuration>
             <executions>
-              <!-- Compile first with module-info for Java LTS -->
+              <!-- Compile first with module-info for Java LTS+ -->
               <execution>
                 <id>default-compile</id>
                 <configuration>
@@ -372,7 +389,6 @@ Licensed under the MIT License.
         </plugins>
       </build>
     </profile>
-
   </profiles>
 
   <reporting>
