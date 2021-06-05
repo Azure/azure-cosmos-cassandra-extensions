@@ -3,11 +3,25 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.*;
+import com.datastax.driver.core.BatchStatement;
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.HostDistance;
+import com.datastax.driver.core.PoolingOptions;
+import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.Row;
+import com.datastax.driver.core.Session;
+import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
@@ -82,14 +96,14 @@ public class CosmosCassandraExtensionsExample {
     static final String GLOBAL_ENDPOINT_HOSTNAME;
     static final int GLOBAL_ENDPOINT_PORT;
 
+    static final List<String> PREFERRED_REGIONS = Arrays.asList(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.preferred-regions",
+        "AZURE_COSMOS_CASSANDRA_PASSWORD",
+        "").split("\\s*,\\s*"));
+
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.password",
             "AZURE_COSMOS_CASSANDRA_PASSWORD",
-            "");
-
-    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.read-datacenter",
-            "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
             "");
 
     static final String USERNAME = getPropertyOrEnvironmentVariable(
@@ -97,17 +111,9 @@ public class CosmosCassandraExtensionsExample {
             "AZURE_COSMOS_CASSANDRA_USERNAME",
             "");
 
-    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.write-datacenter",
-            "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
-            "");
-
     private static final ConsistencyLevel CONSISTENCY_LEVEL = QUORUM;
-    private static final int FIXED_BACK_OFF_TIME = 5000;
-    private static final int GROWING_BACK_OFF_TIME = 1000;
-    private static final String KEYSPACE_NAME = "downgrading_" + UUID.randomUUID().toString().replace("-", "");
-    private static final int MAX_RETRY_COUNT = 5;
-    private static final int TIMEOUT_IN_MILLISECONDS = 30_000;
+    private static final String KEYSPACE_NAME = uniqueName("downgrading_");
+    private static final int TIMEOUT_IN_SECONDS = 30;
 
     static {
 
@@ -116,7 +122,6 @@ public class CosmosCassandraExtensionsExample {
 
         final String hostname = GLOBAL_ENDPOINT.substring(0, index);
         final String port = GLOBAL_ENDPOINT.substring(index + 1);
-        GLOBAL_ENDPOINT_HOSTNAME = hostname;
 
         int value = -1;
 
@@ -127,6 +132,7 @@ public class CosmosCassandraExtensionsExample {
             fail("expected integer port number in range [0, 65535], not " + port);
         }
 
+        GLOBAL_ENDPOINT_HOSTNAME = hostname;
         GLOBAL_ENDPOINT_PORT = value;
     }
 
@@ -137,7 +143,11 @@ public class CosmosCassandraExtensionsExample {
     /**
      * Shows how to integrate with a Cosmos Cassandra API instance using azure-cosmos-cassandra-extensions.
      */
-    @Test(groups = { "examples" }, timeOut = TIMEOUT_IN_MILLISECONDS)
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
     public void canIntegrateWithCosmos() {
 
         final Session session = connect();
@@ -195,9 +205,8 @@ public class CosmosCassandraExtensionsExample {
 
         final Cluster cluster = Cluster.builder()
             .withLoadBalancingPolicy(CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(WRITE_DATACENTER.isEmpty() ? GLOBAL_ENDPOINT : "")
-                .withReadDC(READ_DATACENTER)
-                .withWriteDC(WRITE_DATACENTER)
+                .withMultiRegionWrites(true)
+                .withPreferredRegions(PREFERRED_REGIONS)
                 .build())
             // Cosmos DB load-balances requests against a large number of backend nodes. Experiments show that these
             // values for local and remote node sizes work well in development, test, and low-volume production or
@@ -333,6 +342,21 @@ public class CosmosCassandraExtensionsExample {
         final ResultSet rows = session.execute(statement);
         System.out.println("Read succeeded at " + consistencyLevel);
         return rows;
+    }
+
+    /**
+     * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
+     * <p>
+     * Hyphens are removed from the generated {@link UUID} before it is joined to the {@code prefix} with an underscore.
+     *
+     * @param prefix a string that starts the unique name.
+     *
+     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;</i>.
+     */
+    static String uniqueName(final String prefix) {
+        final UUID uuid = UUID.randomUUID();
+        final long suffix = uuid.getLeastSignificantBits() ^ uuid.getMostSignificantBits();
+        return prefix + '_' + Long.toUnsignedString(suffix, Character.MAX_RADIX);
     }
 
     /**

@@ -6,11 +6,14 @@ package com.azure.cosmos.cassandra;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.LocalDate;
+import com.datastax.driver.core.PoolingOptions;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.querybuilder.Clause;
 import com.datastax.driver.core.querybuilder.Delete;
@@ -18,16 +21,23 @@ import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Select;
 import com.datastax.driver.core.querybuilder.Update;
-import org.testng.SkipException;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 import java.util.UUID;
 
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
+import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
+import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
@@ -93,97 +103,67 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
-    private static final int TIMEOUT = 300_000;
+    static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+    private static final int TIMEOUT_IN_SECONDS = 45;
 
     // endregion
 
     // region Methods
 
     /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying the combination of a read datacenter and a global
-     * endpoint (with no write datacenter) routes requests correctly.
+     * Verifies that a {@link CosmosLoadBalancingPolicy} with preferred regions issues routes requests correctly.
+     * <p>
+     * The behavior varies based on whether multi-region writes are enabled. When multi-region writes are enabled
+     * all requests (reads and writes) will be sent to the first region in the list of preferred regions with failover
+     * to other regions in the preferred region list in the order in which they are listed. If all regions in the
+     * preferred region list are down, all requests will fall back to the region in which the global endpoint is
+     * deployed, then to other regions in alphabetic order.
+     * <p>
+     * When multi-region writes are disabled, all write requests are sent to the global-endpoint. There is no fallback.
+     * Read requests are handled the same whether or not multi-region writes are enabled.
      *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     * We do not test failover scenarios here. We simply check that all requests are sent to the first preferred
+     * region when multi-region writes are enabled. When multi-region writes are disabled we verify that all read
+     * requests are sent to the first preferred region and that all write requests are sent to the global endpoint
+     * address.
+     *
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled.
      */
-    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
-    public void testGlobalEndpointAndReadDatacenter() {
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    public void testWithPreferredRegions(final boolean multiRegionWrites) {
         testAllStatements(
             connect(CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(TestCommon.GLOBAL_ENDPOINT)
-                .withReadDC(TestCommon.READ_DATACENTER)
+                .withPreferredRegions(TestCommon.PREFERRED_REGIONS)
+                .withMultiRegionWrites(multiRegionWrites)
                 .build()),
             TestCommon.uniqueName("globalAndRead"));
     }
 
     /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying a global endpoint (with no read or write datacenter)
-     * routes requests correctly.
+     * Verifies that a {@link CosmosLoadBalancingPolicy} without preferred regions issues routes requests correctly.
+     * <p>
+     * All requests should go to the global endpoint with failover to endpoints in other regions in alphabetic order.
+     * We do not test the failover scenario here. We simply check that all requests are sent to the global endpoint
+     * whether or not multi-region writes are enabled. Cosmos DB guarantees that both read and write requests can be
+     * sent to the global endpoint.
      *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled.
      */
-    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
-    public void testGlobalEndpointOnly() {
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    public void testWithoutPreferredRegions(final boolean multiRegionWrites) {
         testAllStatements(
             connect(CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(TestCommon.GLOBAL_ENDPOINT)
+                .withMultiRegionWrites(multiRegionWrites)
                 .build()),
-            TestCommon.uniqueName("globalOnly"));
-    }
-
-    /**
-     * Verifies that invalid {@link CosmosLoadBalancingPolicy} configurations produce {@link IllegalArgumentException}
-     * errors.
-     */
-    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
-    public void testInvalid() {
-
-        final String readDatacenter = "East US";
-        final String writeDatacenter = "West US";
-
-        assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().build()
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withReadDC(readDatacenter).build()
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withWriteDC(writeDatacenter).build()
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder().withGlobalEndpoint(TestCommon.GLOBAL_ENDPOINT).withWriteDC(writeDatacenter).build()
-        ).isInstanceOf(IllegalArgumentException.class);
-
-        assertThatThrownBy(() ->
-            CosmosLoadBalancingPolicy.builder()
-                .withGlobalEndpoint(TestCommon.GLOBAL_ENDPOINT)
-                .withReadDC(readDatacenter)
-                .withWriteDC(writeDatacenter)
-                .build()
-        ).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} specifying read and write datacenters (with no global endpoint)
-     * routes requests correctly.
-     *
-     * TODO (DANOBLE) Add the check that routing occurs as expected.
-     */
-    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
-    public void testReadDCAndWriteDC() {
-
-        if (TestCommon.WRITE_DATACENTER.isEmpty()) {
-            throw new SkipException("WRITE_DATACENTER is empty");
-        }
-
-        testAllStatements(
-            connect(CosmosLoadBalancingPolicy.builder()
-                .withReadDC(TestCommon.READ_DATACENTER)
-                .withWriteDC(TestCommon.WRITE_DATACENTER)
-                .build()),
-            TestCommon.uniqueName("readWriteDCv2"));
+            TestCommon.uniqueName("globalAndRead"));
     }
 
     // endregion
@@ -193,11 +173,16 @@ public class CosmosLoadBalancingPolicyTest {
     private static Session connect(final LoadBalancingPolicy loadBalancingPolicy) {
 
         final Cluster cluster = Cluster.builder()
-            .withLoadBalancingPolicy(loadBalancingPolicy)
-            .withCredentials(TestCommon.USERNAME, TestCommon.PASSWORD)
-            .addContactPoints(TestCommon.CONTACT_POINTS)
-            .withPort(TestCommon.PORT)
+            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
+            .withCredentials(USERNAME, PASSWORD)
+            .withPort(GLOBAL_ENDPOINT_PORT)
             .withSSL()
+            .withLoadBalancingPolicy(loadBalancingPolicy)
+            .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
+            .withRetryPolicy(new CosmosRetryPolicy())
+            .withPoolingOptions(new PoolingOptions()
+                .setConnectionsPerHost(HostDistance.LOCAL, 1, 10)
+                .setConnectionsPerHost(HostDistance.REMOTE, 1, 10))
             .build();
 
         try {

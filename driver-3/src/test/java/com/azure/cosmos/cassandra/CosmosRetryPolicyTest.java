@@ -12,7 +12,9 @@ import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
@@ -80,10 +82,10 @@ public class CosmosRetryPolicyTest {
     // region Fields
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ONE;
-    private static final int FIXED_BACK_OFF_TIME = 5000;
-    private static final int GROWING_BACK_OFF_TIME = 1000;
+    private static final int FIXED_BACK_OFF_TIME = 5_000;
+    private static final int GROWING_BACK_OFF_TIME = 1_000;
     private static final int MAX_RETRY_COUNT = 5;
-    private static final int TIMEOUT = 300000;
+    private static final int TIMEOUT_IN_SECONDS = 30;
 
     // endregion
 
@@ -92,7 +94,10 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class integrates with DataStax Java Driver 3.
      */
-    @Test(groups = { "integration", "checkintest" }, timeOut = TIMEOUT)
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
     public void canIntegrateWithCosmos() {
 
         final Session session = connect(CosmosRetryPolicy.builder()
@@ -127,7 +132,10 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries on a connection-related exception.
      */
-    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
     public void canRetryOnConnectionException() {
 
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
@@ -146,7 +154,10 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with fixed backoff time.
      */
-    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(-1).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
@@ -155,7 +166,10 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class faithfully executes retries with growing backoff time.
      */
-    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
@@ -164,7 +178,10 @@ public class CosmosRetryPolicyTest {
     /**
      * Verifies that the {@link CosmosRetryPolicy} class rethrows when {@code max-retries} is exceeded.
      */
-    @Test(groups = { "unit", "checkintest" }, timeOut = TIMEOUT)
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
     public void willRethrowOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         this.retry(retryPolicy, MAX_RETRY_COUNT + 1, MAX_RETRY_COUNT + 1, RetryDecision.Type.RETHROW);
@@ -182,8 +199,8 @@ public class CosmosRetryPolicyTest {
         final Cluster cluster = Cluster.builder()
             .withRetryPolicy(retryPolicy)
             .withCredentials(TestCommon.USERNAME, TestCommon.PASSWORD)
-            .addContactPoints(TestCommon.CONTACT_POINTS)
-            .withPort(TestCommon.PORT)
+            .addContactPoint(TestCommon.GLOBAL_ENDPOINT_HOSTNAME)
+            .withPort(TestCommon.GLOBAL_ENDPOINT_PORT)
             .withSSL()
             .build();
 

@@ -13,6 +13,8 @@ import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
@@ -31,32 +33,27 @@ public final class TestCommon {
 
     // region Fields
 
-    static final String[] CONTACT_POINTS;
-
     static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.global-endpoint",
         "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
-        "localhost:9042");
+        "localhost:10350");
+
+    static final String GLOBAL_ENDPOINT_HOSTNAME;
+    static final int GLOBAL_ENDPOINT_PORT;
+
     static final String PASSWORD = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.password",
         "AZURE_COSMOS_CASSANDRA_PASSWORD",
         "");
 
-    static final int PORT;
-
-    static final String READ_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.read-datacenter",
-        "AZURE_COSMOS_CASSANDRA_READ_DATACENTER",
-        "");
+    static final List<String> PREFERRED_REGIONS = Arrays.asList(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.preferred-regions",
+        "AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS",
+        "").split("\\s*,\\s*"));
 
     static final String USERNAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.username",
         "AZURE_COSMOS_CASSANDRA_USERNAME",
-        "");
-
-    static final String WRITE_DATACENTER = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.write-datacenter",
-        "AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER",
         "");
 
     static {
@@ -66,6 +63,8 @@ public final class TestCommon {
 
         final String hostname = GLOBAL_ENDPOINT.substring(0, index);
         final String port = GLOBAL_ENDPOINT.substring(index + 1);
+        GLOBAL_ENDPOINT_HOSTNAME = hostname;
+
         int value = -1;
 
         try {
@@ -75,8 +74,7 @@ public final class TestCommon {
             fail("expected integer port number in range [0, 65535], not " + port);
         }
 
-        CONTACT_POINTS = new String[] { hostname };
-        PORT = value;
+        GLOBAL_ENDPOINT_PORT = value;
     }
 
     // endregion
@@ -228,7 +226,9 @@ public final class TestCommon {
      * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;</i>.
      */
     static String uniqueName(final String prefix) {
-        return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
+        final UUID uuid = UUID.randomUUID();
+        final long suffix = uuid.getLeastSignificantBits() ^ uuid.getMostSignificantBits();
+        return prefix + '_' + Long.toUnsignedString(suffix, Character.MAX_RADIX);
     }
 
     /**

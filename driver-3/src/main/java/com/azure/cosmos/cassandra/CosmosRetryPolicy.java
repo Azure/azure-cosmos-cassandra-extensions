@@ -32,7 +32,11 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Fields
 
+    private static final int DEFAULT_FIXED_BACKOFF_TIME_MILLIS = 5_000;
+    private static final int DEFAULT_GROWING_BACK_OFF_TIME_MILLIS = 1_000;
+    private static final int DEFAULT_MAX_RETRY_COUNT = 5;
     private static final Random RANDOM = new Random();
+
     private final int fixedBackOffTimeMillis;
     private final int growingBackOffTimeMillis;
     private final int maxRetryCount;
@@ -48,33 +52,13 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     }
 
     /**
-     * Initializes a newly created {@link CosmosRetryPolicy} object
-     *
-     * @param maxRetryCount maximum number of times to retry an operation before failing.
-     *
-     * @deprecated use {@link #builder CosmosRetryPolicy.builder} to construct a CosmosRetryPolicy instead.
+     * Initializes a newly created {@link CosmosRetryPolicy} object with default settings.
      */
-    @Deprecated
-    public CosmosRetryPolicy(final int maxRetryCount) {
-        this(maxRetryCount, 5000, 1000);
-    }
 
-    /**
-     * Initializes a newly created {@link CosmosRetryPolicy} object
-     *
-     * @param maxRetryCount maximum number of times to retry an operation before failing.
-     * @param fixedBackOffTimeMillis fixed backoff time in milliseconds.
-     * @param growingBackOffTimeMillis growing backoff time in milliseconds.
-     *
-     * @deprecated use {@link #builder CosmosRetryPolicy.builder} to construct a CosmosRetryPolicy instead.
-     */
-    @Deprecated
-    public CosmosRetryPolicy(
-        final int maxRetryCount, final int fixedBackOffTimeMillis, final int growingBackOffTimeMillis) {
-
-        this.maxRetryCount = maxRetryCount;
-        this.fixedBackOffTimeMillis = fixedBackOffTimeMillis;
-        this.growingBackOffTimeMillis = growingBackOffTimeMillis;
+    public CosmosRetryPolicy() {
+        this.maxRetryCount = DEFAULT_MAX_RETRY_COUNT;
+        this.fixedBackOffTimeMillis = DEFAULT_FIXED_BACKOFF_TIME_MILLIS;
+        this.growingBackOffTimeMillis = DEFAULT_GROWING_BACK_OFF_TIME_MILLIS;
     }
 
     // endregion
