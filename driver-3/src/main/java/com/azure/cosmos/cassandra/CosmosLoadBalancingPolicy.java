@@ -7,9 +7,12 @@ import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.Metrics;
 import com.datastax.driver.core.RegularStatement;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
@@ -18,6 +21,7 @@ import com.datastax.driver.core.querybuilder.BuiltStatement;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -75,8 +79,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             GET_CONTACT_POINTS = Metadata.class.getDeclaredMethod("getContactPoints");
             AccessController.doPrivileged(new PrivilegedAction<Method>() {
                 public Method run() {
-                    GET_CONTACT_POINTS.setAccessible(true);
-                    return GET_CONTACT_POINTS;
+                    try {
+                        GET_CONTACT_POINTS.setAccessible(true);
+                        return GET_CONTACT_POINTS;
+                    } catch (final Throwable error) {
+                        LOG.error("Privileged action on {} to setAccessible(true) failed due to: ",
+                            GET_CONTACT_POINTS,
+                            error);
+                        throw error;
+                    }
                 }
             });
 
@@ -87,7 +98,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 error);
         }
         Json.module()
+            .addSerializer(Cluster.class, ClusterSerializer.INSTANCE)
+            .addSerializer(EndPoint.class, ToStringSerializer.instance)
             .addSerializer(Host.class, HostSerializer.INSTANCE)
+            .addSerializer(Metadata.class, MetadataSerializer.INSTANCE)
             .addSerializer(Statement.class, StatementSerializer.INSTANCE);
     }
 
@@ -98,6 +112,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private CosmosLoadBalancingPolicy(@NonNull final List<String> preferredRegions, final boolean multiRegionWrites) {
         this.multiRegionWrites = multiRegionWrites;
         this.preferredRegions = new ArrayList<>(preferredRegions);
+    }
+
+    /**
+     * Initializes a newly constructed {@link CosmosLoadBalancingPolicy} instance with default settings.
+     * <p>
+     * Multi-region writes are disabled and all requests are sent to the global endpoint.
+     */
+    public CosmosLoadBalancingPolicy() {
+        this(Collections.emptyList(), false);
     }
 
     // endregion
@@ -440,6 +463,55 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
+    private static class ClusterSerializer extends StdSerializer<Cluster> {
+
+        public static final ClusterSerializer INSTANCE = new ClusterSerializer(Cluster.class);
+        private static final long serialVersionUID = -2084259636087581282L;
+
+        ClusterSerializer(final Class<Cluster> type) {
+            super(type);
+        }
+
+        @Override
+        public void serialize(
+            @NonNull final Cluster value,
+            @NonNull final JsonGenerator generator,
+            @NonNull final SerializerProvider serializerProvider) throws IOException {
+
+            requireNonNull(value, "expected non-null value");
+            requireNonNull(value, "expected non-null generator");
+            requireNonNull(value, "expected non-null serializerProvider");
+
+            generator.writeStartObject();
+            generator.writeStringField("name", value.getClusterName());
+            generator.writeBooleanField("closed", value.isClosed());
+
+            Metrics metrics;
+
+            if (value.isClosed()) {
+                generator.writeNullField("metadata");
+                metrics = null;
+            } else {
+                try {
+                    // Side-effect: Cluster::getMetadata calls Metadata::init which throws, if the call fails
+                    generator.writeObjectField("metadata", value.getMetadata());
+                    metrics = value.getMetrics();
+                } catch (final Throwable error) {
+                    generator.writeObjectField("metadata", error);
+                    metrics = null;
+                }
+            }
+
+            if (metrics == null) {
+                generator.writeNullField("metrics");
+            } else {
+                generator.writeObjectField("metrics", metrics);
+            }
+
+            generator.writeEndObject();
+        }
+    }
+
     private static class HostSerializer extends StdSerializer<Host> {
 
         public static final HostSerializer INSTANCE = new HostSerializer(Host.class);
@@ -472,6 +544,61 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
 
             generator.writeStringField("state", value.getState());
+            generator.writeEndObject();
+        }
+    }
+
+    private static class MetadataSerializer extends StdSerializer<Metadata> {
+
+        public static final MetadataSerializer INSTANCE = new MetadataSerializer(Metadata.class);
+        private static final long serialVersionUID = 2234571397397316058L;
+
+        MetadataSerializer(final Class<Metadata> type) {
+            super(type);
+        }
+
+        @Override
+        public void serialize(
+            @NonNull final Metadata value,
+            @NonNull final JsonGenerator generator,
+            @NonNull final SerializerProvider serializerProvider) throws IOException {
+
+            requireNonNull(value, "expected non-null value");
+            requireNonNull(value, "expected non-null generator");
+            requireNonNull(value, "expected non-null serializerProvider");
+
+            generator.writeStartObject();
+
+            final String clusterName = value.getClusterName();
+
+            if (clusterName == null) {
+                generator.writeNullField("clusterName");
+            } else {
+                generator.writeStringField("clusterName", clusterName);
+            }
+
+            final Set<Host> hosts = value.getAllHosts();
+
+            if (hosts == null) {
+                generator.writeNullField("hosts");
+            } else {
+                generator.writeArrayFieldStart("keyspaces");
+                for (final Host host : hosts) {
+                    generator.writeObject(host);
+                }
+            }
+
+            final List<KeyspaceMetadata> keyspacesMetadata = value.getKeyspaces();
+
+            if (keyspacesMetadata == null) {
+                generator.writeNullField("keyspaces");
+            } else {
+                generator.writeArrayFieldStart("keyspaces");
+                for (final KeyspaceMetadata keyspaceMetadata : keyspacesMetadata) {
+                    generator.writeString(keyspaceMetadata.toString());
+                }
+            }
+
             generator.writeEndObject();
         }
     }

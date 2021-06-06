@@ -3,24 +3,22 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.LocalDate;
-import com.datastax.driver.core.PoolingOptions;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
-import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.querybuilder.Clause;
 import com.datastax.driver.core.querybuilder.Delete;
 import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Select;
 import com.datastax.driver.core.querybuilder.Update;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,13 +29,13 @@ import org.slf4j.LoggerFactory;
 import java.util.Date;
 import java.util.UUID;
 
-import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
-import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
-import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
-import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
+import static com.azure.cosmos.cassandra.TestCommon.buildCluster;
+import static com.azure.cosmos.cassandra.TestCommon.cleanUp;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosLoadBalancingPolicy} class.
@@ -110,22 +108,53 @@ public class CosmosLoadBalancingPolicyTest {
 
     // region Methods
 
+    @BeforeAll
+    static void touchCosmosLoadBalancingPolicy() {
+        CosmosLoadBalancingPolicy.builder(); // forces class initialization
+    }
+
+    /**
+     * Verifies that a {@link CosmosLoadBalancingPolicy} without preferred regions issues routes requests correctly.
+     * <p>
+     * All requests should go to the global endpoint with failover to endpoints in other regions in alphabetic order. We
+     * do not test the failover scenario here. We simply check that all requests are sent to the global endpoint whether
+     * or not multi-region writes are enabled. Cosmos DB guarantees that both read and write requests can be sent to the
+     * global endpoint.
+     *
+     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled.
+     */
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    public void testSansPreferredRegions(final boolean multiRegionWrites) {
+
+        try (Cluster cluster = buildCluster(CosmosLoadBalancingPolicy.builder()
+            .withMultiRegionWrites(multiRegionWrites)
+            .build())) {
+            testAllStatements(cluster.connect(), TestCommon.uniqueName("sansPreferredRegions"));
+        } catch (final AssertionError error) {
+            throw error;
+        } catch (final Throwable error) {
+            fail("Failed due to: " + error, error);
+        }
+    }
+
     /**
      * Verifies that a {@link CosmosLoadBalancingPolicy} with preferred regions issues routes requests correctly.
      * <p>
-     * The behavior varies based on whether multi-region writes are enabled. When multi-region writes are enabled
-     * all requests (reads and writes) will be sent to the first region in the list of preferred regions with failover
-     * to other regions in the preferred region list in the order in which they are listed. If all regions in the
-     * preferred region list are down, all requests will fall back to the region in which the global endpoint is
-     * deployed, then to other regions in alphabetic order.
+     * The behavior varies based on whether multi-region writes are enabled. When multi-region writes are enabled all
+     * requests (reads and writes) will be sent to the first region in the list of preferred regions with failover to
+     * other regions in the preferred region list in the order in which they are listed. If all regions in the preferred
+     * region list are down, all requests will fall back to the region in which the global endpoint is deployed, then to
+     * other regions in alphabetic order.
      * <p>
      * When multi-region writes are disabled, all write requests are sent to the global-endpoint. There is no fallback.
      * Read requests are handled the same whether or not multi-region writes are enabled.
-     *
-     * We do not test failover scenarios here. We simply check that all requests are sent to the first preferred
-     * region when multi-region writes are enabled. When multi-region writes are disabled we verify that all read
-     * requests are sent to the first preferred region and that all write requests are sent to the global endpoint
-     * address.
+     * We do not test failover scenarios here. We simply check that all requests are sent to the first preferred region
+     * when multi-region writes are enabled. When multi-region writes are disabled we verify that all read requests are
+     * sent to the first preferred region and that all write requests are sent to the global endpoint address.
      *
      * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled.
      */
@@ -135,63 +164,23 @@ public class CosmosLoadBalancingPolicyTest {
     @Timeout(TIMEOUT_IN_SECONDS)
     @ValueSource(booleans = { false, true })
     public void testWithPreferredRegions(final boolean multiRegionWrites) {
-        testAllStatements(
-            connect(CosmosLoadBalancingPolicy.builder()
-                .withPreferredRegions(TestCommon.PREFERRED_REGIONS)
-                .withMultiRegionWrites(multiRegionWrites)
-                .build()),
-            TestCommon.uniqueName("globalAndRead"));
-    }
 
-    /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} without preferred regions issues routes requests correctly.
-     * <p>
-     * All requests should go to the global endpoint with failover to endpoints in other regions in alphabetic order.
-     * We do not test the failover scenario here. We simply check that all requests are sent to the global endpoint
-     * whether or not multi-region writes are enabled. Cosmos DB guarantees that both read and write requests can be
-     * sent to the global endpoint.
-     *
-     * @param multiRegionWrites {@code true}, if the test should be run with multi-region writes enabled.
-     */
-    @ParameterizedTest
-    @Tag("checkin")
-    @Tag("integration")
-    @Timeout(TIMEOUT_IN_SECONDS)
-    @ValueSource(booleans = { false, true })
-    public void testWithoutPreferredRegions(final boolean multiRegionWrites) {
-        testAllStatements(
-            connect(CosmosLoadBalancingPolicy.builder()
-                .withMultiRegionWrites(multiRegionWrites)
-                .build()),
-            TestCommon.uniqueName("globalAndRead"));
+        try (Cluster cluster = buildCluster(CosmosLoadBalancingPolicy.builder()
+            .withMultiRegionWrites(multiRegionWrites)
+            .withPreferredRegions(PREFERRED_REGIONS)
+            .build())) {
+            LOG.info("[{}] Created cluster: {}", "testWithPreferredRegions", Json.toJson(cluster));
+            testAllStatements(cluster.connect(), TestCommon.uniqueName("withPreferredRegions"));
+        } catch (final AssertionError error) {
+            throw error;
+        } catch (final Throwable error) {
+            fail("Failed due to: " + error, error);
+        }
     }
 
     // endregion
 
     // region Privates
-
-    private static Session connect(final LoadBalancingPolicy loadBalancingPolicy) {
-
-        final Cluster cluster = Cluster.builder()
-            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
-            .withCredentials(USERNAME, PASSWORD)
-            .withPort(GLOBAL_ENDPOINT_PORT)
-            .withSSL()
-            .withLoadBalancingPolicy(loadBalancingPolicy)
-            .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
-            .withRetryPolicy(new CosmosRetryPolicy())
-            .withPoolingOptions(new PoolingOptions()
-                .setConnectionsPerHost(HostDistance.LOCAL, 1, 10)
-                .setConnectionsPerHost(HostDistance.REMOTE, 1, 10))
-            .build();
-
-        try {
-            return cluster.connect();
-        } catch (final Throwable error) {
-            cluster.close();
-            throw error;
-        }
-    }
 
     private static void testAllStatements(final Session session, final String keyspaceName) {
 
@@ -294,7 +283,7 @@ public class CosmosLoadBalancingPolicyTest {
             session.execute(batchStatement);
 
         } finally {
-            TestCommon.cleanUp(session, keyspaceName);
+            cleanUp(session, keyspaceName);
         }
     }
 

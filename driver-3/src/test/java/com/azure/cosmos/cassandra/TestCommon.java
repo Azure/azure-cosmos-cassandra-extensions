@@ -6,11 +6,16 @@ package com.azure.cosmos.cassandra;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.PoolingOptions;
+import com.datastax.driver.core.RemoteEndpointAwareJdkSSLOptions;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
+import com.datastax.driver.core.policies.LoadBalancingPolicy;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -18,6 +23,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
+import static com.datastax.driver.core.HostDistance.LOCAL;
+import static com.datastax.driver.core.HostDistance.REMOTE;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.AssertJUnit.fail;
@@ -51,6 +58,16 @@ public final class TestCommon {
         "AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS",
         "").split("\\s*,\\s*"));
 
+    static final String TRUSTSTORE_PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.truststore-password",
+        "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD",
+        "null");
+
+    static final String TRUSTSTORE_PATH = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.truststore-path",
+        "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH",
+        null);
+
     static final String USERNAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.username",
         "AZURE_COSMOS_CASSANDRA_USERNAME",
@@ -75,11 +92,31 @@ public final class TestCommon {
         }
 
         GLOBAL_ENDPOINT_PORT = value;
+
+        if (TRUSTSTORE_PATH != null) {
+            System.setProperty("javax.net.ssl.trustStore", TRUSTSTORE_PATH);
+            System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
+        }
     }
 
     // endregion
 
     // region Methods
+
+    public static Cluster buildCluster(final LoadBalancingPolicy loadBalancingPolicy) {
+        return Cluster.builder()
+            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
+            .withCredentials(USERNAME, PASSWORD)
+            .withPort(GLOBAL_ENDPOINT_PORT)
+            .withPoolingOptions(new PoolingOptions()
+                .setConnectionsPerHost(LOCAL, 1, 10)
+                .setConnectionsPerHost(REMOTE, 1, 10))
+            .withSSL(RemoteEndpointAwareJdkSSLOptions.builder().build())
+            .withLoadBalancingPolicy(loadBalancingPolicy)
+            .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
+            .withRetryPolicy(new CosmosRetryPolicy())
+            .build();
+    }
 
     /**
      * Closes the given {@link Session} and its associated {@link Cluster cluster} after dropping the given
@@ -89,14 +126,14 @@ public final class TestCommon {
      * @param keyspaceName Name of keyspace to be dropped before closing {@code session} and its associated
      *                     {@link Cluster cluster}.
      */
-    static void cleanUp(final Session session, final String keyspaceName) {
-        if (session != null && !session.isClosed()) {
-            try {
-                session.execute("DROP KEYSPACE IF EXISTS " + keyspaceName);
-            } finally {
-                session.close();
-                session.getCluster().close();
-            }
+    static void cleanUp(@NonNull final Session session, @NonNull final String keyspaceName) {
+        assertThat(session).isNotNull();
+        assertThat(keyspaceName).isNotNull();
+        assertThat(session.isClosed()).isFalse();
+        try {
+            session.execute("DROP KEYSPACE IF EXISTS " + keyspaceName);
+        } catch (final Throwable error) {
+            fail("Failed to drop keyspace " + keyspaceName + " due to: " + error);
         }
     }
 
