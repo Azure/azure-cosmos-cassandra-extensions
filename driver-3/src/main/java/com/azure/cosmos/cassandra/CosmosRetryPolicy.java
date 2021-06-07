@@ -66,12 +66,21 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // region Accessors
 
     /**
-     * Gets a newly created {@link Builder builder} object for constructing a {@link CosmosRetryPolicy}.
+     * Gets the fixed back-off time in milliseconds specified by this {@link CosmosLoadBalancingPolicy}.
      *
-     * @return a newly created {@link CosmosLoadBalancingPolicy} builder instance.
+     * @return the fixed backoff time in milliseconds specified by this {@link CosmosLoadBalancingPolicy}.
      */
-    public static Builder builder() {
-        return new Builder();
+    public int getFixedBackOffTimeMillis() {
+        return this.fixedBackOffTimeMillis;
+    }
+
+    /**
+     * Gets the growing back-off time in milliseconds specified by this {@link CosmosLoadBalancingPolicy}.
+     *
+     * @return the growing back-off time in milliseconds specified by this {@link CosmosLoadBalancingPolicy}.
+     */
+    public int getGrowingBackOffTimeMillis() {
+        return this.growingBackOffTimeMillis;
     }
 
     /**
@@ -86,6 +95,15 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     // endregion
 
     // region Methods
+
+    /**
+     * Gets a newly created {@link Builder builder} object for constructing a {@link CosmosRetryPolicy}.
+     *
+     * @return a newly created {@link CosmosLoadBalancingPolicy} builder instance.
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
 
     @Override
     public void close() {
@@ -169,7 +187,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // endregion
 
-    // region Privtes
+    // region Privates
 
     private static int getRetryAfterMs(final String exceptionString) {
         // Example exceptionString:

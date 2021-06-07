@@ -4,4 +4,4 @@
 /**
  * DataStax Java Driver 3 extensions implementation
  */
-package com.azure.cosmos.cassandra.implementation;
+package com.azure.cosmos.cassandra.implementation.serializer;

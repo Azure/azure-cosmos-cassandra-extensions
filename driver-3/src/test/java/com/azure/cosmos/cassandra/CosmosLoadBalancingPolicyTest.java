@@ -3,7 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
@@ -32,6 +31,7 @@ import java.util.UUID;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.buildCluster;
 import static com.azure.cosmos.cassandra.TestCommon.cleanUp;
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -102,7 +102,7 @@ public class CosmosLoadBalancingPolicyTest {
     // region Fields
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-    private static final int TIMEOUT_IN_SECONDS = 45;
+    private static final int TIMEOUT_IN_SECONDS = 3600;
 
     // endregion
 
@@ -128,12 +128,14 @@ public class CosmosLoadBalancingPolicyTest {
     @Tag("integration")
     @Timeout(TIMEOUT_IN_SECONDS)
     @ValueSource(booleans = { false, true })
-    public void testSansPreferredRegions(final boolean multiRegionWrites) {
+    public void testWithoutPreferredRegions(final boolean multiRegionWrites) {
 
-        try (Cluster cluster = buildCluster(CosmosLoadBalancingPolicy.builder()
-            .withMultiRegionWrites(multiRegionWrites)
-            .build())) {
-            testAllStatements(cluster.connect(), TestCommon.uniqueName("sansPreferredRegions"));
+        try (Cluster cluster = buildCluster(
+            "testWithoutPreferredRegions-multiRegionWrites-" + multiRegionWrites,
+            CosmosLoadBalancingPolicy.builder()
+                .withMultiRegionWrites(multiRegionWrites)
+                .build())) {
+            testAllStatements(cluster.connect(), TestCommon.uniqueName("TestWithoutPreferredRegions"));
         } catch (final AssertionError error) {
             throw error;
         } catch (final Throwable error) {
@@ -165,16 +167,18 @@ public class CosmosLoadBalancingPolicyTest {
     @ValueSource(booleans = { false, true })
     public void testWithPreferredRegions(final boolean multiRegionWrites) {
 
-        try (Cluster cluster = buildCluster(CosmosLoadBalancingPolicy.builder()
-            .withMultiRegionWrites(multiRegionWrites)
-            .withPreferredRegions(PREFERRED_REGIONS)
-            .build())) {
-            LOG.info("[{}] Created cluster: {}", "testWithPreferredRegions", Json.toJson(cluster));
-            testAllStatements(cluster.connect(), TestCommon.uniqueName("withPreferredRegions"));
-        } catch (final AssertionError error) {
-            throw error;
-        } catch (final Throwable error) {
-            fail("Failed due to: " + error, error);
+        try (Cluster cluster = buildCluster(
+            "testWithPreferredRegions-multiRegionWrites-" + multiRegionWrites,
+            CosmosLoadBalancingPolicy.builder()
+                .withMultiRegionWrites(multiRegionWrites)
+                .withPreferredRegions(PREFERRED_REGIONS)
+                .build())) {
+            try {
+                testAllStatements(cluster.connect(), TestCommon.uniqueName("testWithPreferredRegions"));
+            } catch (final Throwable error) {
+                LOG.error("{} failed due to: {}", cluster.getClusterName(), toJson(error));
+                fail(toJson(error));
+            }
         }
     }
 

@@ -3,37 +3,24 @@
 
 package com.azure.cosmos.cassandra.implementation;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonAppend;
-import com.fasterxml.jackson.databind.annotation.JsonAppend.Prop;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
-import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
-import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.PropertyFilter;
-import com.fasterxml.jackson.databind.ser.VirtualBeanPropertyWriter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.fasterxml.jackson.databind.util.Annotations;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
-import java.time.Instant;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
@@ -53,19 +40,18 @@ public final class Json {
 
     private static final Logger LOG = LoggerFactory.getLogger(Json.class);
 
-    private static final SimpleFilterProvider FILTER_PROVIDER = new SimpleFilterProvider();
-
-    private static final SimpleModule MODULE = new SimpleModule()
-        .addSerializer(Duration.class, ToStringSerializer.instance)
-        .addSerializer(Instant.class, ToStringSerializer.instance);
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-        .registerModule(MODULE)
-        .setFilterProvider(FILTER_PROVIDER)
-        .addMixIn(Throwable.class, ThrowableMixIn.class);
-
+    private static final SimpleModule MODULE = new SimpleModule();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(MODULE);
     private static final ObjectWriter OBJECT_WRITER = OBJECT_MAPPER.writer();
     private static final ConcurrentHashMap<Class<?>, String> SIMPLE_CLASS_NAMES = new ConcurrentHashMap<>();
+
+    static {
+        JsonSerializerRegistrar.init();
+    }
+
+    // endregion
+
+    // region Methods
 
     /**
      * Returns the {@link SimpleModule module} used by this class.
@@ -77,10 +63,6 @@ public final class Json {
     public static SimpleModule module() {
         return MODULE;
     }
-
-    // endregion
-
-    // region
 
     /**
      * Returns the {@link ObjectMapper object mapper} used by this class.
@@ -143,6 +125,83 @@ public final class Json {
     }
 
     /**
+     * Registers the serializers in the named package.
+     * <p>
+     * Instances of all {@link JsonSerializer} types are added to {@link #module}. All abstract classes annotated with
+     * {@link JsonAppend} are added to {@link #objectMapper}.
+     *
+     * @param packageName the name of the package containing serializers to be registered.
+     */
+    // TODO (DANOBLE) Make the code match the Java docs. Right now we're matching names, not checking annotations or
+    //  derivations.
+    @SuppressWarnings("unchecked")
+    public static void registerSerializers(@NonNull final String packageName) {
+
+        final String packagePath = packageName.replaceAll("[.]", "/");
+
+        try (InputStream stream = ClassLoader.getSystemClassLoader().getResourceAsStream(packagePath)) {
+
+            if (stream == null) {
+                final ExceptionInInitializerError error = new ExceptionInInitializerError(
+                    "expected resource stream for package"
+                        + packagePath);
+                LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+                throw error;
+            }
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+
+                final ExceptionInInitializerError error = new ExceptionInInitializerError();
+
+                reader.lines()
+                    .filter(line -> line.endsWith(".class")).map(line -> {
+
+                        final String simpleClassName = line.substring(0, line.lastIndexOf('.'));
+
+                        try {
+                            return Class.forName(packageName + "." + simpleClassName);
+                        } catch (final ClassNotFoundException exception) {
+                            error.addSuppressed(exception);
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull).forEachOrdered(cls -> {
+
+                        final String className = cls.getName();
+
+                        try {
+                            if (className.endsWith("Serializer")) {
+
+                                final JsonSerializer<Object> serializer = (JsonSerializer<Object>) cls
+                                    .getDeclaredField("INSTANCE")
+                                    .get(null);
+
+                                Json.module().addSerializer(serializer.handledType(), serializer);
+
+                            } else if (className.endsWith("MixIn")) {
+
+                                Json.objectMapper().addMixIn(
+                                    (Class<Object>) cls.getDeclaredField("HANDLED_TYPE").get(null),
+                                    cls);
+                            }
+                        } catch (IllegalAccessException | NoSuchFieldException exception) {
+                            error.addSuppressed(exception);
+                        }
+                    });
+
+                if (error.getSuppressed().length > 0) {
+                    LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+                    throw error;
+                }
+            }
+
+        } catch (final IOException error) {
+            LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+            throw new ExceptionInInitializerError(error);
+        }
+    }
+
+    /**
      * Converts the given value to JSON.
      *
      * @param value The value to convert.
@@ -193,95 +252,6 @@ public final class Json {
     @NonNull
     public static ObjectWriter writer() {
         return OBJECT_WRITER;
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    static void registerPropertyFilter(final Class<?> type, final Class<? extends PropertyFilter> filter) {
-
-        requireNonNull(type, "type");
-        requireNonNull(filter, "filter");
-
-        try {
-            FILTER_PROVIDER.addFilter(type.getSimpleName(), filter.getDeclaredConstructor().newInstance());
-        } catch (final ReflectiveOperationException error) {
-            throw new IllegalStateException(error);
-        }
-    }
-
-    // endregion
-
-    // region Types
-
-    private static class StackTraceSerializer extends StdSerializer<StackTraceElement[]> {
-
-        private static final StackTraceSerializer INSTANCE = new StackTraceSerializer();
-        private static final long serialVersionUID = 1526311794842313958L;
-
-        private StackTraceSerializer() {
-            super(StackTraceElement[].class);
-        }
-
-        @Override
-        public void serialize(
-            final StackTraceElement[] value,
-            final JsonGenerator generator,
-            final SerializerProvider provider) throws IOException {
-
-            final StringBuilder builder = new StringBuilder();
-
-            for (final StackTraceElement element : value) {
-                builder.append("\tat ");
-                builder.append(element);
-                builder.append('\n');
-            }
-
-            generator.writeString(builder.toString());
-        }
-    }
-
-    @JsonAppend(props = @Prop(value = ThrowableMixIn.Writer.class, name = "error", type = String.class), prepend = true)
-    @JsonPropertyOrder({ "message", "cause", "stackTrace" })
-    @JsonIgnoreProperties({ "localizedMessage" })
-    private abstract static class ThrowableMixIn {
-
-        @JsonSerialize(using = StackTraceSerializer.class)
-        public abstract StackTraceElement[] getStackTrace();
-
-        private static class Writer extends VirtualBeanPropertyWriter {
-
-            private static final long serialVersionUID = -8203269538522149446L;
-
-            public Writer() {
-                super();
-            }
-
-            public Writer(
-                final BeanPropertyDefinition propertyDefinition,
-                final Annotations annotations,
-                final JavaType javaType) {
-
-                super(propertyDefinition, annotations, javaType);
-            }
-
-            @Override
-            public VirtualBeanPropertyWriter withConfig(
-                final MapperConfig<?> mapperConfig,
-                final AnnotatedClass annotatedClass,
-                final BeanPropertyDefinition propertyDefinition,
-                final JavaType javaType) {
-
-                return new Writer(propertyDefinition, annotatedClass.getAnnotations(), javaType);
-            }
-
-            @Override
-            protected Object value(
-                final Object bean,
-                final JsonGenerator generator,
-                final SerializerProvider provider) {
-
-                return bean.getClass().getName();
-            }
-        }
     }
 
     // endregion

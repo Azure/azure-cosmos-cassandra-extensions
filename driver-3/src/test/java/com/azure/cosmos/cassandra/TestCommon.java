@@ -7,7 +7,6 @@ import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.PoolingOptions;
-import com.datastax.driver.core.RemoteEndpointAwareJdkSSLOptions;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
@@ -93,28 +92,32 @@ public final class TestCommon {
 
         GLOBAL_ENDPOINT_PORT = value;
 
-        if (TRUSTSTORE_PATH != null) {
-            System.setProperty("javax.net.ssl.trustStore", TRUSTSTORE_PATH);
-            System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
-        }
+//        if (TRUSTSTORE_PATH != null) {
+//            System.setProperty("javax.net.ssl.trustStore", TRUSTSTORE_PATH);
+//            System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
+//        }
     }
 
     // endregion
 
     // region Methods
 
-    public static Cluster buildCluster(final LoadBalancingPolicy loadBalancingPolicy) {
-        return Cluster.builder()
+    public static Cluster buildCluster(final String clusterName, final LoadBalancingPolicy loadBalancingPolicy) {
+        return Cluster.builder().withClusterName(clusterName)
             .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
             .withCredentials(USERNAME, PASSWORD)
             .withPort(GLOBAL_ENDPOINT_PORT)
-            .withPoolingOptions(new PoolingOptions()
-                .setConnectionsPerHost(LOCAL, 1, 10)
-                .setConnectionsPerHost(REMOTE, 1, 10))
-            .withSSL(RemoteEndpointAwareJdkSSLOptions.builder().build())
+            .withSSL()
+//            .withSocketOptions(new SocketOptions()
+//                .setConnectTimeoutMillis(30_000)
+//                .setReadTimeoutMillis(30_000)
+//                .setKeepAlive(true))
             .withLoadBalancingPolicy(loadBalancingPolicy)
             .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
             .withRetryPolicy(new CosmosRetryPolicy())
+            .withPoolingOptions(new PoolingOptions()
+                .setConnectionsPerHost(LOCAL, 1, 10)
+                .setConnectionsPerHost(REMOTE, 1, 10))
             .build();
     }
 
