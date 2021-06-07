@@ -40,13 +40,17 @@ public final class Json {
 
     private static final Logger LOG = LoggerFactory.getLogger(Json.class);
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final SimpleModule MODULE = new SimpleModule();
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(MODULE);
-    private static final ObjectWriter OBJECT_WRITER = OBJECT_MAPPER.writer();
     private static final ConcurrentHashMap<Class<?>, String> SIMPLE_CLASS_NAMES = new ConcurrentHashMap<>();
 
+    private static final JsonRegistrar REGISTRAR = new JsonRegistrar();
+    private static final ObjectWriter WRITER;
+
     static {
-        JsonSerializerRegistrar.init();
+        REGISTRAR.registerSerializers();
+        MAPPER.registerModule(MODULE);
+        WRITER = MAPPER.writer();
     }
 
     // endregion
@@ -70,7 +74,7 @@ public final class Json {
      * @return The {@link ObjectMapper object mapper} used by this class.
      */
     public static ObjectMapper objectMapper() {
-        return OBJECT_MAPPER;
+        return MAPPER;
     }
 
     /**
@@ -87,7 +91,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final File file, @NonNull final Class<T> type) throws IOException {
         requireNonNull(file, "expected non-null file");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(file, type);
+        return MAPPER.readValue(file, type);
     }
 
     /**
@@ -104,7 +108,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final InputStream stream, @NonNull final Class<T> type) throws IOException {
         requireNonNull(stream, "expected non-null stream");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(stream, type);
+        return MAPPER.readValue(stream, type);
     }
 
     /**
@@ -121,21 +125,38 @@ public final class Json {
     public static <T> T readValue(@NonNull final String string, @NonNull final Class<T> type) throws IOException {
         requireNonNull(string, "expected non-null string");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(string, type);
+        return MAPPER.readValue(string, type);
     }
 
     /**
-     * Registers the serializers in the named package.
-     * <p>
-     * Instances of all {@link JsonSerializer} types are added to {@link #module}. All abstract classes annotated with
-     * {@link JsonAppend} are added to {@link #objectMapper}.
+     * Registers a serializer for a type.
      *
-     * @param packageName the name of the package containing serializers to be registered.
+     * @param type          A {@link Class class}.
+     * @param serializer    A {@link JsonSerializer serializer}.
+     * @param <T>           The type of the class to be serialized.
+     *
+     * @return              A reference to the module to which {@code serializer} was added. This is the value of
+     *                      {@link #module}.
      */
-    // TODO (DANOBLE) Make the code match the Java docs. Right now we're matching names, not checking annotations or
-    //  derivations.
+    public static <T> SimpleModule addSerializer(
+        @NonNull final Class<? extends T> type,
+        @NonNull final JsonSerializer<T> serializer) {
+
+        return MODULE.addSerializer(type, serializer);
+    }
+
+    /**
+     * Registers all the serializers in the named package, including mix-in classes.
+     * <p>
+     * Instances of all {@link JsonSerializer} types are added to {@link #module}. All mix-in classes (i.e., classes
+     * annotated with {@link JsonAppend}) are added to {@link #objectMapper}. Nested classes are not considered.
+     * Mix-in classes must contain this static member or must be added to {@link #objectMapper} manually:
+     * <pre>{@code public static final Class<?> HANDLED_TYPE = handled_type;}</pre>
+     *
+     * @param packageName the name of the package containing serializers and mix-in classes to be added.
+     */
     @SuppressWarnings("unchecked")
-    public static void registerSerializers(@NonNull final String packageName) {
+    public static void addSerializersAndMixIns(@NonNull final String packageName) {
 
         final String packagePath = packageName.replaceAll("[.]", "/");
 
@@ -170,19 +191,25 @@ public final class Json {
                         final String className = cls.getName();
 
                         try {
-                            if (className.endsWith("Serializer")) {
+
+                            if (JsonSerializer.class.isAssignableFrom(cls)) {
 
                                 final JsonSerializer<Object> serializer = (JsonSerializer<Object>) cls
                                     .getDeclaredField("INSTANCE")
                                     .get(null);
 
-                                Json.module().addSerializer(serializer.handledType(), serializer);
+                                MODULE.addSerializer(serializer.handledType(), serializer);
 
-                            } else if (className.endsWith("MixIn")) {
+                            } else if (cls.isAnnotationPresent(JsonAppend.class)) {
 
-                                Json.objectMapper().addMixIn(
-                                    (Class<Object>) cls.getDeclaredField("HANDLED_TYPE").get(null),
-                                    cls);
+                                try {
+                                    final Object value = cls.getDeclaredField("HANDLED_TYPE").get(null);
+                                    if (value.getClass() == Class.class) {
+                                        MAPPER.addMixIn((Class<?>) value, cls);
+                                    }
+                                } catch (final NoSuchFieldException ignored) {
+                                    // nothing to do
+                                }
                             }
                         } catch (IllegalAccessException | NoSuchFieldException exception) {
                             error.addSuppressed(exception);
@@ -211,11 +238,11 @@ public final class Json {
     @NonNull
     public static String toJson(@Nullable final Object value) {
         try {
-            return OBJECT_WRITER.writeValueAsString(value);
+            return WRITER.writeValueAsString(value);
         } catch (final JsonProcessingException error) {
             LOG.debug("could not convert {} value to JSON due to:", value != null ? value.getClass() : null, error);
             try {
-                return "{\"error\":" + OBJECT_WRITER.writeValueAsString(error.toString()) + '}';
+                return "{\"error\":" + WRITER.writeValueAsString(error.toString()) + '}';
             } catch (final JsonProcessingException exception) {
                 return "null";
             }
@@ -251,7 +278,7 @@ public final class Json {
      */
     @NonNull
     public static ObjectWriter writer() {
-        return OBJECT_WRITER;
+        return WRITER;
     }
 
     // endregion

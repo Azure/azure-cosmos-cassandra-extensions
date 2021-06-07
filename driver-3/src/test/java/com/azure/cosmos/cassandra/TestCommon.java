@@ -11,6 +11,7 @@ import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
+import com.datastax.driver.core.SocketOptions;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
@@ -21,10 +22,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
 import static com.datastax.driver.core.HostDistance.LOCAL;
 import static com.datastax.driver.core.HostDistance.REMOTE;
 import static java.lang.String.format;
+import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.AssertJUnit.fail;
 
@@ -92,10 +95,40 @@ public final class TestCommon {
 
         GLOBAL_ENDPOINT_PORT = value;
 
-//        if (TRUSTSTORE_PATH != null) {
-//            System.setProperty("javax.net.ssl.trustStore", TRUSTSTORE_PATH);
-//            System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
-//        }
+        if (TRUSTSTORE_PATH != null) {
+            System.setProperty("javax.net.ssl.trustStore", TRUSTSTORE_PATH);
+            System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
+        }
+
+        out.println("--------------------------------------------------------------");
+        out.println("T E S T  P A R A M E T E R S");
+        out.println("--------------------------------------------------------------");
+
+        out.println("GLOBAL_ENDPOINT = " + toJson(GLOBAL_ENDPOINT));
+        assertThat(GLOBAL_ENDPOINT).isNotBlank();
+
+        out.println("USERNAME = " + toJson(USERNAME));
+        assertThat(USERNAME).isNotEmpty();
+
+        out.println("PASSWORD = " + toJson(PASSWORD));
+        assertThat(PASSWORD).isNotEmpty();
+
+        out.println("PREFERRED_REGIONS = " + toJson(PREFERRED_REGIONS));
+        assertThat(PREFERRED_REGIONS).isNotEmpty();
+
+        out.println("TRUSTSTORE_PATH = " + toJson(TRUSTSTORE_PATH));
+
+        if (TRUSTSTORE_PATH != null) {
+            assertThat(TRUSTSTORE_PATH).isNotEmpty();
+        }
+
+        out.println("TRUSTSTORE_PASSWORD = " + toJson(TRUSTSTORE_PASSWORD));
+
+        if (TRUSTSTORE_PATH != null) {
+            assertThat(TRUSTSTORE_PASSWORD).isNotEmpty();
+        }
+
+        out.println();
     }
 
     // endregion
@@ -108,16 +141,15 @@ public final class TestCommon {
             .withCredentials(USERNAME, PASSWORD)
             .withPort(GLOBAL_ENDPOINT_PORT)
             .withSSL()
-//            .withSocketOptions(new SocketOptions()
-//                .setConnectTimeoutMillis(30_000)
-//                .setReadTimeoutMillis(30_000)
-//                .setKeepAlive(true))
-            .withLoadBalancingPolicy(loadBalancingPolicy)
-            .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
-            .withRetryPolicy(new CosmosRetryPolicy())
             .withPoolingOptions(new PoolingOptions()
                 .setConnectionsPerHost(LOCAL, 1, 10)
                 .setConnectionsPerHost(REMOTE, 1, 10))
+            .withSocketOptions(new SocketOptions()
+                .setConnectTimeoutMillis(6_000)
+                .setReadTimeoutMillis(6_000))
+            .withLoadBalancingPolicy(loadBalancingPolicy)
+            .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
+            .withRetryPolicy(new CosmosRetryPolicy())
             .build();
     }
 

@@ -9,18 +9,16 @@ import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import java.time.Duration;
 import java.time.Instant;
 
-final class JsonSerializerRegistrar {
+final class JsonRegistrar {
 
-    private JsonSerializerRegistrar() {
-        throw new UnsupportedOperationException();
+    JsonRegistrar() {
     }
 
-    static void init() {
-        Json.module()
+    void registerSerializers() {
+        Json.addSerializer(Duration.class, ToStringSerializer.instance)
             .addSerializer(EndPoint.class, ToStringSerializer.instance)
-            .addSerializer(Duration.class, ToStringSerializer.instance)
             .addSerializer(Instant.class, ToStringSerializer.instance)
             .addSerializer(StackTraceElement.class, ToStringSerializer.instance);
-        Json.registerSerializers(JsonSerializerRegistrar.class.getPackage().getName() + ".serializer");
+        Json.addSerializersAndMixIns(JsonRegistrar.class.getPackage().getName() + ".serializer");
     }
 }
