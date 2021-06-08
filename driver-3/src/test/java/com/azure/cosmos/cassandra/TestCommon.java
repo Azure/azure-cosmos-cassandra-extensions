@@ -29,7 +29,7 @@ import static com.datastax.driver.core.HostDistance.REMOTE;
 import static java.lang.String.format;
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.testng.AssertJUnit.fail;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * A utility class that implements common static methods useful for writing tests.

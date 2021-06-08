@@ -53,7 +53,6 @@ Licensed under the MIT License.
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.junit-jupiter>5.7.1</version.junit-jupiter>
     <version.log4j>2.13.3</version.log4j>
-    <version.testng>7.3.0</version.testng>
   </properties>
 
   <scm>
@@ -124,11 +123,6 @@ Licensed under the MIT License.
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${version.slf4j-api}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <version>${version.testng}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -322,6 +316,18 @@ Licensed under the MIT License.
               <excludes>
                 <exclude>module-info.java</exclude>
               </excludes>
+            </configuration>
+          </plugin>
+          <!-- Add automatic module name to jar -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <configuration>
+              <archive>
+                <manifestEntries>
+                  <Automatic-Module-Name>com.azure.cosmos.cassandra</Automatic-Module-Name>
+                </manifestEntries>
+              </archive>
             </configuration>
           </plugin>
           <!-- Don't document module-info.java -->
