@@ -18,11 +18,16 @@ Licensed under the MIT License.
   <packaging>pom</packaging>
   <version>1.0.0-SNAPSHOT</version>
 
+  <organization>
+    <name>Microsoft Azure Cosmos DB</name>
+    <url>https://azure.microsoft.com/en-us/services/cosmos-db/</url>
+  </organization>
+
   <developers>
     <developer>
       <name>Azure Cosmos Cassandra API developers</name>
       <email>azuredocumentdb@service.microsoft.com</email>
-      <organization>Microsoft Azure</organization>
+      <organization>Microsoft Azure Cosmos DB</organization>
       <organizationUrl>
         https://azure.microsoft.com/en-us/blog/dear-cassandra-developers-welcome-to-azure-cosmosdb/
       </organizationUrl>
@@ -324,6 +329,10 @@ Licensed under the MIT License.
             <artifactId>maven-jar-plugin</artifactId>
             <configuration>
               <archive>
+                <manifest>
+                  <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                  <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+                </manifest>
                 <manifestEntries>
                   <Automatic-Module-Name>com.azure.cosmos.cassandra</Automatic-Module-Name>
                 </manifestEntries>
