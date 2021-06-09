@@ -4,7 +4,8 @@
 package com.azure.cosmos.cassandra;
 
 import com.azure.cosmos.cassandra.implementation.Json;
-import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.azure.cosmos.cassandra.implementation.serializer.NodeSerializer;
+import com.azure.cosmos.cassandra.implementation.serializer.RequestSerializer;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -17,19 +18,12 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -177,6 +171,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public List<String> getPreferredRegions() {
         return Collections.unmodifiableList(this.preferredRegions);
     }
+
     // endregion
 
     // region Methods
@@ -217,9 +212,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
 
-            // If you're connected to a Cosmos DB Cassandra API instance, there should be a single contact point,
-            // the global endpoint. This code guards against other arrangements with this expectation: All contact
-            // points must write capable.
+            // Here we assume that all contact points are write capable. If you're connected to a Cosmos DB Cassandra
+            // API instance, there should be a single contact point, the global endpoint. If you're connected to an
+            // Apache Cassandra instance, we assume that the contact points are in the datacenters to which you wish
+            // to write.
 
             for (final Node node : this.getContactPointsOrException()) {
                 if (this.preferredRegions.contains(node.getDatacenter())) {
@@ -346,16 +342,18 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         LOG.debug("onRemove -> returns(void), {}", this);
 
-        if (this.multiRegionWrites) {
-            if (this.nodesForReading.isEmpty()) {
-                LOG.warn("All nodes have now been removed: {}", this);
-            }
-        } else {
-            if (this.nodesForReading.isEmpty()) {
-                LOG.warn("All nodes for reading have now been removed: {}", this);
-            }
-            if (this.nodesForWriting.isEmpty()) {
-                LOG.warn("All nodes for writing have now been removed: {}", this);
+        if (LOG.isWarnEnabled()) {
+            if (this.multiRegionWrites) {
+                if (this.nodesForReading.isEmpty()) {
+                    LOG.warn("All nodes have now been removed: {}", this);
+                }
+            } else {
+                if (this.nodesForReading.isEmpty()) {
+                    LOG.warn("All nodes for reading have now been removed: {}", this);
+                }
+                if (this.nodesForWriting.isEmpty()) {
+                    LOG.warn("All nodes for writing have now been removed: {}", this);
+                }
             }
         }
     }
@@ -418,44 +416,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // endregion
 
     // region Types
-
-    private static class NodeSerializer extends StdSerializer<Node> {
-
-        public static final NodeSerializer INSTANCE = new NodeSerializer(Node.class);
-        private static final long serialVersionUID = -4853942224745141238L;
-
-        NodeSerializer(final Class<Node> type) {
-            super(type);
-        }
-
-        @Override
-        public void serialize(
-            @NonNull final Node value,
-            @NonNull final JsonGenerator generator,
-            @NonNull final SerializerProvider serializerProvider) throws IOException {
-
-            requireNonNull(value, "expected non-null value");
-            requireNonNull(value, "expected non-null generator");
-            requireNonNull(value, "expected non-null serializerProvider");
-
-            generator.writeStartObject();
-            generator.writeStringField("endPoint", value.getEndPoint().toString());
-            generator.writeStringField("datacenter", value.getDatacenter());
-            generator.writeStringField("distance", value.getDistance().toString());
-
-            final UUID hostId = value.getHostId();
-
-            if (hostId == null) {
-                generator.writeNullField("hostId");
-            } else {
-                generator.writeStringField("hostId", hostId.toString());
-            }
-
-            generator.writeNumberField("openConnections", value.getOpenConnections());
-            generator.writeStringField("state", value.getState().toString());
-            generator.writeEndObject();
-        }
-    }
 
     @SuppressFBWarnings("SE_COMPARATOR_SHOULD_BE_SERIALIZABLE")
     private static class PreferredRegionsComparator implements Comparator<Node> {
@@ -566,62 +526,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         @NonNull
         private Set<Node> getContactPoints() {
             return (Set<Node>) (Set<?>) this.metadataManager.getContactPoints();
-        }
-    }
-
-    private static class RequestSerializer extends StdSerializer<Request> {
-
-        public static final RequestSerializer INSTANCE = new RequestSerializer(Request.class);
-        private static final long serialVersionUID = -6046496854932624633L;
-
-        RequestSerializer(final Class<Request> type) {
-            super(type);
-        }
-
-        @Override
-        public void serialize(
-            @NonNull final Request value,
-            @NonNull final JsonGenerator generator,
-            @NonNull final SerializerProvider serializerProvider) throws IOException {
-
-            requireNonNull(value, "expected non-null value");
-            requireNonNull(value, "expected non-null generator");
-            requireNonNull(value, "expected non-null serializerProvider");
-
-            generator.writeStartObject();
-
-            String query;
-
-            try {
-                final Method getQuery = value.getClass().getMethod("getQuery");
-                query = (String) getQuery.invoke(value);
-            } catch (final NoSuchMethodException | InvocationTargetException | IllegalAccessException error) {
-                query = value.getClass().toString();
-            }
-
-            if (query == null) {
-                generator.writeNullField("query");
-            } else {
-                generator.writeStringField("query", query);
-            }
-
-            final CqlIdentifier keyspace = value.getKeyspace();
-
-            if (keyspace == null) {
-                generator.writeNullField("keyspace");
-            } else {
-                generator.writeStringField("keyspace", keyspace.asCql(true));
-            }
-
-            final Duration timeout = value.getTimeout();
-
-            if (timeout == null) {
-                generator.writeNullField("timeout");
-            } else {
-                generator.writeObjectField("timeout", timeout);
-            }
-
-            generator.writeEndObject();
         }
     }
 

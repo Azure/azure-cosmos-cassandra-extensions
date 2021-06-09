@@ -4,22 +4,23 @@
 package com.azure.cosmos.cassandra.implementation;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.annotation.JsonAppend;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.PropertyFilter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
-import java.time.Instant;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
@@ -37,23 +38,24 @@ public final class Json {
 
     // region Fields
 
-    private static final SimpleFilterProvider FILTER_PROVIDER = new SimpleFilterProvider();
     private static final Logger LOG = LoggerFactory.getLogger(Json.class);
 
-    private static final SimpleModule MODULE = new SimpleModule()
-        .addSerializer(Duration.class, ToStringSerializer.instance)
-        .addSerializer(Instant.class, ToStringSerializer.instance);
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-        .registerModule(MODULE)
-        .setFilterProvider(FILTER_PROVIDER);
-
-    private static final ObjectWriter OBJECT_WRITER = OBJECT_MAPPER.writer();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final SimpleModule MODULE = new SimpleModule();
     private static final ConcurrentHashMap<Class<?>, String> SIMPLE_CLASS_NAMES = new ConcurrentHashMap<>();
+
+    private static final JsonRegistrar REGISTRAR = new JsonRegistrar();
+    private static final ObjectWriter WRITER;
+
+    static {
+        REGISTRAR.registerSerializers();
+        MAPPER.registerModule(MODULE);
+        WRITER = MAPPER.writer();
+    }
 
     // endregion
 
-    // region
+    // region Methods
 
     /**
      * Returns the {@link SimpleModule module} used by this class.
@@ -64,6 +66,15 @@ public final class Json {
      */
     public static SimpleModule module() {
         return MODULE;
+    }
+
+    /**
+     * Returns the {@link ObjectMapper object mapper} used by this class.
+     *
+     * @return The {@link ObjectMapper object mapper} used by this class.
+     */
+    public static ObjectMapper objectMapper() {
+        return MAPPER;
     }
 
     /**
@@ -80,7 +91,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final File file, @NonNull final Class<T> type) throws IOException {
         requireNonNull(file, "expected non-null file");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(file, type);
+        return MAPPER.readValue(file, type);
     }
 
     /**
@@ -97,7 +108,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final InputStream stream, @NonNull final Class<T> type) throws IOException {
         requireNonNull(stream, "expected non-null stream");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(stream, type);
+        return MAPPER.readValue(stream, type);
     }
 
     /**
@@ -114,7 +125,107 @@ public final class Json {
     public static <T> T readValue(@NonNull final String string, @NonNull final Class<T> type) throws IOException {
         requireNonNull(string, "expected non-null string");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(string, type);
+        return MAPPER.readValue(string, type);
+    }
+
+    /**
+     * Registers a serializer for a type.
+     *
+     * @param type          A {@link Class class}.
+     * @param serializer    A {@link JsonSerializer serializer}.
+     * @param <T>           The type of the class to be serialized.
+     *
+     * @return              A reference to the module to which {@code serializer} was added. This is the value of
+     *                      {@link #module}.
+     */
+    public static <T> SimpleModule addSerializer(
+        @NonNull final Class<? extends T> type,
+        @NonNull final JsonSerializer<T> serializer) {
+
+        return MODULE.addSerializer(type, serializer);
+    }
+
+    /**
+     * Registers all the serializers in the named package, including mix-in classes.
+     * <p>
+     * Instances of all {@link JsonSerializer} types are added to {@link #module}. All mix-in classes (i.e., classes
+     * annotated with {@link JsonAppend}) are added to {@link #objectMapper}. Nested classes are not considered.
+     * Mix-in classes must contain this static member or must be added to {@link #objectMapper} manually:
+     * <pre>{@code public static final Class<?> HANDLED_TYPE = handled_type;}</pre>
+     *
+     * @param packageName The name of the package containing serializers and mix-in classes to be added.
+     */
+    @SuppressWarnings("unchecked")
+    public static void addSerializersAndMixIns(@NonNull final String packageName) {
+
+        final String packagePath = requireNonNull(packageName, "expected non-null packageName").replace('.', '/');
+
+        try (InputStream stream = Json.class.getClassLoader().getResourceAsStream(packagePath)) {
+
+            if (stream == null) {
+                final ExceptionInInitializerError error = new ExceptionInInitializerError(
+                    "expected resource stream for package "
+                        + packagePath);
+                LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+                throw error;
+            }
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+
+                final ExceptionInInitializerError error = new ExceptionInInitializerError();
+
+                reader.lines()
+                    .filter(line -> line.endsWith(".class")).map(line -> {
+
+                        final String simpleClassName = line.substring(0, line.lastIndexOf('.'));
+
+                        try {
+                            return Class.forName(packageName + "." + simpleClassName);
+                        } catch (final ClassNotFoundException exception) {
+                            error.addSuppressed(exception);
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull).forEachOrdered(cls -> {
+
+                        final String className = cls.getName();
+
+                        try {
+
+                            if (JsonSerializer.class.isAssignableFrom(cls)) {
+
+                                final JsonSerializer<Object> serializer = (JsonSerializer<Object>) cls
+                                    .getDeclaredField("INSTANCE")
+                                    .get(null);
+
+                                MODULE.addSerializer(serializer.handledType(), serializer);
+
+                            } else if (cls.isAnnotationPresent(JsonAppend.class)) {
+
+                                try {
+                                    final Object value = cls.getDeclaredField("HANDLED_TYPE").get(null);
+                                    if (value.getClass() == Class.class) {
+                                        MAPPER.addMixIn((Class<?>) value, cls);
+                                    }
+                                } catch (final NoSuchFieldException ignored) {
+                                    // nothing to do
+                                }
+                            }
+                        } catch (IllegalAccessException | NoSuchFieldException exception) {
+                            error.addSuppressed(exception);
+                        }
+                    });
+
+                if (error.getSuppressed().length > 0) {
+                    LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+                    throw error;
+                }
+            }
+
+        } catch (final IOException error) {
+            LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+            throw new ExceptionInInitializerError(error);
+        }
     }
 
     /**
@@ -127,11 +238,11 @@ public final class Json {
     @NonNull
     public static String toJson(@Nullable final Object value) {
         try {
-            return OBJECT_WRITER.writeValueAsString(value);
+            return WRITER.writeValueAsString(value);
         } catch (final JsonProcessingException error) {
             LOG.debug("could not convert {} value to JSON due to:", value != null ? value.getClass() : null, error);
             try {
-                return "{\"error\":" + OBJECT_WRITER.writeValueAsString(error.toString()) + '}';
+                return "{\"error\":" + WRITER.writeValueAsString(error.toString()) + '}';
             } catch (final JsonProcessingException exception) {
                 return "null";
             }
@@ -167,20 +278,7 @@ public final class Json {
      */
     @NonNull
     public static ObjectWriter writer() {
-        return OBJECT_WRITER;
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    static void registerPropertyFilter(final Class<?> type, final Class<? extends PropertyFilter> filter) {
-
-        requireNonNull(type, "type");
-        requireNonNull(filter, "filter");
-
-        try {
-            FILTER_PROVIDER.addFilter(type.getSimpleName(), filter.getDeclaredConstructor().newInstance());
-        } catch (final ReflectiveOperationException error) {
-            throw new IllegalStateException(error);
-        }
+        return WRITER;
     }
 
     // endregion
