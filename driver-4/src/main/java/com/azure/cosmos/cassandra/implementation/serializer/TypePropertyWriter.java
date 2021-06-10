@@ -22,21 +22,21 @@ import com.fasterxml.jackson.databind.util.Annotations;
  *
  * @see ThrowableMixIn
  */
-public final class ClassNamePropertyWriter extends VirtualBeanPropertyWriter {
+public final class TypePropertyWriter extends VirtualBeanPropertyWriter {
 
     private static final long serialVersionUID = -8203269538522149446L;
 
     /**
-     * Initializes a newly created {@link ClassNamePropertyWriter}.
+     * Initializes a newly created {@link TypePropertyWriter}.
      * <p>
      * Jackson requires a parameterless constructor for all {@link PropertyWriter} classes.
      */
-    public ClassNamePropertyWriter() {
+    public TypePropertyWriter() {
         super();
     }
 
     /**
-     * Initializes a newly created {@link ClassNamePropertyWriter}.
+     * Initializes a newly created {@link TypePropertyWriter}.
      * <p>
      * Jackson requires a constructor with these parameters for all {@link PropertyWriter} classes. This method
      *
@@ -44,7 +44,7 @@ public final class ClassNamePropertyWriter extends VirtualBeanPropertyWriter {
      * @param annotations           The annotations present on the property.
      * @param javaType              The {@link JavaType} of the property value to be written.
      */
-    public ClassNamePropertyWriter(
+    public TypePropertyWriter(
         final BeanPropertyDefinition propertyDefinition,
         final Annotations annotations,
         final JavaType javaType) {
@@ -53,7 +53,7 @@ public final class ClassNamePropertyWriter extends VirtualBeanPropertyWriter {
     }
 
     /**
-     * A factory method for constructing a {@link ClassNamePropertyWriter}.
+     * A factory method for constructing a {@link TypePropertyWriter}.
      *
      * @param mapperConfig          Mapper configuration.
      * @param annotatedClass        An annotated class.
@@ -69,7 +69,7 @@ public final class ClassNamePropertyWriter extends VirtualBeanPropertyWriter {
         final BeanPropertyDefinition propertyDefinition,
         final JavaType javaType) {
 
-        return new ClassNamePropertyWriter(propertyDefinition, annotatedClass.getAnnotations(), javaType);
+        return new TypePropertyWriter(propertyDefinition, annotatedClass.getAnnotations(), javaType);
     }
 
     @Override

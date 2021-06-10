@@ -44,11 +44,11 @@ import java.util.UUID;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
+import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -208,9 +208,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
         try {
 
-            assertThatCode(() ->
-                TestCommon.createSchema(session, keyspaceName, tableName)
-            ).doesNotThrowAnyException();
+            createSchema(session, keyspaceName, tableName, 10_000);
 
             // SimpleStatements
 

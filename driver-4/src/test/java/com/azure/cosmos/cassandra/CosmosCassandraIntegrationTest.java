@@ -44,6 +44,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -98,20 +99,17 @@ public class CosmosCassandraIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
-        TestCommon.getPropertyOrEnvironmentVariable(
+        getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.consistency-level",
-            "AZURE_COSMOS_CASSANDRA_CONSISTENCY_LEVEL",
             "QUORUM"));
 
-    private static final String KEYSPACE_NAME = TestCommon.getPropertyOrEnvironmentVariable(
+    private static final String KEYSPACE_NAME = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.keyspace-name",
-        "AZURE_COSMOS_CASSANDRA_KEYSPACE_NAME",
         "downgrading_" + UUID.randomUUID().toString().replace("-", ""));
 
     private static final File REPORTING_DIRECTORY = new File(
-        TestCommon.getPropertyOrEnvironmentVariable(
+        getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.reporting-directory",
-            "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
             Paths.get(
                 System.getProperty("user.home"),
                 ".local",

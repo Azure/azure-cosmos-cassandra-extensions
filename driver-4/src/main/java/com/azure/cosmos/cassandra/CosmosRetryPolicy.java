@@ -3,6 +3,7 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
@@ -22,6 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Random;
+
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 
 /**
  * A {@link RetryPolicy} implementation with back-offs for {@link CoordinatorException} failures.
@@ -138,7 +141,16 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     @SuppressFBWarnings(value = "DMI_RANDOM_USED_ONLY_ONCE", justification = "False alarm")
     @Override
     public RetryDecision onErrorResponse(
-        @NonNull final Request request, @NonNull final CoordinatorException error, final int retryCount) {
+        @NonNull final Request request,
+        @NonNull final CoordinatorException error,
+        final int retryCount) {
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onErrorResponse(request: {}, error: {}, retryCount: {}",
+                toJson(request),
+                toJson(error),
+                toJson(retryCount));
+        }
 
         RetryDecision retryDecision;
 
@@ -163,6 +175,10 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         } catch (final InterruptedException exception) {
             retryDecision = RetryDecision.RETHROW;
+        }
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("--> {}", retryDecision);
         }
 
         return retryDecision;
@@ -251,10 +267,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     @Override
     public String toString() {
-        return "CosmosRetryPolicy({"
-            + CosmosRetryPolicyOption.FIXED_BACKOFF_TIME.getName() + ':' + this.fixedBackoffTimeInMillis + ','
-            + CosmosRetryPolicyOption.GROWING_BACKOFF_TIME.getName() + ':' + this.growingBackoffTimeInMillis + ','
-            + CosmosRetryPolicyOption.MAX_RETRIES.getName() + ':' + this.maxRetryCount + "})";
+        return Json.toString(this);
     }
 
     // endregion

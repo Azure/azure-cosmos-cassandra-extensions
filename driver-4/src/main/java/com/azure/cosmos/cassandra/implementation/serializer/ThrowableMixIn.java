@@ -8,10 +8,10 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonAppend;
 
 /**
- * A mix-in for serializing a {@link Throwable} object to JSON for use in log messages.
+ * A mix-in for serializing {@link Throwable} instances to JSON for use in log messages.
  */
 @JsonAppend(
-    props = @JsonAppend.Prop(value = ClassNamePropertyWriter.class, name = "error", type = String.class),
+    props = @JsonAppend.Prop(value = TypePropertyWriter.class, name = "error", type = String.class),
     prepend = true)
 @JsonPropertyOrder(value = { "cause", "message", "stackTrace", "suppressed" }, alphabetic = true)
 @JsonIgnoreProperties({ "localizedMessage" })

@@ -32,9 +32,9 @@ public enum CosmosRetryPolicyOption implements CosmosDriverOption {
         Integer::parseUnsignedInt,
         5);
 
+    private final transient BiFunction<CosmosRetryPolicyOption, DriverExecutionProfile, ?> getter;
+    private final transient Function<String, ?> parser;
     private final Object defaultValue;
-    private final BiFunction<CosmosRetryPolicyOption, DriverExecutionProfile, ?> getter;
-    private final Function<String, ?> parser;
     private final String name;
     private final String path;
 

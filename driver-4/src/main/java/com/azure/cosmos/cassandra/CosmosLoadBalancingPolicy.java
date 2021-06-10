@@ -4,8 +4,6 @@
 package com.azure.cosmos.cassandra;
 
 import com.azure.cosmos.cassandra.implementation.Json;
-import com.azure.cosmos.cassandra.implementation.serializer.NodeSerializer;
-import com.azure.cosmos.cassandra.implementation.serializer.RequestSerializer;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -71,12 +69,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // region Fields
 
     private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
-
-    static {
-        Json.module()
-            .addSerializer(Node.class, NodeSerializer.INSTANCE)
-            .addSerializer(Request.class, RequestSerializer.INSTANCE);
-    }
 
     private final InternalDriverContext driverContext;
     private final MetadataManager metadataManager;

@@ -164,9 +164,9 @@ public final class Json {
 
             if (stream == null) {
                 final ExceptionInInitializerError error = new ExceptionInInitializerError(
-                    "expected resource stream for package "
-                        + packagePath);
-                LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+                    "Could not open stream to enumerate classes in package "
+                        + packageName);
+                LOG.error("Class initialization failed due to: ", error);
                 throw error;
             }
 
@@ -187,8 +187,6 @@ public final class Json {
                         }
                     })
                     .filter(Objects::nonNull).forEachOrdered(cls -> {
-
-                        final String className = cls.getName();
 
                         try {
 

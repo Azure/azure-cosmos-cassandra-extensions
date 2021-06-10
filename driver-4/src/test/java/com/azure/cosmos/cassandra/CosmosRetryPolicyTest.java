@@ -3,14 +3,15 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
@@ -18,8 +19,8 @@ import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
 import com.datastax.oss.driver.api.core.session.Request;
+import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import org.junit.jupiter.api.AfterAll;
@@ -32,16 +33,24 @@ import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Array;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
-import static com.azure.cosmos.cassandra.TestCommon.LOCAL_DATACENTER;
+import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
+import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.display;
+import static com.azure.cosmos.cassandra.TestCommon.read;
+import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
+import static com.azure.cosmos.cassandra.TestCommon.write;
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
@@ -95,7 +104,7 @@ public final class CosmosRetryPolicyTest {
 
     // region Fields
 
-    static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+    static final Logger LOG = LoggerFactory.getLogger(CosmosRetryPolicyTest.class);
 
     private static final ConsistencyLevel CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
 
@@ -105,7 +114,7 @@ public final class CosmosRetryPolicyTest {
     private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicyOption.GROWING_BACKOFF_TIME
         .getDefaultValue(Integer.class);
 
-    private static final String KEYSPACE_NAME = TestCommon.uniqueName("downgrading");
+    private static final String KEYSPACE_NAME = uniqueName("downgrading_");
     private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
     private static final String TABLE_NAME = "sensor_data";
     private static final int TIMEOUT_IN_SECONDS = 30;
@@ -125,16 +134,11 @@ public final class CosmosRetryPolicyTest {
     @Timeout(TIMEOUT_IN_SECONDS)
     public void canIntegrateWithCosmos() {
 
-        assertThatCode(() ->
-            TestCommon.createSchema(session, KEYSPACE_NAME, TABLE_NAME)
-        ).doesNotThrowAnyException();
-
-        assertThatCode(() ->
-            TestCommon.write(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> createSchema(session, KEYSPACE_NAME, TABLE_NAME, 400)).doesNotThrowAnyException();
+        assertThatCode(() -> write(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            final ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
+            final ResultSet rows = read(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
             display(rows);
         }).doesNotThrowAnyException();
     }
@@ -147,7 +151,6 @@ public final class CosmosRetryPolicyTest {
     @Tag("unit")
     public void canRetryOverloadedExceptionWithFixedBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(-1);
-        // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
         this.retry(retryPolicy, 0, MAX_RETRIES, RetryDecision.RETRY_SAME);
     }
 
@@ -159,8 +162,47 @@ public final class CosmosRetryPolicyTest {
     @Tag("unit")
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = new CosmosRetryPolicy(MAX_RETRIES);
-        // TODO (DANOBLE) Is the expected retry decision RetryDecision.RETRY_SAME or something else?
         this.retry(retryPolicy, 0, MAX_RETRIES, RetryDecision.RETRY_SAME);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS * 100)
+    public void canRetryWhenThrottled() throws InterruptedException {
+
+        LOG.info("{}", Json.toString(session));
+
+        final CompletableFuture<AsyncResultSet>[] futures = (CompletableFuture<AsyncResultSet>[]) Array.newInstance(
+            CompletableFuture.class,
+            1_000);
+
+        final ConcurrentHashMap<Class<? extends Throwable>, Integer> errors = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<String, Integer> errorMessages = new ConcurrentHashMap<>();
+        final String keyspaceName = "perf_ks";
+        final String tableName = "perf_tbl";
+
+        final Statement<SimpleStatement> statement = QueryBuilder.selectFrom(keyspaceName, tableName).all().build();
+
+        for (int i = 0; i < futures.length; i++) {
+            futures[i] = session.executeAsync(statement).toCompletableFuture().whenComplete(
+                (asyncResultSet, error) -> {
+                    if (error != null) {
+                        errors.compute(error.getClass(), (cls, count) -> count == null ? 1 : count + 1);
+                        errorMessages.compute(error.getMessage(), (value, count) -> count == null ? 1 : count + 1);
+                    }
+                });
+            if (i % 512 == 511) {
+                Thread.sleep(500L);
+            }
+        }
+
+        try {
+            CompletableFuture.allOf(futures).join();
+        } catch (final Throwable error) {
+            LOG.info("Errors:\n  {}\nError messages:\n  {}", toJson(errors), toJson(errorMessages));
+        }
     }
 
     /**
@@ -186,13 +228,7 @@ public final class CosmosRetryPolicyTest {
      */
     @BeforeAll
     public static void connect() {
-
-        session = checkState(CqlSession.builder().withConfigLoader(
-            DriverConfigLoader.programmaticBuilder()
-                .withClass(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, DefaultLoadBalancingPolicy.class)
-                .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DATACENTER)
-                .build())
-            .build());
+        session = checkState(CqlSession.builder().build());
     }
 
     /**
@@ -242,16 +278,10 @@ public final class CosmosRetryPolicyTest {
 
         final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
 
-        assertThat(loadBalancingPolicy.getClass()).isEqualTo(DefaultLoadBalancingPolicy.class);
+        assertThat(loadBalancingPolicy.getClass()).isEqualTo(CosmosLoadBalancingPolicy.class);
 
         final Map<UUID, Node> nodes = session.getMetadata().getNodes();
-//        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(NODES);
-
-        LOG.info("[{}] connected to {} with {} and {}",
-            session.getName(),
-            nodes,
-            retryPolicy,
-            loadBalancingPolicy);
+        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(REGIONAL_ENDPOINTS);
 
         return session;
     }
