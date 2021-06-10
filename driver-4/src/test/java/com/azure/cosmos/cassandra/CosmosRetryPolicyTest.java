@@ -117,7 +117,7 @@ public final class CosmosRetryPolicyTest {
     private static final String KEYSPACE_NAME = uniqueName("downgrading_");
     private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
     private static final String TABLE_NAME = "sensor_data";
-    private static final int TIMEOUT_IN_SECONDS = 30;
+    private static final int TIMEOUT_IN_SECONDS = 60;
 
     private static CqlSession session = null;
 
@@ -169,7 +169,7 @@ public final class CosmosRetryPolicyTest {
     @Test
     @Tag("checkin")
     @Tag("integration")
-    @Timeout(TIMEOUT_IN_SECONDS * 100)
+    @Timeout(TIMEOUT_IN_SECONDS)
     public void canRetryWhenThrottled() throws InterruptedException {
 
         LOG.info("{}", Json.toString(session));
