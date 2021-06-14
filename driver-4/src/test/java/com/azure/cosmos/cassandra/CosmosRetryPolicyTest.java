@@ -189,7 +189,7 @@ public final class CosmosRetryPolicyTest {
     @Test
     @Tag("checkin")
     @Tag("integration")
-    @Timeout(10 * TIMEOUT_IN_SECONDS)
+    @Timeout(2 * TIMEOUT_IN_SECONDS)
     public void canRetryAsExpectedWhenThrottled() {
 
         // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
@@ -198,7 +198,7 @@ public final class CosmosRetryPolicyTest {
 
         final CompletableFuture<AsyncResultSet>[] futures = (CompletableFuture<AsyncResultSet>[]) Array.newInstance(
             CompletableFuture.class,
-            500);
+            100);
 
         final ConcurrentHashMap<Node, ConcurrentHashMap<Class<? extends DriverException>, Integer>>
             nodes = new ConcurrentHashMap<>();
@@ -289,7 +289,9 @@ public final class CosmosRetryPolicyTest {
             assertThat(type).isIn(DriverTimeoutException.class, OverloadedException.class);
         });
 
-        // Expected: all errors are from the first preferred region in the list of preferred regions
+        // Expected:
+        // * All errors and retries are from the first preferred region in the list of preferred regions
+        // * All retries are the result of other errors, a metric that tracks calls to #onServerError
         // We don't expect any regional outages while this test is running
 
         final String preferredRegion = PREFERRED_REGIONS.get(0);
