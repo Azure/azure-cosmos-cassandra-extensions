@@ -30,7 +30,19 @@ public enum CosmosRetryPolicyOption implements CosmosDriverOption {
     MAX_RETRIES("max-retries",
         (option, profile) -> profile.getInt(option, option.getDefaultValue(Integer.class)),
         Integer::parseUnsignedInt,
-        5);
+        5),
+
+    RETRY_READ_TIMEOUTS("retry-read-timeouts",
+        (option, profile) -> profile.getBoolean(option, option.getDefaultValue(Boolean.class)),
+        Boolean::parseBoolean,
+        true
+    ),
+
+    RETRY_WRITE_TIMEOUTS("retry-write-timeouts",
+        (option, profile) -> profile.getBoolean(option, option.getDefaultValue(Boolean.class)),
+        Boolean::parseBoolean,
+        true
+    );
 
     private final transient BiFunction<CosmosRetryPolicyOption, DriverExecutionProfile, ?> getter;
     private final transient Function<String, ?> parser;

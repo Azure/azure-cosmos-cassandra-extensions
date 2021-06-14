@@ -18,6 +18,7 @@ import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.insert.Insert;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.KEYSPACE_NAME;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
@@ -49,6 +51,7 @@ import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -116,7 +119,7 @@ public final class CosmosLoadBalancingPolicyTest {
             .build();
 
         try (CqlSession session = this.connect(configLoader, multiRegionWrites)) {
-            this.testAllStatements(session, uniqueName("preferred_regions"));
+            this.testAllStatements(session, KEYSPACE_NAME);
         }
     }
 
@@ -188,7 +191,7 @@ public final class CosmosLoadBalancingPolicyTest {
         final CqlSession session = CqlSession.builder().withConfigLoader(checkState(configLoader)).build();
 
         try {
-            Thread.sleep(2_000L); // Gives the session time to enumerate peers and initialize all channel pools
+            Thread.sleep(5_000L); // Gives the session time to enumerate peers and initialize all channel pools
             return checkState(session, multiRegionWrites);
         } catch (final Throwable error) {
             session.close();
@@ -202,9 +205,10 @@ public final class CosmosLoadBalancingPolicyTest {
             DefaultRetryPolicy.class);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private void testAllStatements(@NonNull final CqlSession session, @NonNull final String keyspaceName) {
 
-        final String tableName = "sensor_data";
+        final String tableName = uniqueName("sensor_data_");
 
         try {
 
@@ -312,7 +316,10 @@ public final class CosmosLoadBalancingPolicyTest {
             session.execute(batchStatement);
 
         } finally {
-            session.execute("DROP KEYSPACE IF EXISTS " + keyspaceName);
+            assertThatCode(() -> session.execute(SchemaBuilder.dropTable(keyspaceName, tableName)
+                .ifExists()
+                .build()))
+            .doesNotThrowAnyException();
         }
     }
 

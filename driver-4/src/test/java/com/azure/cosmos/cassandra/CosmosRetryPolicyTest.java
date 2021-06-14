@@ -4,8 +4,13 @@
 package com.azure.cosmos.cassandra;
 
 import com.azure.cosmos.cassandra.implementation.Json;
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.DriverException;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
@@ -14,12 +19,14 @@ import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -34,12 +41,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Array;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.KEYSPACE_NAME;
+import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
 import static com.azure.cosmos.cassandra.TestCommon.createSchema;
 import static com.azure.cosmos.cassandra.TestCommon.display;
@@ -47,7 +62,8 @@ import static com.azure.cosmos.cassandra.TestCommon.read;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.azure.cosmos.cassandra.TestCommon.write;
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
-import static java.lang.String.format;
+import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES;
+import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES_ON_OTHER_ERROR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
@@ -114,9 +130,9 @@ public final class CosmosRetryPolicyTest {
     private static final int GROWING_BACK_OFF_TIME = CosmosRetryPolicyOption.GROWING_BACKOFF_TIME
         .getDefaultValue(Integer.class);
 
-    private static final String KEYSPACE_NAME = uniqueName("downgrading_");
     private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
-    private static final String TABLE_NAME = "sensor_data";
+
+    private static final String TABLE_NAME = uniqueName("sensor_data_");
     private static final int TIMEOUT_IN_SECONDS = 60;
 
     private static CqlSession session = null;
@@ -135,10 +151,10 @@ public final class CosmosRetryPolicyTest {
     public void canIntegrateWithCosmos() {
 
         assertThatCode(() -> createSchema(session, KEYSPACE_NAME, TABLE_NAME, 400)).doesNotThrowAnyException();
-        assertThatCode(() -> write(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME)).doesNotThrowAnyException();
+        assertThatCode(() -> write(session, KEYSPACE_NAME, TABLE_NAME, CONSISTENCY_LEVEL)).doesNotThrowAnyException();
 
         assertThatCode(() -> {
-            final ResultSet rows = read(session, CONSISTENCY_LEVEL, KEYSPACE_NAME, TABLE_NAME);
+            final ResultSet rows = read(session, KEYSPACE_NAME, TABLE_NAME, CONSISTENCY_LEVEL);
             display(rows);
         }).doesNotThrowAnyException();
     }
@@ -165,48 +181,148 @@ public final class CosmosRetryPolicyTest {
         this.retry(retryPolicy, 0, MAX_RETRIES, RetryDecision.RETRY_SAME);
     }
 
+    /**
+     * Verifies that the {@link CosmosRetryPolicy#onErrorResponse} method retries {@link OverloadedException} as
+     * expected.
+     */
     @SuppressWarnings("unchecked")
     @Test
     @Tag("checkin")
     @Tag("integration")
-    @Timeout(TIMEOUT_IN_SECONDS)
-    public void canRetryWhenThrottled() throws InterruptedException {
+    @Timeout(10 * TIMEOUT_IN_SECONDS)
+    public void canRetryAsExpectedWhenThrottled() {
+
+        // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
 
         LOG.info("{}", Json.toString(session));
 
         final CompletableFuture<AsyncResultSet>[] futures = (CompletableFuture<AsyncResultSet>[]) Array.newInstance(
             CompletableFuture.class,
-            1_000);
+            500);
 
-        final ConcurrentHashMap<Class<? extends Throwable>, Integer> errors = new ConcurrentHashMap<>();
-        final ConcurrentHashMap<String, Integer> errorMessages = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<Node, ConcurrentHashMap<Class<? extends DriverException>, Integer>>
+            nodes = new ConcurrentHashMap<>();
+
+        final ConcurrentHashMap<Class<? extends Throwable>, Integer>
+            errors = new ConcurrentHashMap<>();
+
+        final AtomicInteger completions = new AtomicInteger();
+        final AtomicInteger failures = new AtomicInteger();
         final String keyspaceName = "perf_ks";
         final String tableName = "perf_tbl";
 
-        final Statement<SimpleStatement> statement = QueryBuilder.selectFrom(keyspaceName, tableName).all().build();
+        final Statement<SimpleStatement> statement = QueryBuilder.selectFrom(keyspaceName, tableName)
+            .all()
+            .build()
+            .setTimeout(Duration.ofSeconds(10 * TIMEOUT_IN_SECONDS));
+
+        final Instant startTime = Instant.now();
 
         for (int i = 0; i < futures.length; i++) {
+
             futures[i] = session.executeAsync(statement).toCompletableFuture().whenComplete(
                 (asyncResultSet, error) -> {
-                    if (error != null) {
-                        errors.compute(error.getClass(), (cls, count) -> count == null ? 1 : count + 1);
-                        errorMessages.compute(error.getMessage(), (value, count) -> count == null ? 1 : count + 1);
+                    if (error == null) {
+                        final Node coordinator = asyncResultSet.getExecutionInfo().getCoordinator();
+                        nodes.computeIfAbsent(coordinator, node -> new ConcurrentHashMap<>());
+                        completions.incrementAndGet();
+                        return;
                     }
+                    failures.incrementAndGet();
+                    if (error instanceof DriverException) {
+                        final DriverException driverException = (DriverException) error;
+                        final Node coordinator = driverException.getExecutionInfo().getCoordinator();
+                        if (coordinator != null) {
+                            nodes.compute(coordinator, (node, driverExceptions) -> {
+                                if (driverExceptions == null) {
+                                    driverExceptions = new ConcurrentHashMap<>();
+                                }
+                                driverExceptions.compute(driverException.getClass(), (cls, count) ->
+                                    count == null ? 1 : count + 1);
+                                return driverExceptions;
+                            });
+                        }
+                    }
+                    errors.compute(error.getClass(), (cls, count) -> count == null ? 1 : count + 1);
                 });
-            if (i % 512 == 511) {
-                Thread.sleep(500L);
-            }
         }
 
         try {
             CompletableFuture.allOf(futures).join();
-        } catch (final Throwable error) {
-            LOG.info("Errors:\n  {}\nError messages:\n  {}", toJson(errors), toJson(errorMessages));
+        } catch (final CompletionException error) {
+            // ignored
         }
+
+        final Duration elapsedTime = Duration.between(Instant.now(), startTime);
+        final Metrics metrics = session.getMetrics().orElse(null);
+        assertThat(metrics).isNotNull();
+
+        final MetricRegistry metricRegistry = metrics.getRegistry();
+
+        final Duration requestTimeout = statement.getTimeout();
+
+        final int maxRequestsPerSecond = session.getContext()
+            .getConfig()
+            .getDefaultProfile()
+            .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_REQUESTS_PER_SECOND);
+
+        LOG.info(
+            "{\"cql-requests\":{},\"completions\":{},\"failures\":{},\"session-errors\":{},\"node-errors\":{},"
+                + "\"elapsed-time\":{},\"request-timeout\":{},\"max-requests-per-second\":{},\"metrics\":{"
+                + "\"gauges\":{},\"timers\":{},\"counters\":{}}}",
+            futures.length,
+            completions.get(),
+            failures.get(),
+            toJson(errors),
+            toJson(nodes),
+            toJson(elapsedTime),
+            toJson(requestTimeout),
+            toJson(maxRequestsPerSecond),
+            toJson(metricRegistry.getGauges()),
+            toJson(metricRegistry.getTimers()),
+            toJson(metricRegistry.getCounters()));
+
+        // Expected: all errors are the result of request timeouts or rethrown OverloadedException errors
+        // We expect mostly, if not entirely rethrown OverloadedException errors
+
+        assertThat(errors).allSatisfy((type, count) -> {
+            assertThat(type).isIn(DriverTimeoutException.class, OverloadedException.class);
+        });
+
+        // Expected: all errors are from the first preferred region in the list of preferred regions
+        // We don't expect any regional outages while this test is running
+
+        final String preferredRegion = PREFERRED_REGIONS.get(0);
+        int preferredRegionErrorCount = 0;
+        int preferredRegionRetryCount = 0;
+        int preferredRegionRetriesOnOtherErrorCount = 0;
+
+        for (final Node node : nodes.keySet()) {
+            if (Objects.equals(node.getDatacenter(), preferredRegion)) {
+                final ConcurrentHashMap<Class<? extends DriverException>, Integer> nodeErrors = nodes.get(node);
+                assertThat(nodeErrors).isNotNull();
+                for (final int count : nodeErrors.values()) {
+                    preferredRegionErrorCount += count;
+                }
+                final Optional<Counter> retriesCounter = metrics.getNodeMetric(node, RETRIES);
+                assertThat(retriesCounter).isPresent();
+                preferredRegionRetryCount += retriesCounter.get().getCount();
+                final Optional<Counter> retriesOnOtherErrorCounter = metrics.getNodeMetric(node, RETRIES_ON_OTHER_ERROR);
+                assertThat(retriesOnOtherErrorCounter).isPresent();
+                preferredRegionRetriesOnOtherErrorCount += retriesOnOtherErrorCounter.get().getCount();
+                break;
+            }
+        }
+
+        final Integer expectedErrorCount = errors.get(OverloadedException.class);
+
+        assertThat(preferredRegionRetriesOnOtherErrorCount).isGreaterThan(0);
+        assertThat(preferredRegionRetryCount).isEqualTo(preferredRegionRetriesOnOtherErrorCount);
+        assertThat(preferredRegionErrorCount).isEqualTo(expectedErrorCount == null ? 0 : expectedErrorCount);
     }
 
     /**
-     * Closes the {@link #session} for testing {@link CosmosRetryPolicy} after dropping {@link #KEYSPACE_NAME}, if it
+     * Closes the {@link #session} for testing {@link CosmosRetryPolicy} after dropping {@link TestCommon#KEYSPACE_NAME}, if it
      * exists.
      */
     @AfterAll
@@ -214,7 +330,7 @@ public final class CosmosRetryPolicyTest {
     public static void cleanUp() {
         if (session != null && !session.isClosed()) {
             try {
-                session.execute(format("DROP KEYSPACE IF EXISTS %s", KEYSPACE_NAME));
+                session.execute(SchemaBuilder.dropTable(KEYSPACE_NAME, TABLE_NAME).ifExists().build());
             } finally {
                 session.close();
             }
@@ -227,6 +343,7 @@ public final class CosmosRetryPolicyTest {
      * This method also verifies that the resulting session is configured and connected as expected.
      */
     @BeforeAll
+    @Timeout(TIMEOUT_IN_SECONDS)
     public static void connect() {
         session = checkState(CqlSession.builder().build());
     }
@@ -267,14 +384,20 @@ public final class CosmosRetryPolicyTest {
 
         assertThat(retryPolicy.getClass()).isEqualTo(CosmosRetryPolicy.class);
 
-        assertThat(((CosmosRetryPolicy) retryPolicy).getFixedBackoffTimeInMillis())
+        assertThat(((CosmosRetryPolicy) retryPolicy).getFixedBackOffTimeInMillis())
             .isEqualTo(profile.getInt(CosmosRetryPolicyOption.FIXED_BACKOFF_TIME));
 
-        assertThat(((CosmosRetryPolicy) retryPolicy).getGrowingBackoffTimeInMillis())
+        assertThat(((CosmosRetryPolicy) retryPolicy).getGrowingBackOffTimeInMillis())
             .isEqualTo(profile.getInt(CosmosRetryPolicyOption.GROWING_BACKOFF_TIME));
 
         assertThat(((CosmosRetryPolicy) retryPolicy).getMaxRetryCount())
             .isEqualTo(profile.getInt(CosmosRetryPolicyOption.MAX_RETRIES));
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).isRetryReadTimeoutsEnabled())
+            .isEqualTo(profile.getBoolean(CosmosRetryPolicyOption.RETRY_READ_TIMEOUTS));
+
+        assertThat(((CosmosRetryPolicy) retryPolicy).isRetryWriteTimeoutsEnabled())
+            .isEqualTo(profile.getBoolean(CosmosRetryPolicyOption.RETRY_WRITE_TIMEOUTS));
 
         final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
 

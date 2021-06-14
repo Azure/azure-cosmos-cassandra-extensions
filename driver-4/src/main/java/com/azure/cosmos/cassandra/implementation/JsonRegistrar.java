@@ -15,7 +15,7 @@ final class JsonRegistrar {
     }
 
     void registerSerializers() {
-        Json.objectMapper().disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+        Json.objectMapper().configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         Json.addSerializer(Duration.class, ToStringSerializer.instance)
             .addSerializer(Instant.class, ToStringSerializer.instance)
             .addSerializer(StackTraceElement.class, ToStringSerializer.instance);

@@ -50,10 +50,11 @@ public final class TestCommon {
     static final String TRUSTSTORE_PATH;
     static final String TRUSTSTORE_PASSWORD;
 
-    private static final Pattern PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN = Pattern.compile("([^.-]*)([.-]?)");
-    private static final Map<String, String> PROPERTIES = new TreeMap<>();
+    static final String KEYSPACE_NAME = "test_common";
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+
+    private static final Map<String, String> PROPERTIES = new TreeMap<>();
 
     static {
 
@@ -272,19 +273,17 @@ public final class TestCommon {
      * Queries data, retrying if necessary with a downgraded consistency level.
      *
      * @param session          the session for executing requests.
-     * @param consistencyLevel the consistency level to apply or {@code null}.
      * @param keyspaceName     name of the keyspace to query.
      * @param tableName        name of the table to query.
      *
+     * @param consistencyLevel the consistency level to apply or {@code null}.
      * @return A {@link ResultSet result set}.
      */
     @SuppressWarnings("SameParameterValue")
     @NonNull
     static ResultSet read(
         @NonNull final CqlSession session,
-        final ConsistencyLevel consistencyLevel,
-        @NonNull final String keyspaceName,
-        @NonNull final String tableName) {
+        @NonNull final String keyspaceName, @NonNull final String tableName, final ConsistencyLevel consistencyLevel) {
 
         out.printf("Reading at %s%n", consistencyLevel);
 
@@ -361,18 +360,15 @@ public final class TestCommon {
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
-     *
-     * @param session          the session for executing requests.
-     * @param consistencyLevel the consistency level to apply or {@code null}.
+     *  @param session          the session for executing requests.
      * @param keyspaceName     name of the keyspace to query.
      * @param tableName        name of the table to query.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
      */
     @SuppressWarnings("SameParameterValue")
     static void write(
         @NonNull final CqlSession session,
-        final ConsistencyLevel consistencyLevel,
-        @NonNull final String keyspaceName,
-        @NonNull final String tableName) {
+        @NonNull final String keyspaceName, @NonNull final String tableName, final ConsistencyLevel consistencyLevel) {
 
         out.printf("Writing at %s%n", consistencyLevel);
 
