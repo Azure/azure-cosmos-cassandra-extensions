@@ -37,49 +37,62 @@ import java.util.Random;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.FIXED_BACKOFF_TIME;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.GROWING_BACKOFF_TIME;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.MAX_RETRIES;
-import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.RETRY_READ_TIMEOUTS;
-import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.RETRY_WRITE_TIMEOUTS;
+import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.READ_TIMEOUT_RETRIES;
+import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.WRITE_TIMEOUT_RETRIES;
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 
 /**
- * A {@link RetryPolicy} implementation with back-offs for {@link CoordinatorException} failures.
+ * A {@link RetryPolicy} implementation with back-offs for {@link OverloadedException} failures.
  * <p>
- * This is the default retry policy when you take a dependency on this package. It provides a good out-of-box experience
- * for communicating with Cosmos Cassandra API instances. Its behavior is specified in configuration:
- * <pre>{@code
- * datastax-java-driver.advanced.retry-policy {
- *   class = DefaultRetryPolicy
- *   max-retries = 5              # Maximum number of retries
- *   fixed-backoff-time = 5000    # Fixed backoff time in milliseconds
- *   growing-backoff-time = 1000  # Growing backoff time in milliseconds
- * }
- * }</pre>
- * The number of retries that should be attempted is specified by {@code max-retries}. A value of {@code -1} specifies
- * that an indefinite number of retries should be attempted. For {@link #onReadTimeout onReadTimout}, {@link
- * #onWriteTimeout onWriteTimeout}, and {@link #onUnavailable onUnavailable}, retries are immediate. For {@link
- * #onErrorResponse onResponse}, the exception message is parsed to obtain the value of the {@code RetryAfterMs} field
- * provided by the server as the back-off duration. If {@code RetryAfterMs} is not available, the default exponential
- * growing back-off scheme is used. In this case the time between retries is increased by {@code growing-backoff-time}
- * on each retry, unless {@code max-retries} is {@code -1}. In this case back-off occurs with fixed {@code
- * fixed-backoff-time} duration.
+ * This is the default retry policy when you take a dependency on {@code azure-cosmos-cassandra-driver-4-extensions}. It
+ * provides a good out-of-box experience for communicating with Cosmos Cassandra API instances. Its behavior is
+ * specified in configuration:
+ * <p><pre>{@code
+ *   datastax-java-driver.advanced.retry-policy {
+ *     max-retries = 5               # Maximum number of retries.
+ *     fixed-backoff-time = 5000     # Fixed backoff time in milliseconds.
+ *     growing-backoff-time = 1000   # Growing backoff time in milliseconds.
+ *     read-timeout-retries = true   # Whether retries on read timeouts are enabled. Disabling read timeouts may be
+ *                                   # desirable when Cosmos Cassanra API server-side retries are enabled.
+ *     write-timeout-retries = true  # Whether retries on write timeouts are enabled. Disabling write timeouts may be
+ *                                   # desirable when Cosmos Cassandra API server-side retries are enabled.
+ *   }
+ * }</pre></p>
+ * <p>
+ * The number of retries that should be attempted is specified by {@code max-retries}. A value of {@code -1} indicates
+ * that an indefinite number of retries should be attempted.
+ * <p>
+ * Retry decisions by {@link #onErrorResponse} may be delayed. Delays are triggered in response to {@link
+ * OverloadedException} errors. The delay time is extracted from the error message, or&mdash;if the delay time isn't
+ * present in the error message&mdash;computed as follows:
+ * <p><pre>{@code
+ *   this.maxRetryCount == -1
+ *     ? fixedBackOffTimeInMillis
+ *     : retryCount * growingBackOffTimeInMillis + saltValue;
+ * }</pre></p>
+ * <p>
+ * There are no other uses for {@code fixed-backoff-time} and {@code growing-backoff-time}. Retry decisions are returned
+ * immediately in all other cases. There is no delay in returning from any method but one: {@link #onErrorResponse} when
+ * it receives an {@link OverloadedException} error.
  *
  * @see <a href="../../../../../doc-files/reference.conf.html">reference.conf</a>
- * @see <a href="https://docs.datastax.com/en/developer/java-driver/latest/manual/core/retries/">DataStax Java
- * Driver Retries</a>
+ * @see <a href="https://docs.datastax.com/en/developer/java-driver/4.11/manual/core/retries/">DataStax Java Driver
+ * Retries</a>
  */
 public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Fields
 
-    private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 1_000;
     private static final Logger LOG = LoggerFactory.getLogger(CosmosRetryPolicy.class);
+
+    private static final int GROWING_BACKOFF_SALT_IN_MILLIS = 1_000;
     private static final Random RANDOM = new Random();
 
     private final int fixedBackOffTimeInMillis;
     private final int growingBackOffTimeInMillis;
     private final int maxRetryCount;
-    private final boolean retryReadTimeoutsEnabled;
-    private final boolean retryWriteTimeoutsEnabled;
+    private final boolean readTimeoutRetriesEnabled;
+    private final boolean writeTimeoutRetriesEnabled;
 
     // endregion
 
@@ -99,8 +112,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this.maxRetryCount = MAX_RETRIES.getValue(profile, Integer.class);
         this.fixedBackOffTimeInMillis = FIXED_BACKOFF_TIME.getValue(profile, Integer.class);
         this.growingBackOffTimeInMillis = GROWING_BACKOFF_TIME.getValue(profile, Integer.class);
-        this.retryReadTimeoutsEnabled = RETRY_READ_TIMEOUTS.getValue(profile, Boolean.class);
-        this.retryWriteTimeoutsEnabled = RETRY_WRITE_TIMEOUTS.getValue(profile, Boolean.class);
+        this.readTimeoutRetriesEnabled = READ_TIMEOUT_RETRIES.getValue(profile, Boolean.class);
+        this.writeTimeoutRetriesEnabled = WRITE_TIMEOUT_RETRIES.getValue(profile, Boolean.class);
     }
 
     CosmosRetryPolicy(final int maxRetryCount) {
@@ -108,22 +121,22 @@ public final class CosmosRetryPolicy implements RetryPolicy {
             maxRetryCount,
             FIXED_BACKOFF_TIME.getDefaultValue(Integer.class),
             GROWING_BACKOFF_TIME.getDefaultValue(Integer.class),
-            RETRY_READ_TIMEOUTS.getDefaultValue(Boolean.class),
-            RETRY_WRITE_TIMEOUTS.getDefaultValue(Boolean.class));
+            READ_TIMEOUT_RETRIES.getDefaultValue(Boolean.class),
+            WRITE_TIMEOUT_RETRIES.getDefaultValue(Boolean.class));
     }
 
     CosmosRetryPolicy(
         final int maxRetryCount,
         final int fixedBackOffTimeInMillis,
         final int growingBackoffTimeInMillis,
-        final boolean retryReadTimeoutsEnabled,
-        final boolean retryWriteTimeoutsEnabled) {
+        final boolean readTimeoutRetriesEnabled,
+        final boolean writeTimeoutRetriesEnabled) {
 
         this.maxRetryCount = maxRetryCount;
         this.fixedBackOffTimeInMillis = fixedBackOffTimeInMillis;
         this.growingBackOffTimeInMillis = growingBackoffTimeInMillis;
-        this.retryReadTimeoutsEnabled = retryReadTimeoutsEnabled;
-        this.retryWriteTimeoutsEnabled = retryWriteTimeoutsEnabled;
+        this.readTimeoutRetriesEnabled = readTimeoutRetriesEnabled;
+        this.writeTimeoutRetriesEnabled = writeTimeoutRetriesEnabled;
     }
 
     // endregion
@@ -150,6 +163,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     /**
      * Gets the {@code max-retries} value specified by this {@link CosmosRetryPolicy} object.
+     * <p>
+     * A value of {@code -1} indicates that an indefinite number of retries should be attempted.
      *
      * @return the {@code max-retries} value specified by this {@link CosmosRetryPolicy} object.
      */
@@ -159,20 +174,24 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     /**
      * Gets the {@code retry-read-timeouts} value specified by this {@link CosmosRetryPolicy} object.
+     * <p>
+     * This value indicates whether read timeouts are enabled.
      *
      * @return The {@code retry-read-timeouts} value specified by this {@link CosmosRetryPolicy} object.
      */
-    public boolean isRetryReadTimeoutsEnabled() {
-        return this.retryReadTimeoutsEnabled;
+    public boolean isReadTimeoutRetriesEnabled() {
+        return this.readTimeoutRetriesEnabled;
     }
 
     /**
      * Gets the {@code retry-write-timeouts} value specified by this {@link CosmosRetryPolicy} object.
+     * <p>
+     * This value indicates whether write timeouts are enabled.
      *
      * @return The {@code retry-write-timeouts} value specified by this {@link CosmosRetryPolicy} object.
      */
-    public boolean isRetryWriteTimeoutsEnabled() {
-        return this.retryWriteTimeoutsEnabled;
+    public boolean isWriteTimeoutRetriesEnabled() {
+        return this.writeTimeoutRetriesEnabled;
     }
 
     /**
@@ -240,7 +259,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final int retryCount) {
 
         if (LOG.isTraceEnabled()) {
-            LOG.trace("onErrorResponse(request: {}, error: {}, retryCount: {}",
+            LOG.trace("onErrorResponse(request: {}, error: {}, retryCount: {})",
                 toJson(request),
                 toJson(error),
                 toJson(retryCount));
@@ -248,20 +267,20 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
         RetryDecision retryDecision = RetryDecision.RETHROW;
 
-        if (error instanceof OverloadedException || error instanceof WriteFailureException) {
+        if (error instanceof OverloadedException) {
             if (this.maxRetryCount == -1 || retryCount < this.maxRetryCount) {
-                int retryAfterMillis = getRetryAfterMillis(error.toString());
+                int retryAfterMillis = getRetryAfterMillis(error.getMessage());
                 if (retryAfterMillis == -1) {
                     retryAfterMillis = this.maxRetryCount == -1
                         ? this.fixedBackOffTimeInMillis
                         : retryCount * this.growingBackOffTimeInMillis + RANDOM.nextInt(GROWING_BACKOFF_SALT_IN_MILLIS);
                 }
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("--> sleeping on {} for {} before retrying",
+                        Thread.currentThread(),
+                        Duration.ofMillis(retryAfterMillis));
+                }
                 try {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("--> sleeping on {} for {} before retrying",
-                            Thread.currentThread(),
-                            Duration.ofMillis(retryAfterMillis));
-                    }
                     Thread.sleep(retryAfterMillis);
                     retryDecision = RetryDecision.RETRY_SAME;
                 } catch (final InterruptedException exception) {
@@ -281,7 +300,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
      * Returns a {@link RetryDecision#RETRY_SAME retry-same} or {@link RetryDecision#RETHROW} decision in response to
      * a {@link ReadTimeoutException read timeout error}.
      * <p>
-     * Retries on read timeouts can be disabled by setting {@link CosmosRetryPolicyOption#RETRY_READ_TIMEOUTS} to
+     * Retries on read timeouts can be disabled by setting {@link CosmosRetryPolicyOption#READ_TIMEOUT_RETRIES} to
      * {@code false}:
      * <p><pre>{@code
      *     datastax-java-driver.advanced.retry-policy.retry-write-timeouts = false
@@ -299,7 +318,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
      *
      * @return A maximum of one {@link RetryDecision#RETRY_SAME retry to the same node}, if the number of replica
      * acknowledgements/responses received before the operation failed (the value of {@code received}) is greater than
-     * or equal to the minimum number of replica acknowledgements/response required to fulfill the operation (the value
+     * or equal to the minimum number of replica acknowledgements/responses required to fulfill the operation (the value
      * of {@code blockFor}), data was not retrieved ({@code dataPresent}: false}, and only if retries on read timeouts
      * are enabled (the default). Otherwise, a {@link RetryDecision#RETHROW rethrow decision} is returned.
      */
@@ -312,27 +331,34 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final boolean dataPresent,
         final int retryCount) {
 
-        if (!this.retryReadTimeoutsEnabled) {
-            return RetryDecision.RETHROW;
-        }
-
-        final RetryDecision decision = retryCount == 0 && received >= blockFor && !dataPresent
-            ? RetryDecision.RETRY_SAME
-            : RetryDecision.RETHROW;
-
-        if (decision == RetryDecision.RETRY_SAME && LOG.isDebugEnabled()) {
-            LOG.debug(
-                "retrying on read timeout on same host: { "
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onReadTimeout("
+                    + "request: {}, "
                     + "consistencyLevel: {}, "
                     + "blockFor: {}, "
-                    + "dataPresent: {}, "
                     + "received: {}, "
-                    + "retryCount: {} }",
-                consistencyLevel,
-                blockFor,
-                false,
-                received,
-                retryCount);
+                    + "dataPresent: {}, "
+                    + "retryCount: {})",
+                toJson(request),
+                toJson(consistencyLevel),
+                toJson(blockFor),
+                toJson(received),
+                toJson(dataPresent),
+                toJson(retryCount));
+        }
+
+        final RetryDecision decision;
+
+        if (!this.readTimeoutRetriesEnabled) {
+            decision = RetryDecision.RETHROW;
+        } else {
+            decision = retryCount == 0 && received >= blockFor && !dataPresent
+                ? RetryDecision.RETRY_SAME
+                : RetryDecision.RETHROW;
+        }
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("--> returning {}", toJson(decision));
         }
 
         return decision;
@@ -344,8 +370,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
      * <p>
      * This can happen in two cases:
      * <p><ul>
-     * <li>The connection was closed due to an external event. This will manifest as a {@link
-     * ClosedConnectionException}
+     * <li>The connection was closed due to an external event. This will manifest as a {@link ClosedConnectionException}
      * (network failure) or a {@link HeartbeatException} (missed heartbeat); or</li>
      * <li>There was an unexpected error while decoding the response. This can only be a driver bug.</li>
      * </ul><p>
@@ -363,9 +388,22 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     public RetryDecision onRequestAborted(
         @NonNull final Request request, @NonNull final Throwable error, final int retryCount) {
 
-        return error instanceof ClosedConnectionException || error instanceof HeartbeatException
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onRequestAborted(request: {}, error: {}, retryCount: {})",
+                toJson(request),
+                toJson(error),
+                toJson(retryCount));
+        }
+
+        final RetryDecision decision = error instanceof ClosedConnectionException || error instanceof HeartbeatException
             ? this.retryManyTimesOrThrow(retryCount)
             : RetryDecision.RETHROW;
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("--> returning {}", toJson(decision));
+        }
+
+        return decision;
     }
 
     /**
@@ -391,7 +429,27 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final int alive,
         final int retryCount) {
 
-        return this.retryManyTimesOrThrow(retryCount);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUnavailable("
+                    + "request: {}, "
+                    + "consistencyLevel: {}, "
+                    + "required: {}, "
+                    + "alive: {}, "
+                    + "retryCount: {})",
+                toJson(request),
+                toJson(consistencyLevel),
+                toJson(required),
+                toJson(alive),
+                toJson(retryCount));
+        }
+
+        final RetryDecision decision = this.retryManyTimesOrThrow(retryCount);
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("--> returning {}", decision);
+        }
+
+        return decision;
     }
 
     /**
@@ -401,7 +459,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
      * This method is only invoked for idempotent statements. It is similar to {link #onReadTimeout}, but for write
      * operations.
      * <p>
-     * Retries on write timeouts can be disabled by setting {@link CosmosRetryPolicyOption#RETRY_WRITE_TIMEOUTS} to
+     * Retries on write timeouts can be disabled by setting {@link CosmosRetryPolicyOption#WRITE_TIMEOUT_RETRIES} to
      * {@code false}:
      * <p><pre>{@code
      *     datastax-java-driver.advanced.retry-policy.retry-write-timeouts = false
@@ -429,7 +487,23 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         final int received,
         final int retryCount) {
 
-        if (!this.retryReadTimeoutsEnabled) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onWriteTimeout("
+                    + "request: {}"
+                    + "consistencyLevel: {}, "
+                    + "writeType: {}, "
+                    + "blockFor: {}, "
+                    + "received: {}, "
+                    + "retryCount: {})",
+                request,
+                consistencyLevel,
+                writeType,
+                blockFor,
+                received,
+                retryCount);
+        }
+
+        if (!this.writeTimeoutRetriesEnabled) {
             return RetryDecision.RETHROW;
         }
 
@@ -437,19 +511,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
             ? RetryDecision.RETRY_SAME
             : RetryDecision.RETHROW;
 
-        if (decision == RetryDecision.RETRY_SAME && LOG.isDebugEnabled()) {
-            LOG.debug(
-                "retrying on write timeout on same host: { "
-                    + "consistencyLevel: {}, "
-                    + "writeType: {}, "
-                    + "blockFor: {}, "
-                    + "received: {}, "
-                    + "retryCount: {} }",
-                consistencyLevel,
-                writeType,
-                blockFor,
-                received,
-                retryCount);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("--> returning {}", toJson(decision));
         }
 
         return decision;
@@ -464,11 +527,18 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     // region Privates
 
-    // Example errorMessage:
-    // "com.datastax.driver.core.exceptions.OverloadedException: Queried host (babas.cassandra.cosmos.azure.com/40
-    // .65.106.154:10350)
-    // was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10,
-    // Additional details='
+    /**
+     * Extracts the {@code RetryAfterMs} field from an error message.
+     * <p>
+     * Here is an example error message:
+     * <p><pre>{@code
+     * Queried host (babas.cassandra.cosmos.azure.com/40.65.106.154:10350) was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10, Additional details='
+     * }</pre></p>
+     *
+     * @param errorMessage The error messages.
+     *
+     * @return Value of the {@code RetryAfterMs} field or {@code -1}, if the field is missing.
+     */
     private static int getRetryAfterMillis(final String errorMessage) {
 
         final String[] tokens = errorMessage.split(",");

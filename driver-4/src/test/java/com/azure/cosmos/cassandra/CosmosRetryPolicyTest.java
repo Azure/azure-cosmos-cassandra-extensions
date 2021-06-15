@@ -395,11 +395,11 @@ public final class CosmosRetryPolicyTest {
         assertThat(((CosmosRetryPolicy) retryPolicy).getMaxRetryCount())
             .isEqualTo(profile.getInt(CosmosRetryPolicyOption.MAX_RETRIES));
 
-        assertThat(((CosmosRetryPolicy) retryPolicy).isRetryReadTimeoutsEnabled())
-            .isEqualTo(profile.getBoolean(CosmosRetryPolicyOption.RETRY_READ_TIMEOUTS));
+        assertThat(((CosmosRetryPolicy) retryPolicy).isReadTimeoutRetriesEnabled())
+            .isEqualTo(profile.getBoolean(CosmosRetryPolicyOption.READ_TIMEOUT_RETRIES));
 
-        assertThat(((CosmosRetryPolicy) retryPolicy).isRetryWriteTimeoutsEnabled())
-            .isEqualTo(profile.getBoolean(CosmosRetryPolicyOption.RETRY_WRITE_TIMEOUTS));
+        assertThat(((CosmosRetryPolicy) retryPolicy).isWriteTimeoutRetriesEnabled())
+            .isEqualTo(profile.getBoolean(CosmosRetryPolicyOption.WRITE_TIMEOUT_RETRIES));
 
         final LoadBalancingPolicy loadBalancingPolicy = context.getLoadBalancingPolicy(profile.getName());
 
