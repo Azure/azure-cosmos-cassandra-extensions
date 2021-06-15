@@ -53,7 +53,7 @@ import static com.azure.cosmos.cassandra.implementation.Json.toJson;
  *     fixed-backoff-time = 5000     # Fixed backoff time in milliseconds.
  *     growing-backoff-time = 1000   # Growing backoff time in milliseconds.
  *     read-timeout-retries = true   # Whether retries on read timeouts are enabled. Disabling read timeouts may be
- *                                   # desirable when Cosmos Cassanra API server-side retries are enabled.
+ *                                   # desirable when Cosmos Cassandra API server-side retries are enabled.
  *     write-timeout-retries = true  # Whether retries on write timeouts are enabled. Disabling write timeouts may be
  *                                   # desirable when Cosmos Cassandra API server-side retries are enabled.
  *   }
