@@ -3,20 +3,8 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.datastax.driver.core.BatchStatement;
-import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.LocalDate;
-import com.datastax.driver.core.PreparedStatement;
-import com.datastax.driver.core.Session;
-import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.querybuilder.Clause;
-import com.datastax.driver.core.querybuilder.Delete;
-import com.datastax.driver.core.querybuilder.Insert;
-import com.datastax.driver.core.querybuilder.QueryBuilder;
-import com.datastax.driver.core.querybuilder.Select;
-import com.datastax.driver.core.querybuilder.Update;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Timeout;
@@ -25,16 +13,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Date;
-import java.util.UUID;
+import java.util.Collections;
 
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
+import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
-import static com.azure.cosmos.cassandra.TestCommon.buildCluster;
-import static com.azure.cosmos.cassandra.TestCommon.cleanUp;
+import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.cosmosClusterBuilder;
+import static com.azure.cosmos.cassandra.TestCommon.testAllStatements;
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
-import static java.lang.String.format;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -130,16 +117,21 @@ public class CosmosLoadBalancingPolicyTest {
     @ValueSource(booleans = { false, true })
     public void testWithoutPreferredRegions(final boolean multiRegionWrites) {
 
-        try (Cluster cluster = buildCluster(
-            "testWithoutPreferredRegions-multiRegionWrites-" + multiRegionWrites,
+        final Cluster.Builder builder = cosmosClusterBuilder(
             CosmosLoadBalancingPolicy.builder()
                 .withMultiRegionWrites(multiRegionWrites)
-                .build())) {
-            testAllStatements(cluster.connect(), TestCommon.uniqueName("TestWithoutPreferredRegions"));
+                .withPreferredRegions(Collections.emptyList())
+                .build())
+            .withClusterName("testWithoutPreferredRegions.multiRegionWrites=" + multiRegionWrites)
+            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
+            .withCredentials(USERNAME, PASSWORD);
+
+        try (Cluster cluster = builder.build()) {
+            testAllStatements(cluster.connect());
         } catch (final AssertionError error) {
             throw error;
         } catch (final Throwable error) {
-            fail("Failed due to: " + error, error);
+            fail("Failed due to: " + toJson(error), error);
         }
     }
 
@@ -167,129 +159,28 @@ public class CosmosLoadBalancingPolicyTest {
     @ValueSource(booleans = { false, true })
     public void testWithPreferredRegions(final boolean multiRegionWrites) {
 
-        try (Cluster cluster = buildCluster(
-            "testWithPreferredRegions-multiRegionWrites-" + multiRegionWrites,
-            CosmosLoadBalancingPolicy.builder()
-                .withMultiRegionWrites(multiRegionWrites)
-                .withPreferredRegions(PREFERRED_REGIONS)
-                .build())) {
-            try {
-                testAllStatements(cluster.connect(), TestCommon.uniqueName("testWithPreferredRegions"));
-            } catch (final Throwable error) {
-                LOG.error("{} failed due to: {}", cluster.getClusterName(), toJson(error));
-                fail(toJson(error));
-            }
+        final Cluster.Builder builder = cosmosClusterBuilder(
+                CosmosLoadBalancingPolicy.builder()
+                    .withMultiRegionWrites(multiRegionWrites)
+                    .withPreferredRegions(PREFERRED_REGIONS)
+                    .build(),
+                CosmosRetryPolicy.defaultPolicy())
+            .withClusterName("testWithPreferredRegions.multiRegionWrites=" + multiRegionWrites)
+            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
+            .withCredentials(USERNAME, PASSWORD);
+
+        try (Cluster cluster = builder.build()) {
+            testAllStatements(cluster.connect());
+        } catch (final AssertionError error) {
+            throw error;
+        } catch (final Throwable error) {
+            fail("Failed due to: " + toJson(error), error);
         }
     }
 
     // endregion
 
     // region Privates
-
-    private static void testAllStatements(final Session session, final String keyspaceName) {
-
-        final String tableName = "sensor_data";
-
-        try {
-            assertThatCode(() -> TestCommon.createSchema(session, keyspaceName, tableName)).doesNotThrowAnyException();
-
-            // SimpleStatements
-
-            SimpleStatement simpleStatement = new SimpleStatement(format(
-                "SELECT * FROM %s.%s WHERE sensor_id=uuid() and date=toDate(now())",
-                keyspaceName,
-                tableName));
-            session.execute(simpleStatement);
-
-            simpleStatement = new SimpleStatement(format(
-                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
-                keyspaceName,
-                tableName));
-            session.execute(simpleStatement);
-
-            simpleStatement = new SimpleStatement(format(
-                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp="
-                    + "toTimestamp(now())",
-                keyspaceName,
-                tableName));
-            session.execute(simpleStatement);
-
-            simpleStatement = new SimpleStatement(format(
-                "DELETE FROM %s.%s WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp=toTimestamp(now())",
-                keyspaceName,
-                tableName));
-            session.execute(simpleStatement);
-
-            // BuiltStatements
-
-            final UUID uuid = UUID.randomUUID();
-            final LocalDate date = LocalDate.fromYearMonthDay(2016, 06, 30);
-            final Date timestamp = new Date();
-
-            final Clause pk1Clause = QueryBuilder.eq("sensor_id", uuid);
-            final Clause pk2Clause = QueryBuilder.eq("date", date);
-            final Clause ckClause = QueryBuilder.eq("timestamp", 1000);
-
-            final Select select = QueryBuilder.select()
-                .all()
-                .from(keyspaceName, tableName);
-
-            select.where(pk1Clause).and(pk2Clause).and(ckClause);
-            session.execute(select);
-
-            final Insert insert = QueryBuilder.insertInto(keyspaceName, tableName);
-            insert.values(new String[] { "sensor_id", "date", "timestamp" }, new Object[] { uuid, date, 1000 });
-            session.execute(insert);
-
-            final Update update = QueryBuilder.update(keyspaceName, tableName);
-            update.with(set("value", 1.0)).where(pk1Clause).and(pk2Clause).and(ckClause);
-            session.execute(update);
-
-            final Delete delete = QueryBuilder.delete().from(keyspaceName, tableName);
-            delete.where(pk1Clause).and(pk2Clause).and(ckClause);
-            session.execute(delete);
-
-            // BoundStatements
-
-            PreparedStatement preparedStatement = session.prepare(format(
-                "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
-                keyspaceName,
-                tableName));
-            BoundStatement boundStatement = preparedStatement.bind(uuid, date);
-            session.execute(boundStatement);
-
-            preparedStatement = session.prepare(format(
-                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
-                keyspaceName,
-                tableName));
-            boundStatement = preparedStatement.bind(uuid, date, timestamp);
-            session.execute(boundStatement);
-
-            preparedStatement = session.prepare(format(
-                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-                keyspaceName,
-                tableName));
-            boundStatement = preparedStatement.bind(uuid, date, timestamp);
-            session.execute(boundStatement);
-
-            preparedStatement = session.prepare(format(
-                "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
-                keyspaceName,
-                tableName));
-            boundStatement = preparedStatement.bind(uuid, date, timestamp);
-            session.execute(boundStatement);
-
-            // BatchStatement
-
-            final BatchStatement batchStatement = new BatchStatement(BatchStatement.Type.UNLOGGED)
-                .add(simpleStatement)
-                .add(boundStatement);
-            session.execute(batchStatement);
-
-        } finally {
-            cleanUp(session, keyspaceName);
-        }
-    }
 
     // endregion
 }

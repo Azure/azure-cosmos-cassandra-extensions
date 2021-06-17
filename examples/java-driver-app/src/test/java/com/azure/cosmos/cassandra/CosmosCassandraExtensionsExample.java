@@ -220,11 +220,11 @@ public class CosmosCassandraExtensionsExample {
                 .setConnectionsPerHost(HostDistance.LOCAL, 10, 10)
                 .setConnectionsPerHost(HostDistance.REMOTE, 1, 10))
             .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
-            .withRetryPolicy(CosmosRetryPolicy.builder().build())
-            .withCredentials(USERNAME, PASSWORD)
+            .withRetryPolicy(new CosmosRetryPolicy())
+            .withSSL()
             .addContactPoints(GLOBAL_ENDPOINT_HOSTNAME)
             .withPort(GLOBAL_ENDPOINT_PORT)
-            .withSSL()
+            .withCredentials(USERNAME, PASSWORD)
             .build();
 
         try {

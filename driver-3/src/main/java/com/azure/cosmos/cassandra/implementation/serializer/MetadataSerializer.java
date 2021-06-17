@@ -3,8 +3,6 @@
 
 package com.azure.cosmos.cassandra.implementation.serializer;
 
-import com.datastax.driver.core.Host;
-import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
@@ -13,8 +11,6 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -41,37 +37,9 @@ public final class MetadataSerializer extends StdSerializer<Metadata> {
         requireNonNull(value, "expected non-null serializerProvider");
 
         generator.writeStartObject();
-
-        final String clusterName = value.getClusterName();
-
-        if (clusterName == null) {
-            generator.writeNullField("clusterName");
-        } else {
-            generator.writeStringField("clusterName", clusterName);
-        }
-
-        final Set<Host> hosts = value.getAllHosts();
-
-        if (hosts == null) {
-            generator.writeNullField("hosts");
-        } else {
-            generator.writeArrayFieldStart("keyspaces");
-            for (final Host host : hosts) {
-                generator.writeObject(host);
-            }
-        }
-
-        final List<KeyspaceMetadata> keyspacesMetadata = value.getKeyspaces();
-
-        if (keyspacesMetadata == null) {
-            generator.writeNullField("keyspaces");
-        } else {
-            generator.writeArrayFieldStart("keyspaces");
-            for (final KeyspaceMetadata keyspaceMetadata : keyspacesMetadata) {
-                generator.writeString(keyspaceMetadata.toString());
-            }
-        }
-
+        serializerProvider.defaultSerializeField("clusterName", value.getClusterName(), generator);
+        serializerProvider.defaultSerializeField("hosts", value.getAllHosts(), generator);
+        serializerProvider.defaultSerializeField("keyspaces", value.getKeyspaces(), generator);
         generator.writeEndObject();
     }
 }

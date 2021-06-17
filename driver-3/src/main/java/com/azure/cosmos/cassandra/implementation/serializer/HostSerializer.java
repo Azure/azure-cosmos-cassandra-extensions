@@ -4,6 +4,7 @@
 package com.azure.cosmos.cassandra.implementation.serializer;
 
 import com.datastax.driver.core.Host;
+import com.datastax.driver.core.VersionNumber;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
@@ -11,7 +12,6 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 import java.io.IOException;
-import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -31,25 +31,27 @@ public final class HostSerializer extends StdSerializer<Host> {
     public void serialize(
         @NonNull final Host value,
         @NonNull final JsonGenerator generator,
-        @NonNull final SerializerProvider serializerProvider) throws IOException {
+        @NonNull final SerializerProvider provider) throws IOException {
 
         requireNonNull(value, "expected non-null value");
         requireNonNull(value, "expected non-null generator");
-        requireNonNull(value, "expected non-null serializerProvider");
+        requireNonNull(value, "expected non-null provider");
+
+        final VersionNumber cassandraVersion = value.getCassandraVersion();
 
         generator.writeStartObject();
-        generator.writeStringField("endPoint", value.getEndPoint().toString());
-        generator.writeStringField("datacenter", value.getDatacenter());
 
-        final UUID hostId = value.getHostId();
+        provider.defaultSerializeField("endPoint", value.getEndPoint().toString(), generator);
+        provider.defaultSerializeField("datacenter", value.getDatacenter(), generator);
+        provider.defaultSerializeField("hostId", value.getHostId(), generator);
+        provider.defaultSerializeField("state", value.getState(), generator);
+        provider.defaultSerializeField("schemaVersion", value.getSchemaVersion(), generator);
 
-        if (hostId == null) {
-            generator.writeNullField("hostId");
-        } else {
-            generator.writeStringField("hostId", hostId.toString());
-        }
+        provider.defaultSerializeField("cassandraVersion", cassandraVersion == null
+                ? null
+                : cassandraVersion.toString(),
+            generator);
 
-        generator.writeStringField("state", value.getState());
         generator.writeEndObject();
     }
 }

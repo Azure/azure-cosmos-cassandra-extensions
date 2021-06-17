@@ -50,7 +50,7 @@ Licensed under the MIT License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
     <!-- Package dependency version numbers -->
-    <version.cassandra-driver>[3.8,3.12)</version.cassandra-driver>
+    <version.cassandra-driver>[3.8,3.11)</version.cassandra-driver>
     <version.jackson>[2.12,2.13)</version.jackson>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
     <version.spotbugs>[4.2.3,4.3)</version.spotbugs>

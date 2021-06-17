@@ -31,38 +31,31 @@ public final class ClusterSerializer extends StdSerializer<Cluster> {
     public void serialize(
         @NonNull final Cluster value,
         @NonNull final JsonGenerator generator,
-        @NonNull final SerializerProvider serializerProvider) throws IOException {
+        @NonNull final SerializerProvider provider) throws IOException {
 
         requireNonNull(value, "expected non-null value");
         requireNonNull(value, "expected non-null generator");
-        requireNonNull(value, "expected non-null serializerProvider");
+        requireNonNull(value, "expected non-null provider");
 
         generator.writeStartObject();
-        generator.writeStringField("name", value.getClusterName());
-        generator.writeBooleanField("closed", value.isClosed());
+        provider.defaultSerializeField("clusterName", value.getClusterName(), generator);
+        provider.defaultSerializeField("closed", value.isClosed(), generator);
 
-        Metrics metrics;
+        Metrics metrics = null;
 
         if (value.isClosed()) {
             generator.writeNullField("metadata");
-            metrics = null;
         } else {
             try {
                 // Side-effect: Cluster::getMetadata calls Metadata::init which throws, if the call fails
-                generator.writeObjectField("metadata", value.getMetadata());
+                provider.defaultSerializeField("metadata", value.getMetadata(), generator);
                 metrics = value.getMetrics();
             } catch (final Throwable error) {
-                generator.writeObjectField("metadata", error);
-                metrics = null;
+                provider.defaultSerializeField("metadata", error, generator);
             }
         }
 
-        if (metrics == null) {
-            generator.writeNullField("metrics");
-        } else {
-            generator.writeObjectField("metrics", metrics);
-        }
-
+        provider.defaultSerializeField("metrics", metrics, generator);
         generator.writeEndObject();
     }
 }

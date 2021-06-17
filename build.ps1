@@ -47,28 +47,6 @@ Get-Item -ErrorAction SilentlyContinue `
     (Join-Path $ReportingDirectory *cql-requests.csv), 
     (Join-Path $ReportingDirectory *cql-messages.csv) | Remove-Item -Force -Recurse
 
-# The numbered variables we create here are required for Typesafe Config (HOCON) which provides no mechanism for
-# initializing arrays from System or Environment variables. You must add elements to a list serially like this: 
-# <list-element> += <value>.
-
-$env:AZURE_COSMOS_CASSANDRA_HOSTNAME, $env:AZURE_COSMOS_CASSANDRA_PORT = $env:AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT -split ':'
-
-$i = 1
-
-foreach ($region in $env:AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS -split ',') {
-    $name = "env:AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_$i"
-    Set-Content -Path $name -Value $region
-    $i++
-}
-
-$i = 1
-
-foreach ($region in $env:AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS -split ',') {
-    $name = "env:AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_$i"
-    Set-Content -Path $name -Value $region
-    $i++
-}
-
 ""
 "-----------------------------------------------------------------------------------------------------------------------"
 " V E R I F Y"

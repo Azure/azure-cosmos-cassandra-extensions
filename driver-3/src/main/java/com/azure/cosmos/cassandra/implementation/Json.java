@@ -153,20 +153,20 @@ public final class Json {
      * Mix-in classes must contain this static member or must be added to {@link #objectMapper} manually:
      * <pre>{@code public static final Class<?> HANDLED_TYPE = handled_type;}</pre>
      *
-     * @param packageName the name of the package containing serializers and mix-in classes to be added.
+     * @param packageName The name of the package containing serializers and mix-in classes to be added.
      */
     @SuppressWarnings("unchecked")
     public static void addSerializersAndMixIns(@NonNull final String packageName) {
 
-        final String packagePath = packageName.replaceAll("[.]", "/");
+        final String packagePath = requireNonNull(packageName, "expected non-null packageName").replace('.', '/');
 
-        try (InputStream stream = ClassLoader.getSystemClassLoader().getResourceAsStream(packagePath)) {
+        try (InputStream stream = Json.class.getClassLoader().getResourceAsStream(packagePath)) {
 
             if (stream == null) {
                 final ExceptionInInitializerError error = new ExceptionInInitializerError(
-                    "expected resource stream for package"
-                        + packagePath);
-                LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+                    "Could not open stream to enumerate classes in package "
+                        + packageName);
+                LOG.error("Class initialization failed due to: ", error);
                 throw error;
             }
 
@@ -187,8 +187,6 @@ public final class Json {
                         }
                     })
                     .filter(Objects::nonNull).forEachOrdered(cls -> {
-
-                        final String className = cls.getName();
 
                         try {
 

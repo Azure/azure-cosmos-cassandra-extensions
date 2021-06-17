@@ -3,29 +3,54 @@
 
 package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.implementation.Json;
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.EndPoint;
+import com.datastax.driver.core.Host;
+import com.datastax.driver.core.Metrics;
 import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.ConnectionException;
+import com.datastax.driver.core.exceptions.CoordinatorException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.OverloadedException;
+import com.datastax.driver.core.querybuilder.QueryBuilder;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Array;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
-import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
+import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
+import static com.azure.cosmos.cassandra.TestCommon.cosmosClusterBuilder;
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
@@ -100,40 +125,193 @@ public class CosmosRetryPolicyTest {
     // region Methods
 
     /**
-     * Verifies that the {@link CosmosRetryPolicy} class integrates with DataStax Java Driver 3.
+     * Verifies that the {@link CosmosRetryPolicy#onRequestError} method retries {@link OverloadedException} as
+     * expected.
      */
+    @SuppressFBWarnings({ "SIC_INNER_SHOULD_BE_STATIC_ANON" })
+    @SuppressWarnings({ "UnstableApiUsage" })
     @Test
     @Tag("checkin")
     @Tag("integration")
-    @Timeout(TIMEOUT_IN_SECONDS)
-    public void canIntegrateWithCosmos() {
+    //@Timeout(2 * TIMEOUT_IN_SECONDS)
+    public void canRetryAsExpectedWhenThrottled() {
 
-        final Session session = connect(CosmosRetryPolicy.builder()
-            .withMaxRetryCount(MAX_RETRY_COUNT)
-            .withFixedBackOffTimeInMillis(FIXED_BACK_OFF_TIME)
-            .withGrowingBackOffTimeInMillis(GROWING_BACK_OFF_TIME)
-            .build());
+        // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
 
-        final String keyspaceName = TestCommon.uniqueName("downgrading");
-        final String tableName = "sensor_data";
+        final Cluster.Builder builder = cosmosClusterBuilder()
+            .withClusterName("CosmosRetryPolicyTest.canRetryAsExpectedWhenThrottled")
+            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
+            .withCredentials(USERNAME, PASSWORD)
+            .withoutJMXReporting();
 
-        try {
+        try (Cluster cluster = builder.build()) {
 
-            assertThatCode(() ->
-                TestCommon.createSchema(session, keyspaceName, tableName)
-            ).doesNotThrowAnyException();
+            LOG.info("{}", Json.toString(cluster));
 
-            assertThatCode(() ->
-                TestCommon.write(session, CONSISTENCY_LEVEL, keyspaceName, tableName)
-            ).doesNotThrowAnyException();
+            try (Session session = cluster.connect()) {
 
-            assertThatCode(() -> {
-                final ResultSet rows = TestCommon.read(session, CONSISTENCY_LEVEL, keyspaceName, tableName);
-                TestCommon.display(rows);
-            }).doesNotThrowAnyException();
+                LOG.info("{}", Json.toString(session));
 
-        } finally {
-            TestCommon.cleanUp(session, keyspaceName);
+                final ResultSetFuture[] futures = (ResultSetFuture[]) Array.newInstance(ResultSetFuture.class, 100);
+
+                final ConcurrentHashMap<EndPoint, ConcurrentHashMap<Class<? extends CoordinatorException>, Integer>>
+                    endPoints = new ConcurrentHashMap<>();
+
+                final ConcurrentHashMap<Class<? extends Throwable>, Integer>
+                    errors = new ConcurrentHashMap<>();
+
+                final AtomicInteger completions = new AtomicInteger();
+                final AtomicInteger failures = new AtomicInteger();
+                final String keyspaceName = "perf_ks";
+                final String tableName = "perf_tbl";
+
+                final Statement statement = QueryBuilder.select()
+                    .all()
+                    .from(keyspaceName, tableName)
+                    .setReadTimeoutMillis(10 * TIMEOUT_IN_SECONDS * 1_000);
+
+                final CountDownLatch countDownLatch = new CountDownLatch(futures.length);
+                final Instant startTime = Instant.now();
+
+                for (int i = 0; i < futures.length; i++) {
+
+                    final ResultSetFuture future = session.executeAsync(statement);
+
+                    Futures.addCallback(future, new FutureCallback<>() {
+                        @Override
+                        public void onFailure(@NonNull final Throwable error) {
+
+                            try {
+                                failures.incrementAndGet();
+
+                                if (error instanceof CoordinatorException) {
+
+                                    final CoordinatorException coordinatorException = (CoordinatorException) error;
+                                    final EndPoint coordinator = coordinatorException.getEndPoint();
+
+                                    if (coordinator != null) {
+                                        endPoints.compute(coordinator, (endPoint, coordinatorExceptions) -> {
+                                            if (coordinatorExceptions == null) {
+                                                coordinatorExceptions = new ConcurrentHashMap<>();
+                                            }
+                                            coordinatorExceptions.compute(
+                                                coordinatorException.getClass(),
+                                                (cls, count) -> count == null ? 1 : count + 1);
+                                            return coordinatorExceptions;
+                                        });
+                                    }
+                                }
+
+                                errors.compute(error.getClass(), (cls, count) -> count == null ? 1 : count + 1);
+                            } finally {
+                                countDownLatch.countDown();
+                            }
+                        }
+
+                        @Override
+                        public void onSuccess(@Nullable final ResultSet resultSet) {
+                            try {
+                                assertThat(resultSet).isNotNull();
+                                final Host host = resultSet.getExecutionInfo().getQueriedHost();
+                                endPoints.computeIfAbsent(host.getEndPoint(), endPoint -> new ConcurrentHashMap<>());
+                                completions.incrementAndGet();
+                            } finally {
+                                countDownLatch.countDown();
+                            }
+                        }
+                    });
+
+                    futures[i] = future;
+                }
+
+                try {
+                    countDownLatch.await();
+                } catch (final InterruptedException error) {
+                    // ignored
+                }
+
+                final Duration elapsedTime = Duration.between(Instant.now(), startTime);
+                final Metrics metrics = cluster.getMetrics();
+                assertThat(metrics).isNotNull();
+
+                final MetricRegistry metricRegistry = metrics.getRegistry();
+                final Duration readTimeout = Duration.ofMillis(statement.getReadTimeoutMillis());
+
+                LOG.info(
+                    "{\"cql-requests\":{},\"completions\":{},\"failures\":{},\"session-errors\":{},"
+                        + "\"endpoint-errors\":{},\"elapsed-time\":{},\"read-timeout\":{},"
+                        + "\"metrics\":{\"gauges\":{},\"timers\":{},\"counters\":{}}}",
+                    futures.length,
+                    completions.get(),
+                    failures.get(),
+                    toJson(errors),
+                    toJson(endPoints),
+                    toJson(elapsedTime),
+                    toJson(readTimeout),
+                    toJson(metricRegistry.getGauges()),
+                    toJson(metricRegistry.getTimers()),
+                    toJson(metricRegistry.getCounters()));
+
+                // Expected: all errors are the result of request timeouts or rethrown OverloadedException errors
+                // We expect mostly, if not entirely rethrown OverloadedException errors
+
+                assertThat(errors).allSatisfy((type, count) -> {
+                    assertThat(type).isIn(TimeoutException.class, OverloadedException.class);
+                });
+
+                // Expected:
+                // * All errors and retries are from the first preferred region in the list of preferred regions
+                // * All retries are the result of other errors, a metric that tracks calls to #onServerError
+                // We don't expect any regional outages while this test is running
+
+                final String preferredRegion = PREFERRED_REGIONS.get(0);
+                int preferredRegionErrorCount = 0;
+                int preferredRegionRetryCount = 0;
+                int preferredRegionRetriesOnOtherErrorCount = 0;
+
+                for (final EndPoint endPoint : endPoints.keySet()) {
+
+                    String datacenter = null;
+
+                    for (final Host host : cluster.getMetadata().getAllHosts()) {
+                        if (host.getEndPoint().equals(endPoint)) {
+                            datacenter = host.getDatacenter();
+                        }
+                    }
+
+                    if (Objects.equals(datacenter, preferredRegion)) {
+
+                        final ConcurrentHashMap<Class<? extends CoordinatorException>, Integer>
+                            endPointErrors = endPoints.get(endPoint);
+
+                        assertThat(endPointErrors).isNotNull();
+
+                        for (final int count : endPointErrors.values()) {
+                            preferredRegionErrorCount += count;
+                        }
+
+                        final Counter retriesCounter = metrics.getErrorMetrics().getRetries();
+                        assertThat(retriesCounter).isNotNull();
+                        preferredRegionRetryCount += retriesCounter.getCount();
+
+                        final Counter retriesOnOtherErrorCounter = metrics.getErrorMetrics().getRetriesOnOtherErrors();
+                        assertThat(retriesOnOtherErrorCounter).isNotNull();
+                        preferredRegionRetriesOnOtherErrorCount += retriesOnOtherErrorCounter.getCount();
+
+                        break;
+                    }
+                }
+
+                final Integer expectedErrorCount = errors.get(OverloadedException.class);
+
+                assertThat(preferredRegionRetriesOnOtherErrorCount).isGreaterThan(0);
+                assertThat(preferredRegionRetryCount).isEqualTo(preferredRegionRetriesOnOtherErrorCount);
+                assertThat(preferredRegionErrorCount).isEqualTo(expectedErrorCount == null ? 0 : expectedErrorCount);
+            }
+        } catch (final AssertionError error) {
+            // swallow it
+        } catch (final Throwable error) {
+            fail("unexpected error", error);
         }
     }
 
@@ -198,27 +376,6 @@ public class CosmosRetryPolicyTest {
     // endregion
 
     // region Privates
-
-    /**
-     * Initiates a connection to the cluster specified by the given contact points and port.
-     */
-    private static Session connect(final CosmosRetryPolicy retryPolicy) {
-
-        final Cluster cluster = Cluster.builder()
-            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
-            .withCredentials(USERNAME, PASSWORD)
-            .withPort(GLOBAL_ENDPOINT_PORT)
-            .withSSL()
-            .withRetryPolicy(retryPolicy)
-            .build();
-
-        try {
-            return cluster.connect();
-        } catch (final Throwable error) {
-            cluster.close();
-            throw error;
-        }
-    }
 
     /**
      * Tests a retry operation

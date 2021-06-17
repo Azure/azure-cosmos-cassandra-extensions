@@ -38,7 +38,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.stream.Collectors;
 
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -59,7 +61,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
     private static final Method GET_CONTACT_POINTS;
 
-    private final boolean multiRegionWrites;
+    private final boolean multiRegionWritesEnabled;
     private final List<String> preferredRegions;
 
     private List<Host> contactPoints;
@@ -93,8 +95,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Constructors
 
-    private CosmosLoadBalancingPolicy(@NonNull final List<String> preferredRegions, final boolean multiRegionWrites) {
-        this.multiRegionWrites = multiRegionWrites;
+    private CosmosLoadBalancingPolicy(
+        @NonNull final List<String> preferredRegions,
+        final boolean multiRegionWritesEnabled) {
+
+        this.multiRegionWritesEnabled = multiRegionWritesEnabled;
         this.preferredRegions = new ArrayList<>(preferredRegions);
     }
 
@@ -117,7 +122,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @return the list of contact points for the cluster with this {@link CosmosLoadBalancingPolicy}.
      */
     public List<Host> getContactPoints() {
-        return Collections.unmodifiableList(new ArrayList<>(this.hostsForReading));
+        return Collections.unmodifiableList(new ArrayList<>(this.contactPoints));
     }
 
     /**
@@ -159,8 +164,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      *
      * @return a value of {@code true}, if multi region writes are enabled; {@code false} otherwise.
      */
-    public boolean getMultiRegionWrites() {
-        return this.multiRegionWrites;
+    public boolean getMultiRegionWritesEnabled() {
+        return this.multiRegionWritesEnabled;
     }
 
     /**
@@ -182,6 +187,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      *
      * @return a newly created {@link CosmosLoadBalancingPolicy} builder instance.
      */
+    @NonNull
     public static Builder builder() {
         return new Builder();
     }
@@ -192,6 +198,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void close() {
         // nothing to do
+    }
+
+    /**
+     * Gets a newly created {@link CosmosLoadBalancingPolicy} object with default settings.
+     *
+     * @return a newly created {@link CosmosLoadBalancingPolicy} object with default settings.
+     */
+    @NonNull
+    public static CosmosLoadBalancingPolicy defaultPolicy() {
+        return new CosmosLoadBalancingPolicy();
     }
 
     /**
@@ -207,25 +223,44 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         // TODO (DANOBLE) Does the driver ever act based on distance or does it simply inform LoadBalancingPolicy?
         //  Does it matter that we say that all but the first preferred region is at HostDistance.REMOTE?
 
-        return host.getDatacenter().equals(this.preferredRegions.get(0)) ? HostDistance.LOCAL : HostDistance.REMOTE;
+        final String datacenter = host.getDatacenter();
+
+        if (datacenter == null) {
+            LOG.warn("{} Returning HostDistance.IGNORED because datacenter is unknown", host);
+            return HostDistance.IGNORED;
+        }
+
+        return datacenter.equals(this.preferredRegions.get(0)) ? HostDistance.LOCAL : HostDistance.REMOTE;
     }
 
     /**
      * Initializes the list of hosts in read, write, local, and remote categories.
+     *
+     * @throws NullPointerException if the contact points for {@code cluster} cannot be obtained.
      */
     @Override
     public void init(@NonNull final Cluster cluster, @NonNull final Collection<Host> hosts) {
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("init({})", Json.toJson(hosts));
+            LOG.debug("init({})", toJson(hosts));
         }
+
+        requireNonNull(cluster, "expected non-null cluster");
+        requireNonNull(hosts, "expected non-null hosts");
 
         // Finalize the list of preferred regions
 
-        this.contactPoints = getContactPointsOrException(cluster);
+        this.contactPoints = getContactPointsOrThrow(cluster);
 
         this.contactPoints.stream()
-            .map(Host::getDatacenter)
+            .map(host -> {
+                final String region = host.getDatacenter();
+                if (region == null) {
+                    LOG.warn("Datacenter for contact point is unknown: {}", toJson(host));
+                }
+                return region;
+            })
+            .filter(Objects::nonNull)
             .distinct()
             .forEachOrdered(region -> {
                 if (!this.preferredRegions.contains(region)) {
@@ -236,9 +271,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         // Initialize the hosts for read and write requests
 
         this.hostsForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.preferredRegions));
-        this.hostsForReading.addAll(hosts);
 
-        if (this.multiRegionWrites) {
+        this.hostsForReading.addAll(hosts.stream()
+            .filter(host -> {
+                requireNonNull(host, "expected non-null host");
+                final String datacenter = host.getDatacenter();
+                if (datacenter == null) {
+                    LOG.warn("Datacenter for host is unknown: {}", host);
+                    return false;
+                }
+                return true;
+            })
+            .collect(Collectors.toList()));
+
+        if (this.multiRegionWritesEnabled) {
             this.hostsForWriting = this.hostsForReading;
         } else {
 
@@ -257,9 +303,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        // TODO (DANOBLE) consider brining in the semaphore code to ensure we've got a full list of nodes before we hit
-        //  CosmosLoadBalancingPolicy::newQueryPlan for the first time.
+        // TODO (DANOBLE) consider brining in the semaphore code to increase the probability we've got a full list of
+        //  nodes before we hit CosmosLoadBalancingPolicy::newQueryPlan for the first time.
         //  See: driver-4/src/main/java/com/azure/cosmos/cassandra/CosmosLoadBalancingPolicy.java
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("init -> {}", this);
+        }
     }
 
     /**
@@ -274,16 +324,27 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @Override
     public Iterator<Host> newQueryPlan(final String loggedKeyspace, final Statement statement) {
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("newQueryPlan(loggedKeyspace: {}, statement: {})",
-                Json.toJson(loggedKeyspace),
-                Json.toJson(statement));
+                toJson(loggedKeyspace),
+                toJson(statement));
         }
-        return isReadRequest(statement) ? this.hostsForReading.iterator() : this.hostsForWriting.iterator();
+
+        final Set<Host> hosts = isReadRequest(statement) ? this.hostsForReading : this.hostsForWriting;
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("newQueryPlan -> returns({}) from {}", hosts.iterator(), this);
+        }
+
+        return hosts.iterator();
     }
 
     @Override
     public void onAdd(final Host host) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onAdd({})", toJson(host));
+        }
         this.onUp(host);
     }
 
@@ -291,24 +352,67 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public void onDown(final Host host) {
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("onAdd({})", Json.toJson(host));
+            LOG.debug("onDown({})", toJson(host));
         }
 
-        this.hostsForReading.add(host);
+        requireNonNull(host, "expected non-null host");
 
-        if (this.multiRegionWrites) {
-            assert this.hostsForReading == this.hostsForWriting;
+        if (host.getDatacenter() == null) {
+
+            if (this.hostsForReading.stream().anyMatch(host::equals)) {
+                throw new IllegalStateException(
+                    "Host without a datacenter should not be in list of hosts for reading: "
+                        + Json.toString(host));
+            }
+
+            if (!this.multiRegionWritesEnabled) {
+
+                assert this.hostsForReading == this.hostsForWriting;
+
+                if (this.hostsForWriting.stream().anyMatch(host::equals)) {
+                    throw new IllegalStateException(
+                        "Host without a datacenter should not be in list of hosts for writing: "
+                            + Json.toString(host));
+                }
+            }
+
         } else {
-            if (this.contactPoints.contains(host)) {
-                this.hostsForWriting.add(host);
+
+            this.hostsForReading.remove(host);
+
+            if (this.multiRegionWritesEnabled) {
+                assert this.hostsForReading == this.hostsForWriting;
+            } else {
+                this.hostsForWriting.remove(host);
             }
         }
 
-        LOG.debug("onAdd -> returns(void), {}", this);
+        if (LOG.isWarnEnabled()) {
+
+            if (this.multiRegionWritesEnabled) {
+                if (this.hostsForReading.isEmpty()) {
+                    LOG.warn("All nodes have now been removed: {}", toJson(this));
+                }
+            } else {
+                if (this.hostsForReading.isEmpty()) {
+                    LOG.warn("All nodes for reading have now been removed: {}", toJson(this));
+                }
+                if (this.hostsForWriting.isEmpty()) {
+                    LOG.warn("All nodes for writing have now been removed: {}", toJson(this));
+                }
+            }
+        }
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onDown -> {}", this);
+        }
     }
 
     @Override
     public void onRemove(final Host host) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onRemove({})", toJson(host));
+        }
         this.onDown(host);
     }
 
@@ -316,34 +420,27 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public void onUp(final Host host) {
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Removing node: onRemove({})", Json.toJson(host));
+            LOG.debug("onUp({})", toJson(host));
         }
 
-        this.hostsForReading.remove(host);
+        this.hostsForReading.add(host);
 
-        if (this.multiRegionWrites) {
+        if (this.multiRegionWritesEnabled) {
             assert this.hostsForReading == this.hostsForWriting;
         } else {
-            this.hostsForWriting.remove(host);
-        }
-
-        LOG.debug("onRemove -> returns(void), {}", this);
-
-        if (LOG.isWarnEnabled()) {
-
-            if (this.multiRegionWrites) {
-                if (this.hostsForReading.isEmpty()) {
-                    LOG.warn("All nodes have now been removed: {}", this);
-                }
-            } else {
-                if (this.hostsForReading.isEmpty()) {
-                    LOG.warn("All nodes for reading have now been removed: {}", this);
-                }
-                if (this.hostsForWriting.isEmpty()) {
-                    LOG.warn("All nodes for writing have now been removed: {}", this);
-                }
+            if (this.contactPoints.contains(host)) {
+                this.hostsForWriting.add(host);
             }
         }
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onUp -> {}", this);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return Json.toString(this);
     }
 
     // endregion
@@ -359,21 +456,32 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static List<Host> getContactPoints(@NonNull final Cluster cluster) {
 
         requireNonNull(cluster, "expected non-null cluster");
+        final List<Host> contactPoints;
 
         try {
-            return (List<Host>) GET_CONTACT_POINTS.invoke(cluster);
+            contactPoints = (List<Host>) GET_CONTACT_POINTS.invoke(cluster.getMetadata());
         } catch (IllegalAccessException | InvocationTargetException error) {
-            final String message = "Could not obtain contact points from cluster " + cluster + " due to: " + error;
+            final String message = "Could not obtain contact points for cluster " + cluster + " due to: " + error;
             LOG.error("Could not obtain contact points from cluster {} due to: ", cluster, error);
             throw new IllegalStateException(message, error);
         }
+
+        return contactPoints == null ? null : new ArrayList<>(contactPoints);
     }
 
     @NonNull
-    private static List<Host> getContactPointsOrException(@NonNull final Cluster cluster) {
-        return requireNonNull(getContactPoints(cluster), "expected non-null contactPoints");
-    }
+    private static List<Host> getContactPointsOrThrow(@NonNull final Cluster cluster) {
 
+        final List<Host> contactPoints = getContactPoints(cluster);
+
+        if (contactPoints == null) {
+            final String message = "Could not obtain contact points for cluster " + cluster;
+            LOG.error("{}: {}", message, toJson(cluster));
+            throw new IllegalStateException(message);
+        }
+
+        return contactPoints;
+    }
 
     private static boolean isReadRequest(final String query) {
         return query.toLowerCase(Locale.ROOT).startsWith("select");
