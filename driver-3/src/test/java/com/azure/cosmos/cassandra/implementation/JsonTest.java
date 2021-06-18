@@ -8,6 +8,7 @@ import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
@@ -143,8 +144,8 @@ public class JsonTest {
     @Tag("checkin")
     @MethodSource("provideStatements")
     public void canSerializeStatement(@NonNull final Statement input, @NonNull final String expected) {
-        final String value = toJson(input);
-        assertThat(value).isEqualTo(expected);
+        final String observed = toJson(input);
+        assertThat(observed).isEqualTo(expected);
     }
 
     @ParameterizedTest()
@@ -171,6 +172,13 @@ public class JsonTest {
     @NonNull
     private static Stream<Arguments> provideStatements() {
         return Stream.of(
+            Arguments.of(new SimpleStatement("CREATE KEYSPACE IF NOT EXISTS keyspace "
+                + "WITH replication = {'class':'SimpleStrategy','replication_factor':3} "
+                + "WITH cosmosdb_provisioned_throughput=400"),
+                "{\"queryString\":\"CREATE KEYSPACE IF NOT EXISTS keyspace WITH replication = "
+                    + "{'class':'SimpleStrategy','replication_factor':3} WITH cosmosdb_provisioned_throughput=400\","
+                    + "\"tracing\":false,\"fetchSize\":0,\"readTimeoutMillis\":-2147483648,"
+                    + "\"defaultTimestamp\":-9223372036854775808}"),
             Arguments.of(QueryBuilder
                     .insertInto("keyspace", "table")
                     .values(
@@ -178,35 +186,31 @@ public class JsonTest {
                         new String[] { "xx", "value_1", "value_2", "value_3" })
                     .ifNotExists(),
                 "{\"queryString\":\"INSERT INTO keyspace.table (id,field_1,field_2,field_3) VALUES (?,?,?,?) IF NOT "
-                    + "EXISTS;\",\"defaultTimestamp\":-9223372036854775808,\"fetchSize\":0,\"idempotent\":false,"
-                    + "\"keyspace\":\"keyspace\",\"readTimeoutMillis\":-2147483648,\"tracing\":false}"
-            ),
+                    + "EXISTS;\",\"tracing\":false,\"fetchSize\":0,\"readTimeoutMillis\":-2147483648,"
+                    + "\"defaultTimestamp\":-9223372036854775808,\"idempotent\":false,\"keyspace\":\"keyspace\"}"),
             Arguments.of(
                 QueryBuilder
                     .select("id", "field_1", "field_2", "field_3")
                     .from("keyspace", "table"),
-                "{\"queryString\":\"SELECT id,field_1,field_2,field_3 FROM keyspace.table;\","
-                    + "\"defaultTimestamp\":-9223372036854775808,\"fetchSize\":0,\"idempotent\":true,"
-                    + "\"keyspace\":\"keyspace\",\"readTimeoutMillis\":-2147483648,\"tracing\":false}"
-            ),
+                "{\"queryString\":\"SELECT id,field_1,field_2,field_3 FROM keyspace.table;\",\"tracing\":false,"
+                    + "\"fetchSize\":0,\"readTimeoutMillis\":-2147483648,\"defaultTimestamp\":-9223372036854775808,"
+                    + "\"idempotent\":true,\"keyspace\":\"keyspace\"}"),
             Arguments.of(
                 QueryBuilder
                     .update("keyspace", "table")
                     .where(QueryBuilder.eq("id", "xx"))
                     .with(QueryBuilder.set("field_1", "new-value")),
-                "{\"queryString\":\"UPDATE keyspace.table SET field_1=? WHERE id=?;\","
-                    + "\"defaultTimestamp\":-9223372036854775808,\"fetchSize\":0,\"idempotent\":true,"
-                    + "\"keyspace\":\"keyspace\",\"readTimeoutMillis\":-2147483648,\"tracing\":false}"
-            ),
+                "{\"queryString\":\"UPDATE keyspace.table SET field_1=? WHERE id=?;\",\"tracing\":false,"
+                    + "\"fetchSize\":0,\"readTimeoutMillis\":-2147483648,\"defaultTimestamp\":-9223372036854775808,"
+                    + "\"idempotent\":true,\"keyspace\":\"keyspace\"}"),
             Arguments.of(
                 QueryBuilder
                     .delete()
                     .from("keyspace", "table")
                     .where(QueryBuilder.eq("id", "xx")),
-                "{\"queryString\":\"DELETE FROM keyspace.table WHERE id=?;\","
-                    + "\"defaultTimestamp\":-9223372036854775808,\"fetchSize\":0,\"idempotent\":true,"
-                    + "\"keyspace\":\"keyspace\",\"readTimeoutMillis\":-2147483648,\"tracing\":false}"
-            ),
+                "{\"queryString\":\"DELETE FROM keyspace.table WHERE id=?;\",\"tracing\":false,\"fetchSize\":0,"
+                    + "\"readTimeoutMillis\":-2147483648,\"defaultTimestamp\":-9223372036854775808,\"idempotent\":true,"
+                    + "\"keyspace\":\"keyspace\"}"),
             Arguments.of(
                 QueryBuilder.batch(
                     QueryBuilder
@@ -225,15 +229,12 @@ public class JsonTest {
                     QueryBuilder
                         .delete()
                         .from("keyspace", "table")
-                        .where(QueryBuilder.eq("id", "xx"))
-                ),
+                        .where(QueryBuilder.eq("id", "xx"))),
                 "{\"queryString\":\"BEGIN BATCH INSERT INTO keyspace.table (id,field_1,field_2,field_3) VALUES (?,?,"
                     + "?,?) IF NOT EXISTS;SELECT id,field_1,field_2,field_3 FROM keyspace.table;UPDATE keyspace.table "
-                    + "SET field_1=? WHERE id=?;DELETE FROM keyspace.table WHERE id=?;APPLY BATCH;\","
-                    + "\"defaultTimestamp\":-9223372036854775808,\"fetchSize\":0,\"idempotent\":false,"
-                    + "\"keyspace\":\"keyspace\",\"readTimeoutMillis\":-2147483648,\"tracing\":false}"
-            )
-        );
+                    + "SET field_1=? WHERE id=?;DELETE FROM keyspace.table WHERE id=?;APPLY BATCH;\",\"tracing\":false,"
+                    + "\"fetchSize\":0,\"readTimeoutMillis\":-2147483648,\"defaultTimestamp\":-9223372036854775808,"
+                    + "\"idempotent\":false,\"keyspace\":\"keyspace\"}"));
     }
 
     @NonNull

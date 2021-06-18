@@ -28,7 +28,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -39,6 +38,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
@@ -69,7 +69,7 @@ public final class TestCommon {
     public static final String PASSWORD;
     public static final boolean MULTI_REGION_WRITES;
     public static final List<String> PREFERRED_REGIONS;
-    public static final List<SocketAddress> REGIONAL_ENDPOINTS;
+    public static final List<InetSocketAddress> REGIONAL_ENDPOINTS;
     public static final String TRUSTSTORE_PATH;
     public static final String TRUSTSTORE_PASSWORD;
 
@@ -147,7 +147,7 @@ public final class TestCommon {
             "azure.cosmos.cassandra.regional-endpoint-");
 
         assertThat(list).isNotEmpty();
-        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseInetSocketAddress).collect(Collectors.toList());
 
         value = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.truststore-path",
@@ -226,8 +226,6 @@ public final class TestCommon {
             session.execute(SchemaBuilder.dropTable(KEYSPACE_NAME, tableName).ifExists());
         } catch (final Throwable error) {
             fail("Failed to drop table " + tableName + " due to: " + error);
-        } finally {
-            session.close();
         }
     }
 
@@ -237,17 +235,17 @@ public final class TestCommon {
     static void createSchema(
         final Session session, final String tableName) throws InterruptedException {
 
-        session.execute(format(
-            "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy','replication_factor':3}",
-            KEYSPACE_NAME));
+        session.execute(SchemaBuilder.createKeyspace(KEYSPACE_NAME).ifNotExists().with().replication(Stream.of(new String[][] {
+                { "class", "SimpleStrategy" },
+                { "replication_factor", "3" }
+            }).collect(Collectors.toMap(data -> data[0], data -> data[1]))));
 
         Thread.sleep(5_000);
 
-        session.execute(format(
-            "CREATE TABLE IF NOT EXISTS %s.%s ("
+        session.execute(format("CREATE TABLE IF NOT EXISTS %s.%s ("
                 + "sensor_id uuid,"
                 + "date date,"
-                + "timestamp timestamp,"  // emulates bucketing by day
+                + "timestamp timestamp," // emulates bucketing by day
                 + "value double,"
                 + "PRIMARY KEY ((sensor_id,date),timestamp)"
                 + ")",
@@ -511,7 +509,7 @@ public final class TestCommon {
         return matcher;
     }
 
-    private static InetSocketAddress parseSocketAddress(final String value) {
+    private static InetSocketAddress parseInetSocketAddress(final String value) {
 
         final Matcher matcher = matchSocketAddress(value);
 
@@ -623,7 +621,7 @@ public final class TestCommon {
             session.execute(batchStatement);
 
         } finally {
-            cleanUp(session, KEYSPACE_NAME);
+            cleanUp(session, tableName);
         }
     }
 

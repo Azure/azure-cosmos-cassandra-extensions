@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -65,8 +66,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private final List<String> preferredRegions;
 
     private List<Host> contactPoints;
-    private Set<Host> hostsForReading;
-    private Set<Host> hostsForWriting;
+    private NavigableSet<Host> hostsForReading;
+    private NavigableSet<Host> hostsForWriting;
 
     static {
         try {
@@ -101,6 +102,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.multiRegionWritesEnabled = multiRegionWritesEnabled;
         this.preferredRegions = new ArrayList<>(preferredRegions);
+        this.hostsForReading = Collections.emptyNavigableSet();
+        this.hostsForWriting = Collections.emptyNavigableSet();
     }
 
     /**
@@ -223,14 +226,21 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         // TODO (DANOBLE) Does the driver ever act based on distance or does it simply inform LoadBalancingPolicy?
         //  Does it matter that we say that all but the first preferred region is at HostDistance.REMOTE?
 
-        final String datacenter = host.getDatacenter();
-
-        if (datacenter == null) {
-            LOG.warn("{} Returning HostDistance.IGNORED because datacenter is unknown", host);
-            return HostDistance.IGNORED;
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("distance({})", toJson(host));
         }
 
-        return datacenter.equals(this.preferredRegions.get(0)) ? HostDistance.LOCAL : HostDistance.REMOTE;
+        final String datacenter = host.getDatacenter();
+
+        final HostDistance distance = datacenter == null
+            ? HostDistance.IGNORED
+            : datacenter.equals(this.preferredRegions.get(0)) ? HostDistance.LOCAL : HostDistance.REMOTE;
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("distance -> returns({}) from {}", toJson(distance), this);
+        }
+
+        return distance;
     }
 
     /**
@@ -277,7 +287,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 requireNonNull(host, "expected non-null host");
                 final String datacenter = host.getDatacenter();
                 if (datacenter == null) {
-                    LOG.warn("Datacenter for host is unknown: {}", host);
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("init -> Datacenter for host is unknown: {}", toJson(host));
+                    }
                     return false;
                 }
                 return true;
@@ -334,7 +346,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final Set<Host> hosts = isReadRequest(statement) ? this.hostsForReading : this.hostsForWriting;
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan -> returns({}) from {}", hosts.iterator(), this);
+            LOG.debug("newQueryPlan -> returns({}) from {}", toJson(hosts.iterator()), this);
         }
 
         return hosts.iterator();
@@ -589,22 +601,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         @Override
         public int compare(@NonNull final Host x, @NonNull final Host y) {
 
-            requireNonNull(x, "expected non-null x");
-            requireNonNull(y, "expected non-null y");
-
             if (x == y) {
                 return 0;
             }
 
-            final String xDatacenter = x.getDatacenter();
-            final String yDatacenter = y.getDatacenter();
+            final String xDatacenter = requireNonNull(x.getDatacenter(), "expected non-null x::datacenter");
+            final String yDatacenter = requireNonNull(y.getDatacenter(), "expected non-null y::datacenter");
 
-            requireNonNull(xDatacenter, "expected non-null x::datacenter");
-            requireNonNull(yDatacenter, "expected non-null y::datacenter");
+            final int datacenterNameComparison = xDatacenter.compareTo(yDatacenter);
 
-            final int compareDatacenterNames = xDatacenter.compareTo(yDatacenter);
-
-            if (compareDatacenterNames != 0) {
+            if (datacenterNameComparison != 0) {
 
                 final Integer xIndex = this.indexes.get(xDatacenter);
                 final Integer yIndex = this.indexes.get(yDatacenter);
@@ -612,26 +618,27 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 if (xIndex != yIndex) {
 
                     if (xIndex == null) {
-                        return -1;  // y is a preferred datacenter and x is not
+                        return 1;  // y is a preferred datacenter and x is not => x > y
                     }
 
                     if (yIndex == null) {
-                        return 1;  // x is a preferred datacenter and y is not
+                        return -1;  // x is a preferred datacenter and y is not => x < y
                     }
 
                     final int result = Integer.compare(xIndex, yIndex);
 
                     if (result != 0) {
-                        return result; // x and y are preferred datacenters and one has higher priority than the other
+                        return result;  // x and y are preferred datacenters and one has higher priority than the other
                     }
                 }
 
-                if (xIndex == null) {  // x and y are both not in a preferred datacenter
-                    return compareDatacenterNames;
+                if (xIndex == null) {  // x and y are both not in a preferred datacenter => compare alphabetically
+                    return datacenterNameComparison;
                 }
             }
 
             // We distinguish x and y by Host ID because they're in the same datacenter
+            // This path covers Apache Cassandra use cases with some grace
 
             final UUID xHostId = x.getHostId();
             final UUID yHostId = y.getHostId();
