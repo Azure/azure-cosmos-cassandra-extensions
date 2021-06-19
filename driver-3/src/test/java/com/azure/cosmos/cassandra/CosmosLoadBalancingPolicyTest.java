@@ -7,7 +7,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.Session;
-import com.datastax.driver.core.Statement;
+import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Timeout;
@@ -51,7 +51,7 @@ public class CosmosLoadBalancingPolicyTest {
     // region Fields
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-    private static final int TIMEOUT_IN_SECONDS = 3600;
+    private static final int TIMEOUT_IN_SECONDS = 90;
 
     // endregion
 
@@ -143,19 +143,11 @@ public class CosmosLoadBalancingPolicyTest {
 
             try (Session session = cluster.connect()) {
 
-                Set<Host> hosts = Collections.emptySet();
+                // Here we check after the cluster is fully operation, usually shortly before or shortly after the
+                // first session is created. Our checks now require that regional (failover) hosts are fully
+                // enumerated. We do a full check on the host failover sequence.
 
-                for (int i = 0; i < 10; i++) {
-
-                    testAllStatements(session);
-                    hosts = clusterMetadata.getAllHosts();
-
-                    if (hosts.size() == REGIONAL_ENDPOINTS.size()) {
-                        break;
-                    }
-                }
-
-                assertThat(hosts).hasSize(REGIONAL_ENDPOINTS.size());
+                final Set<Host> hosts = getAllRegionalHosts(session);
 
                 final Host[] expectedPreferredHosts = hosts.stream()
                     .filter(host -> expectedPreferredRegions.contains(host.getDatacenter()))
@@ -258,19 +250,11 @@ public class CosmosLoadBalancingPolicyTest {
 
             try (Session session = cluster.connect()) {
 
-                Set<Host> hosts = Collections.emptySet();
+                // Here we check after the cluster is fully operation, usually shortly before or shortly after the
+                // first session is created. Our checks now require that regional (failover) hosts are fully
+                // enumerated. We do a full check on the host failover sequence.
 
-                for (int iteration = 0; iteration < 10; iteration++) {
-
-                    testAllStatements(session);
-                    hosts = clusterMetadata.getAllHosts();
-
-                    if (hosts.size() == REGIONAL_ENDPOINTS.size()) {
-                        break;
-                    }
-                }
-
-                assertThat(hosts).hasSize(REGIONAL_ENDPOINTS.size());
+                final Set<Host> hosts = getAllRegionalHosts(session);
 
                 final Host[] expectedFailoverHosts = hosts.stream()
                     .filter(host -> !Objects.equals(host.getDatacenter(), globalHost.getDatacenter()))
@@ -298,13 +282,54 @@ public class CosmosLoadBalancingPolicyTest {
         CosmosLoadBalancingPolicy.builder(); // forces class initialization
     }
 
+    // endregion
+
+    // region Privates
+
     /**
-     * Validates the final state of a {@link CosmosLoadBalancingPolicy} instance.
+     * Runs tests until all regional hosts are enumerated by the driver or the calling test times out.
      * <p>
+     * The {@link TestCommon#REGIONAL_ENDPOINTS} list is used to determine whether all regional hosts have been
+     * enumerated. You must ensure that the list of {@link TestCommon#REGIONAL_ENDPOINTS} is accurate.
      *
-     * This is the state of the instance once the cluster under state is fully operation, usually shortly before or
-     * after the first session is created. Our checks now require that regional (failover) hosts have been enumerated.
-     * We do a full check on the host failover sequence.
+     * @param session The current session.
+     *
+     * @return The set of regional hosts obtained from the driver. The number of hosts returned is guaranteed to be
+     * equal to the size of {@link TestCommon#REGIONAL_ENDPOINTS}.
+     */
+    private static Set<Host> getAllRegionalHosts(final Session session) {
+
+        final Metadata metadata = session.getCluster().getMetadata();
+        Set<Host> hosts = Collections.emptySet();
+        int iterations = 0;
+
+        try {
+
+            do {
+                iterations++;
+                testAllStatements(session);
+                hosts = metadata.getAllHosts();
+            } while (hosts.size() != REGIONAL_ENDPOINTS.size());
+
+            return hosts;
+
+        } finally {
+
+            assertThat(hosts).hasSize(REGIONAL_ENDPOINTS.size());
+
+            assertThat(hosts).are(new Condition<>(
+                host -> REGIONAL_ENDPOINTS.contains(host.getBroadcastRpcAddress()),
+                "regional endpoint"));
+
+            LOG.info("[{}] regional endpoints enumerated in iteration {}: {}",
+                session.getCluster().getClusterName(),
+                iterations,
+                toJson(hosts));
+        }
+    }
+
+    /**
+     * Validates the operational state of a {@link CosmosLoadBalancingPolicy} instance.
      *
      * @param policy                   The {@link CosmosLoadBalancingPolicy} instance under test.
      * @param globalHost               The {@link Host} representing the global endpoint.
@@ -335,10 +360,6 @@ public class CosmosLoadBalancingPolicyTest {
             assertThat(policy.getHostsForWriting()).containsExactly(globalHost);
         }
     }
-
-    // endregion
-
-    // region Privates
 
     // endregion
 }
