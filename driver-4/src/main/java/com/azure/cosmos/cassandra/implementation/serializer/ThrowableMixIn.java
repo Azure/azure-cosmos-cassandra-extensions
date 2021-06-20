@@ -6,13 +6,12 @@ package com.azure.cosmos.cassandra.implementation.serializer;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonAppend;
+import com.fasterxml.jackson.databind.annotation.JsonAppend.Prop;
 
 /**
  * A mix-in for serializing {@link Throwable} instances to JSON for use in log messages.
  */
-@JsonAppend(
-    props = @JsonAppend.Prop(value = TypePropertyWriter.class, name = "error", type = String.class),
-    prepend = true)
+@JsonAppend(props = @Prop(value = TypePropertyWriter.class, name = "error", type = String.class), prepend = true)
 @JsonPropertyOrder(value = { "cause", "message", "stackTrace", "suppressed" }, alphabetic = true)
 @JsonIgnoreProperties({ "localizedMessage" })
 public abstract class ThrowableMixIn {

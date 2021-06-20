@@ -532,7 +532,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
      * <p>
      * Here is an example error message:
      * <p><pre>{@code
-     * Queried host (babas.cassandra.cosmos.azure.com/40.65.106.154:10350) was overloaded: Request rate is large: ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10, Additional details='
+     * Queried host (babas.cassandra.cosmos.azure.com/40.65.106.154:10350) was overloaded: Request rate is large:
+     *   ActivityID=98f98762-512e-442d-b5ef-36f5d03d788f, RetryAfterMs=10, Additional details='
      * }</pre></p>
      *
      * @param errorMessage The error messages.

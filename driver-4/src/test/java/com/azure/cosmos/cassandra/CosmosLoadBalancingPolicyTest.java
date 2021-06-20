@@ -161,7 +161,7 @@ public final class CosmosLoadBalancingPolicyTest {
         final CosmosLoadBalancingPolicy cosmosLoadBalancingPolicy = (CosmosLoadBalancingPolicy) loadBalancingPolicy;
         final List<Node> nodesForReading = cosmosLoadBalancingPolicy.getNodesForReading();
 
-        assertThat(cosmosLoadBalancingPolicy.getMultiRegionWrites()).isEqualTo(multiRegionWrites);
+        assertThat(cosmosLoadBalancingPolicy.getMultiRegionWritesEnabled()).isEqualTo(multiRegionWrites);
         assertThat(cosmosLoadBalancingPolicy.getPreferredRegions()).isEqualTo(PREFERRED_REGIONS);
 
         assertThat(nodesForReading.size()).isEqualTo(PREFERRED_REGIONS.size());

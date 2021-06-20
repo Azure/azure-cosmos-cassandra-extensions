@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
@@ -40,6 +41,7 @@ import java.util.function.Function;
 
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES;
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS;
+import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -72,9 +74,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private final InternalDriverContext driverContext;
     private final MetadataManager metadataManager;
-    private final boolean multiRegionWrites;
-    private final Set<Node> nodesForReading;
-    private final Set<Node> nodesForWriting;
+    private final boolean multiRegionWritesEnabled;
+    private final NavigableSet<Node> nodesForReading;
+    private final NavigableSet<Node> nodesForWriting;
     private final List<String> preferredRegions;
     private DistanceReporter distanceReporter;
     private volatile Function<Request, Queue<Node>> getNodes;
@@ -96,16 +98,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.driverContext = (InternalDriverContext) driverContext;
         this.metadataManager = this.driverContext.getMetadataManager();
 
-        this.multiRegionWrites = MULTI_REGION_WRITES.getValue(profile, Boolean.class);
+        this.multiRegionWritesEnabled = MULTI_REGION_WRITES.getValue(profile, Boolean.class);
         this.preferredRegions = PREFERRED_REGIONS.getValue(profile, List.class);
 
-        this.nodesForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(
-            this.metadataManager,
-            this.preferredRegions));
+        this.nodesForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.preferredRegions));
 
-        this.nodesForWriting = this.multiRegionWrites
+        this.nodesForWriting = this.multiRegionWritesEnabled
             ? this.nodesForReading
-            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.metadataManager, this.preferredRegions));
+            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.preferredRegions));
     }
 
     // endregion
@@ -117,8 +117,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      *
      * @return a value of {@code true}, if multi region writes are enabled; {@code false} otherwise.
      */
-    public boolean getMultiRegionWrites() {
-        return this.multiRegionWrites;
+    public boolean getMultiRegionWritesEnabled() {
+        return this.multiRegionWritesEnabled;
     }
 
     /**
@@ -170,6 +170,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     /**
      * Closes the current {@link CosmosLoadBalancingPolicy} instance.
+     * <p>
+     * This method performs no action. It is a noop.
      */
     @Override
     public void close() {
@@ -186,7 +188,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("init({})", Json.toJson(nodes.values()));
+            LOG.debug("init({})", toJson(nodes.values()));
         }
 
         this.distanceReporter = distanceReporter;
@@ -200,7 +202,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.nodesForReading.add(node);  // When multiRegionWrites is true, nodesForReading == nodesForWriting
         }
 
-        if (this.multiRegionWrites) {
+        if (this.multiRegionWritesEnabled) {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
 
@@ -208,8 +210,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             // API instance, there should be a single contact point, the global endpoint. If you're connected to an
             // Apache Cassandra instance, we assume that the contact points are in the datacenters to which you wish
             // to write.
-
-            for (final Node node : this.getContactPointsOrException()) {
+            
+            // TODO (DANOBLE) add all all datacenter names for all contact points to the list of preferred regions
+            //   This may require waiting til we hit this code to create nodesForReading and nodesForWriting
+            
+            for (final Node node : this.getContactPointsOrThrow()) {
                 if (this.preferredRegions.contains(node.getDatacenter())) {
                     distanceReporter.setDistance(node, NodeDistance.LOCAL);
                 } else {
@@ -240,7 +245,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } else {
                 if (LOG.isDebugEnabled()) {
                     final Map<UUID, Node> refreshedNodes = this.metadataManager.getMetadata().getNodes();
-                    LOG.debug("refreshed nodes: {}", Json.toJson(refreshedNodes));
+                    LOG.debug("refreshed nodes: {}", toJson(refreshedNodes));
                 }
             }
 
@@ -248,7 +253,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.getNodes = this::doGetNodes;
         });
 
-        LOG.debug("init -> returns(void), {}", this);
+        LOG.debug("init -> {}", this);
     }
 
     /**
@@ -272,8 +277,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("newQueryPlan(request: {}, session: {})",
-                Json.toJson(request),
-                Json.toJson(session == null ? null : session.getName()));
+                toJson(request),
+                toJson(session == null ? null : session.getName()));
         }
 
         // TODO (DANOBLE) consider caching results so that evaluation is reduced
@@ -282,7 +287,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final Queue<Node> nodes = function.apply(request);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan -> returns({}), {}", Json.toJson(nodes), this);
+            LOG.debug("newQueryPlan -> returns({}) from {}", toJson(nodes), this);
         }
 
         return nodes;
@@ -290,9 +295,61 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onAdd(@NonNull final Node node) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onAdd({})", toJson(node));
+        }
+        this.onUp(node);
+    }
+
+    @Override
+    public void onDown(@NonNull final Node node) {
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("onAdd({})", Json.toJson(node));
+            LOG.debug("onDown({})", toJson(node));
+        }
+
+        requireNonNull(node, "expected non-null node");
+        this.nodesForReading.remove(node);
+
+        if (this.multiRegionWritesEnabled) {
+            assert this.nodesForReading == this.nodesForWriting;
+        } else {
+            this.nodesForWriting.remove(node);
+        }
+
+        if (LOG.isWarnEnabled()) {
+            if (this.multiRegionWritesEnabled) {
+                if (this.nodesForReading.isEmpty()) {
+                    LOG.warn("All nodes have now been removed: {}", toJson(this));
+                }
+            } else {
+                if (this.nodesForReading.isEmpty()) {
+                    LOG.warn("All nodes for reading have now been removed: {}", toJson(this));
+                }
+                if (this.nodesForWriting.isEmpty()) {
+                    LOG.warn("All nodes for writing have now been removed: {}", toJson(this));
+                }
+            }
+        }
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onDown -> {}", this);
+        }
+    }
+
+    @Override
+    public void onRemove(@NonNull final Node node) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onRemove({})", toJson(node));
+        }
+        this.onDown(node);
+    }
+
+    @Override
+    public void onUp(@NonNull final Node node) {
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("onUp({})", toJson(node));
         }
 
         if (this.preferredRegions.contains(node.getDatacenter())) {
@@ -303,57 +360,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.nodesForReading.add(node);
 
-        if (!this.multiRegionWrites) {
-            if (this.getContactPointsOrException().contains(node)) {
+        if (this.multiRegionWritesEnabled) {
+            assert this.nodesForReading == this.nodesForWriting;
+        } else {
+            if (this.getContactPointsOrThrow().contains(node)) {
                 this.nodesForWriting.add(node);
             }
         }
 
-        LOG.debug("onAdd -> returns(void), {}", this);
-    }
-
-    @Override
-    public void onDown(@NonNull final Node node) {
         if (LOG.isDebugEnabled()) {
-            LOG.debug("onDown({})", Json.toJson(node));
-        }
-    }
-
-    @Override
-    public void onRemove(@NonNull final Node node) {
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Removing node: onRemove({})", Json.toJson(node));
-        }
-
-        this.nodesForReading.remove(node);
-
-        if (!this.multiRegionWrites) {
-            this.nodesForWriting.remove(node);
-        }
-
-        LOG.debug("onRemove -> returns(void), {}", this);
-
-        if (LOG.isWarnEnabled()) {
-            if (this.multiRegionWrites) {
-                if (this.nodesForReading.isEmpty()) {
-                    LOG.warn("All nodes have now been removed: {}", this);
-                }
-            } else {
-                if (this.nodesForReading.isEmpty()) {
-                    LOG.warn("All nodes for reading have now been removed: {}", this);
-                }
-                if (this.nodesForWriting.isEmpty()) {
-                    LOG.warn("All nodes for writing have now been removed: {}", this);
-                }
-            }
-        }
-    }
-
-    @Override
-    public void onUp(@NonNull final Node node) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp({})", Json.toJson(node));
+            LOG.debug("onUp -> {}", this);
         }
     }
 
@@ -369,7 +385,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @NonNull
-    private Set<Node> getContactPointsOrException() {
+    private Set<Node> getContactPointsOrThrow() {
         return requireNonNull(this.getContactPoints(), "expected non-null contactPoints");
     }
 
@@ -413,13 +429,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static class PreferredRegionsComparator implements Comparator<Node> {
 
         private final Map<String, Integer> indexes;
-        private final MetadataManager metadataManager;
 
-        PreferredRegionsComparator(
-            @NonNull final MetadataManager metadataManager,
-            @NonNull final List<String> preferredRegions) {
-
-            this.metadataManager = requireNonNull(metadataManager, "expected non-null contactPoints");
+        PreferredRegionsComparator(@NonNull final List<String> preferredRegions) {
 
             this.indexes = new HashMap<>(
                 requireNonNull(preferredRegions, "expected non-null preferredRegions").size());
@@ -450,60 +461,44 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         @Override
         public int compare(@NonNull final Node x, @NonNull final Node y) {
 
-            requireNonNull(x, "expected non-null x");
-            requireNonNull(y, "expected non-null y");
-
             if (x == y) {
                 return 0;
             }
 
-            final String xDatacenter = x.getDatacenter();
-            final String yDatacenter = y.getDatacenter();
+            final String xDatacenter = requireNonNull(x.getDatacenter(), "expected non-null x::datacenter");
+            final String yDatacenter = requireNonNull(y.getDatacenter(), "expected non-null y::datacenter");
 
-            requireNonNull(xDatacenter, "expected non-null x::datacenter");
-            requireNonNull(yDatacenter, "expected non-null y::datacenter");
+            final int datacenterNameComparison = xDatacenter.compareTo(yDatacenter);
 
-            final int compareDatacenterNames = xDatacenter.compareTo(yDatacenter);
-
-            if (compareDatacenterNames != 0) {
+            if (datacenterNameComparison != 0) {
 
                 final Integer xIndex = this.indexes.get(xDatacenter);
                 final Integer yIndex = this.indexes.get(yDatacenter);
 
-                int result;
-
                 if (xIndex != yIndex) {
 
                     if (xIndex == null) {
-                        return -1;  // y is a preferred datacenter and x is not
+                        return 1;  // y is a preferred datacenter and x is not => x > y
                     }
 
                     if (yIndex == null) {
-                        return 1;  // x is a preferred datacenter and y is not
+                        return -1;  // x is a preferred datacenter and y is not => x < y
                     }
 
-                    result = Integer.compare(xIndex, yIndex);
+                    final int result = Integer.compare(xIndex, yIndex);
 
                     if (result != 0) {
-                        return result; // x and y are preferred datacenters and one has higher priority than the other
+                        return result;  // x and y are preferred datacenters and one has higher priority than the other
                     }
                 }
 
-                final boolean xIsContactPoint = this.getContactPoints().contains(x);
-                final boolean yIsContactPoint = this.getContactPoints().contains(y);
-
-                result = Boolean.compare(xIsContactPoint, yIsContactPoint);
-
-                if (result != 0) {
-                    return result;  // one of x or y are a contact point
-                }
-
-                if (xIndex == null) {  // x and y are both not in a preferred datacenter
-                    return compareDatacenterNames;
+                if (xIndex == null) {  // x and y are both not in a preferred datacenter => compare alphabetically
+                    return datacenterNameComparison;
                 }
             }
 
             // We distinguish x and y by Host ID because they're in the same datacenter
+            // This path covers Apache Cassandra use cases with some grace
 
             final UUID xHostId = x.getHostId();
             final UUID yHostId = y.getHostId();
@@ -512,12 +507,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             requireNonNull(yHostId, "expected non-null y::hostId");
 
             return Objects.compare(x.getHostId(), y.getHostId(), UUID::compareTo);
-        }
-
-        @SuppressWarnings("unchecked")
-        @NonNull
-        private Set<Node> getContactPoints() {
-            return (Set<Node>) (Set<?>) this.metadataManager.getContactPoints();
         }
     }
 

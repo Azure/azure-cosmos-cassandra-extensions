@@ -30,7 +30,7 @@ import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static java.lang.String.format;
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Fail.fail;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * A utility class that implements common static methods useful for writing tests.
@@ -43,7 +43,7 @@ public final class TestCommon {
 
     // region Fields
 
-    static final InetSocketAddress GLOBAL_ENDPOINT;
+    public static final InetSocketAddress GLOBAL_ENDPOINT;
     static final String LOCAL_DATACENTER;
     static final List<String> PREFERRED_REGIONS;
     static final List<SocketAddress> REGIONAL_ENDPOINTS;
@@ -354,10 +354,6 @@ public final class TestCommon {
         return prefix + Long.toUnsignedString(id, Character.MAX_RADIX);
     }
 
-    // endregion
-
-    // region Privates
-
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
      *  @param session          the session for executing requests.
@@ -400,6 +396,10 @@ public final class TestCommon {
         out.println("Write succeeded at " + consistencyLevel);
     }
 
+    // endregion
+    
+    // region Privates
+    
     /**
      * Draws a line to isolate headings from rows.
      *

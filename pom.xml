@@ -48,7 +48,7 @@ Licensed under the MIT License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
     <!-- Package dependency version numbers -->
-    <version.cassandra-driver>[4.7,4.12)</version.cassandra-driver>
+    <version.cassandra-driver>[4.7,4.13)</version.cassandra-driver>
     <version.jackson>[2.12,2.13)</version.jackson>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
     <version.spring-data-cassandra>[3.2,3.3)</version.spring-data-cassandra>
@@ -96,13 +96,8 @@ Licensed under the MIT License.
         <version>${version.cassandra-driver}</version>
       </dependency>
       <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-core</artifactId>
-        <version>${version.jackson}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
+        <groupId>com.fasterxml.jackson.datatype</groupId>
+        <artifactId>jackson-datatype-jdk8</artifactId>
         <version>${version.jackson}</version>
       </dependency>
       <dependency>
