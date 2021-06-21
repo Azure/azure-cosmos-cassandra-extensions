@@ -46,10 +46,10 @@ variables:
     $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
 
     Copy-Item *.jar $targetDirectory
-    Copy-Item ../pom.xml $targetDirectory/$packageName.pom
+    Copy-Item (Join-Path .. pom.xml) (Join-Path ${targetDirectory} ${packageName}.pom)
 
     $packageName = $packageName.Split("-extensions-") -join "-"
-    $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY $packageName)
+    $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY ${packageName})
 
     Copy-Item (Join-Path .. .. pom.xml) (Join-Path ${targetDirectory} ${packageName}.pom)
   readonly: true
