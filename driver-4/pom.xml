@@ -15,12 +15,12 @@ Licensed under the MIT License.
 
   <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
   <packaging>jar</packaging>
-  <version>1.0.1-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
 
   <parent>
     <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
     <groupId>com.azure</groupId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
 
   <dependencies>
