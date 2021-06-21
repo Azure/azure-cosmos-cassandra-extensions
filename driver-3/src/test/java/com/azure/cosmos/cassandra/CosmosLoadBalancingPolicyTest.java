@@ -9,7 +9,9 @@ import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.Session;
 import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -40,22 +42,34 @@ import static org.junit.jupiter.api.Assertions.fail;
  * This test verifies that the {@link CosmosLoadBalancingPolicy} class routes requests correctly.
  * <h3>
  * Preconditions</h3>
- * <p>
- * A Cosmos Cassandra API account is required. It should have at least two regions with multi-region writes
- * enabled.
- *
+ * <ol>
+ * <li> A Cosmos DB Cassandra API account is required. It should have at least two regions with multi-region writes
+ * enabled. A number of system or--alternatively--environment variables must be set. See {@link TestCommon} for a 
+ * complete list. Their use and meaning should be apparent from the relevant sections of the configuration and code.
+ * </ol>
  * @see <a href="http://datastax.github.io/java-driver/manual/">Java driver online manual</a>
  */
-public class CosmosLoadBalancingPolicyTest {
+public final class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-    private static final int TIMEOUT_IN_SECONDS = 90;
+    private static final int TIMEOUT_IN_SECONDS = 120;
 
     // endregion
 
     // region Methods
+
+    @BeforeAll
+    public static void init() {
+        TestCommon.printTestParameters();
+        CosmosLoadBalancingPolicy.builder(); // forces class initialization
+    }
+
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        TestCommon.logTestName(info, LOG);
+    }
 
     /**
      * Verifies that a {@link CosmosLoadBalancingPolicy} with preferred regions routes requests correctly.
@@ -277,11 +291,6 @@ public class CosmosLoadBalancingPolicyTest {
         }
     }
 
-    @BeforeAll
-    static void touchCosmosLoadBalancingPolicy() {
-        CosmosLoadBalancingPolicy.builder(); // forces class initialization
-    }
-
     // endregion
 
     // region Privates
@@ -348,7 +357,7 @@ public class CosmosLoadBalancingPolicyTest {
         final Host[] expectedPreferredHosts,
         final Host[] expectedFailoverHosts) {
 
-        assertThat(policy.getPreferredRegions()).containsExactlyElementsOf(expectedPreferredRegions);
+        assertThat(policy.getPreferredReadRegions()).containsExactlyElementsOf(expectedPreferredRegions);
 
         assertThat(policy.getHostsForReading()).hasSize(expectedPreferredHosts.length + expectedFailoverHosts.length);
         assertThat(policy.getHostsForReading()).startsWith(expectedPreferredHosts);

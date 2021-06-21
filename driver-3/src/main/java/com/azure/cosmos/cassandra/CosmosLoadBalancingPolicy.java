@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -63,11 +62,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static final Method GET_CONTACT_POINTS;
 
     private final boolean multiRegionWritesEnabled;
-    private final List<String> preferredRegions;
-
-    private List<Host> contactPoints;
-    private NavigableSet<Host> hostsForReading;
-    private NavigableSet<Host> hostsForWriting;
+    private final NavigableSet<Host> hostsForReading;
+    private final NavigableSet<Host> hostsForWriting;
 
     static {
         try {
@@ -101,9 +97,11 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final boolean multiRegionWritesEnabled) {
 
         this.multiRegionWritesEnabled = multiRegionWritesEnabled;
-        this.preferredRegions = new ArrayList<>(preferredRegions);
-        this.hostsForReading = Collections.emptyNavigableSet();
-        this.hostsForWriting = Collections.emptyNavigableSet();
+        this.hostsForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
+
+        this.hostsForWriting = this.multiRegionWritesEnabled
+            ? this.hostsForReading
+            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
     }
 
     /**
@@ -118,15 +116,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // endregion
 
     // region Accessors
-
-    /**
-     * Returns the list of contact points for the cluster with this {@link CosmosLoadBalancingPolicy}.
-     *
-     * @return the list of contact points for the cluster with this {@link CosmosLoadBalancingPolicy}.
-     */
-    public List<Host> getContactPoints() {
-        return Collections.unmodifiableList(new ArrayList<>(this.contactPoints));
-    }
 
     /**
      * Returns a copy of the current list of nodes for reading.
@@ -172,12 +161,31 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Gets the list of preferred regions for failover.
+     * Gets the list of preferred regions for failover on read operations.
+     * <p>
+     * When multi-region writes are enabled, this list will be the same as the one returned by {@link
+     * #getPreferredWriteRegions}.
      *
-     * @return The list of preferred regions for failover.
+     * @return The list of preferred regions for failover on read operations.
      */
-    public List<String> getPreferredRegions() {
-        return Collections.unmodifiableList(this.preferredRegions);
+    public List<String> getPreferredReadRegions() {
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
+        assert comparator != null;
+        return Collections.unmodifiableList(comparator.getPreferredRegions());
+    }
+
+    /**
+     * Gets the list of preferred regions for failover on read operations.
+     * <p>
+     * When multi-region writes are enabled, this list will be the same as the one returned by {@link
+     * #getPreferredReadRegions}.
+     *
+     * @return The list of preferred regions for failover on write operations.
+     */
+    public List<String> getPreferredWriteRegions() {
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
+        assert comparator != null;
+        return Collections.unmodifiableList(comparator.getPreferredRegions());
     }
 
     // endregion
@@ -196,7 +204,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Closes the current {@link CosmosLoadBalancingPolicy} object.
+     * Closes the current {@link CosmosLoadBalancingPolicy} instance.
+     * <p>
+     * This method performs no action. It is a noop.
      */
     @Override
     public void close() {
@@ -223,18 +233,18 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public HostDistance distance(final Host host) {
 
-        // TODO (DANOBLE) Does the driver ever act based on distance or does it simply inform LoadBalancingPolicy?
-        //  Does it matter that we say that all but the first preferred region is at HostDistance.REMOTE?
-
         if (LOG.isDebugEnabled()) {
             LOG.debug("distance({})", toJson(host));
         }
+
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
+        assert comparator != null;
 
         final String datacenter = host.getDatacenter();
 
         final HostDistance distance = datacenter == null
             ? HostDistance.IGNORED
-            : datacenter.equals(this.preferredRegions.get(0)) ? HostDistance.LOCAL : HostDistance.REMOTE;
+            : comparator.hasPreferredRegion(datacenter) ? HostDistance.LOCAL : HostDistance.REMOTE;
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("distance -> returns({}) from {}", toJson(distance), this);
@@ -260,27 +270,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         // Finalize the list of preferred regions
 
-        this.contactPoints = getContactPointsOrThrow(cluster);
+        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
+        assert comparator != null;
 
-        this.contactPoints.stream()
-            .map(host -> {
-                final String region = host.getDatacenter();
-                if (region == null) {
-                    LOG.warn("Datacenter for contact point is unknown: {}", toJson(host));
-                }
-                return region;
-            })
-            .filter(Objects::nonNull)
-            .distinct()
-            .forEachOrdered(region -> {
-                if (!this.preferredRegions.contains(region)) {
-                    this.preferredRegions.add(region);
-                }
-            });
+        final List<Host> contactPoints = getContactPointsOrThrow(cluster);
+        comparator.addPreferredRegions(contactPoints);
 
+        if (this.multiRegionWritesEnabled) {
+            assert this.hostsForReading == this.hostsForWriting;
+        } else {
+            comparator = (PreferredRegionsComparator) this.hostsForWriting.comparator();
+            assert comparator != null;
+            comparator.addPreferredRegions(contactPoints);
+        }
         // Initialize the hosts for read and write requests
-
-        this.hostsForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.preferredRegions));
 
         this.hostsForReading.addAll(hosts.stream()
             .filter(host -> {
@@ -297,7 +300,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             .collect(Collectors.toList()));
 
         if (this.multiRegionWritesEnabled) {
-            this.hostsForWriting = this.hostsForReading;
+            assert this.hostsForReading == this.hostsForWriting;
         } else {
 
             // Here we assume that all contact points are write capable. If you're connected to a Cosmos DB Cassandra
@@ -306,10 +309,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             // with multi-region writes disabled, we assume that the contact points are in the datacenters to which
             // write requests should be sent.
 
-            this.hostsForWriting = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.preferredRegions));
-
             for (final Host host : hosts) {
-                if (this.contactPoints.contains(host)) {
+                if (contactPoints.contains(host)) {
                     this.hostsForWriting.add(host);
                 }
             }
@@ -435,12 +436,21 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             LOG.debug("onUp({})", toJson(host));
         }
 
+        assert host.getDatacenter() != null;
         this.hostsForReading.add(host);
 
         if (this.multiRegionWritesEnabled) {
+
             assert this.hostsForReading == this.hostsForWriting;
+
         } else {
-            if (this.contactPoints.contains(host)) {
+
+            final PreferredRegionsComparator comparator =
+                (PreferredRegionsComparator) this.hostsForWriting.comparator();
+
+            assert comparator != null;
+
+            if (comparator.hasPreferredRegion(host.getDatacenter())) {
                 this.hostsForWriting.add(host);
             }
         }
@@ -571,15 +581,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     private static class PreferredRegionsComparator implements Comparator<Host> {
 
         private final Map<String, Integer> indexes;
+        private List<String> preferredRegions;
 
         PreferredRegionsComparator(@NonNull final List<String> preferredRegions) {
 
-            this.indexes = new HashMap<>(requireNonNull(preferredRegions, "expected non-null preferredRegions").size());
+            requireNonNull(preferredRegions, "expected non-null preferredRegions");
+
+            this.indexes = new HashMap<>(preferredRegions.size() + 1);
             int index = 0;
 
             for (final String region : preferredRegions) {
                 this.indexes.put(region, index++);
             }
+
+            this.preferredRegions = null;
         }
 
         /**
@@ -595,9 +610,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
          *
          * @return a negative integer, zero, or a positive integer as the first argument is less than, equal to, or
          * greater than the second.
+         *
+         * @throws NullPointerException if x or y have no datacenter name or host ID.
          */
         @SuppressFBWarnings(value = "RC_REF_COMPARISON", justification = "Reference comparison is intentional")
-        @SuppressWarnings("NumberEquality")
         @Override
         public int compare(@NonNull final Host x, @NonNull final Host y) {
 
@@ -608,45 +624,68 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             final String xDatacenter = requireNonNull(x.getDatacenter(), "expected non-null x::datacenter");
             final String yDatacenter = requireNonNull(y.getDatacenter(), "expected non-null y::datacenter");
 
-            final int datacenterNameComparison = xDatacenter.compareTo(yDatacenter);
+            final int xIndex = this.indexes.getOrDefault(xDatacenter, this.preferredRegions.size());
+            final int yIndex = this.indexes.getOrDefault(yDatacenter, this.preferredRegions.size());
 
-            if (datacenterNameComparison != 0) {
+            int result = Integer.compare(xIndex, yIndex);
 
-                final Integer xIndex = this.indexes.get(xDatacenter);
-                final Integer yIndex = this.indexes.get(yDatacenter);
-
-                if (xIndex != yIndex) {
-
-                    if (xIndex == null) {
-                        return 1;  // y is a preferred datacenter and x is not => x > y
-                    }
-
-                    if (yIndex == null) {
-                        return -1;  // x is a preferred datacenter and y is not => x < y
-                    }
-
-                    final int result = Integer.compare(xIndex, yIndex);
-
-                    if (result != 0) {
-                        return result;  // x and y are preferred datacenters and one has higher priority than the other
-                    }
-                }
-
-                if (xIndex == null) {  // x and y are both not in a preferred datacenter => compare alphabetically
-                    return datacenterNameComparison;
-                }
+            if (result != 0) {
+                return result;  // x and y are in different regions and one sorts before the other
             }
 
-            // We distinguish x and y by Host ID because they're in the same datacenter
-            // This path covers Apache Cassandra use cases with some grace
+            // This remainder of this method covers Apache Cassandra use cases with some grace
 
-            final UUID xHostId = x.getHostId();
-            final UUID yHostId = y.getHostId();
+            // We first distinguish x and y by datacenter name, lexicographically
 
-            requireNonNull(xHostId, "expected non-null x::hostId");
-            requireNonNull(yHostId, "expected non-null y::hostId");
+            result = xDatacenter.compareTo(yDatacenter);
 
-            return Objects.compare(x.getHostId(), y.getHostId(), UUID::compareTo);
+            if (result != 0) {
+                return result;
+            }
+
+            // We then distinguish x and y by Host ID they're in the same datacenter
+
+            final UUID xHostId = requireNonNull(x.getHostId(), "expected non-null x::hostId");
+            final UUID yHostId = requireNonNull(y.getHostId(), "expected non-null y::hostId");
+
+            return xHostId.compareTo(yHostId);
+        }
+
+        /**
+         * Called by {@link #init} to add the datacenters for all contact points to the list of preferred regions.
+         *
+         * These regions will appear last in the list of preferred regions following those specified using
+         * {@link CosmosLoadBalancingPolicy#builder()}.
+         * <p>
+         * This method is not thread safe and can only be called once. It should only be called by {@link #init}.
+         *
+         * @param contactPoints A set of contact points.
+         *
+         * @throws IllegalStateException if this method is called more than once.
+         */
+        void addPreferredRegions(final List<Host> contactPoints) {
+            if (this.preferredRegions != null) {
+                throw new IllegalStateException("attempt to add preferred regions more than once");
+            }
+            contactPoints.stream()
+                .map(Host::getDatacenter)
+                .forEachOrdered(region -> this.indexes.put(region, this.indexes.size()));
+            this.preferredRegions = this.collectPreferredRegions();
+        }
+
+        boolean hasPreferredRegion(final String name) {
+            return this.indexes.containsKey(name);
+        }
+
+        List<String> getPreferredRegions() {
+            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
+        }
+
+        private List<String> collectPreferredRegions() {
+            return this.indexes.entrySet().stream()
+                .sorted(Comparator.comparingInt(Map.Entry::getValue))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
         }
     }
 

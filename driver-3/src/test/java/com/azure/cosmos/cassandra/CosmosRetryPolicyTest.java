@@ -26,8 +26,11 @@ import com.google.common.util.concurrent.Futures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -359,6 +362,17 @@ public class CosmosRetryPolicyTest {
     public void canRetryOverloadedExceptionWithGrowingBackOffTime() {
         final CosmosRetryPolicy retryPolicy = CosmosRetryPolicy.builder().withMaxRetryCount(MAX_RETRY_COUNT).build();
         this.retry(retryPolicy, 0, MAX_RETRY_COUNT, RetryDecision.Type.RETRY);
+    }
+
+    @BeforeAll
+    public static void init() {
+        TestCommon.printTestParameters();
+        CosmosLoadBalancingPolicy.builder(); // forces class initialization
+    }
+
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        TestCommon.logTestName(info, LOG);
     }
 
     /**

@@ -25,6 +25,10 @@ import com.datastax.driver.core.querybuilder.Select;
 import com.datastax.driver.core.querybuilder.Update;
 import com.datastax.driver.core.schemabuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -56,24 +60,20 @@ import static org.assertj.core.api.Assertions.fail;
  */
 public final class TestCommon {
 
-    private TestCommon() {
-        throw new UnsupportedOperationException();
-    }
-
     // region Fields
 
     public static final String GLOBAL_ENDPOINT;
+    public static final InetSocketAddress GLOBAL_ENDPOINT_ADDRESS;
     public static final String GLOBAL_ENDPOINT_HOSTNAME;
     public static final int GLOBAL_ENDPOINT_PORT;
-    public static final String USERNAME;
-    public static final String PASSWORD;
+    public static final String KEYSPACE_NAME = "test_driver_3";
     public static final boolean MULTI_REGION_WRITES;
+    public static final String PASSWORD;
     public static final List<String> PREFERRED_REGIONS;
     public static final List<InetSocketAddress> REGIONAL_ENDPOINTS;
-    public static final String TRUSTSTORE_PATH;
     public static final String TRUSTSTORE_PASSWORD;
-
-    public static final String KEYSPACE_NAME = "test_driver_3";
+    public static final String TRUSTSTORE_PATH;
+    public static final String USERNAME;
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
     private static final Map<String, String> PROPERTIES = new TreeMap<>();
@@ -101,6 +101,9 @@ public final class TestCommon {
             GLOBAL_ENDPOINT_PORT = Integer.parseUnsignedInt(GLOBAL_ENDPOINT.substring(index + 1));
         }
 
+        GLOBAL_ENDPOINT_ADDRESS = new InetSocketAddress(GLOBAL_ENDPOINT_HOSTNAME, GLOBAL_ENDPOINT_PORT);
+
+        setProperty("azure.cosmos.cassandra.global-endpoint-address", GLOBAL_ENDPOINT_ADDRESS);
         setProperty("azure.cosmos.cassandra.global-endpoint-hostname", GLOBAL_ENDPOINT_HOSTNAME);
         setProperty("azure.cosmos.cassandra.global-endpoint-port", GLOBAL_ENDPOINT_PORT);
 
@@ -163,23 +166,10 @@ public final class TestCommon {
 
         assertThat(value).isNotEmpty();
         TRUSTSTORE_PASSWORD = value;
-
-        out.println("--------------------------------------------------------------");
-        out.println("T E S T  P A R A M E T E R S");
-        out.println("--------------------------------------------------------------");
-
-        for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
-            out.println(property.getKey() + " = " + toJson(property.getValue()));
-        }
-
-        out.println();
     }
 
-    private static void setProperty(@NonNull final String name, @NonNull final Object value) {
-        final String string = value.toString();
-        PROPERTIES.put(name, string);
-        System.setProperty(name, string);
-        System.setProperty(getVariableName(name), string);
+    private TestCommon() {
+        throw new UnsupportedOperationException();
     }
 
     // endregion
@@ -208,6 +198,42 @@ public final class TestCommon {
             .withRetryPolicy(retryPolicy)
             .withPort(GLOBAL_ENDPOINT_PORT)
             .withSSL();
+    }
+
+    // endregion
+
+    // region Methods
+
+    /**
+     * Logs the name of each test before it is executed.
+     * <p>
+     * This method should be called in a test method marked with {@link BeforeEach}. It is not automatically called
+     * here.
+     *
+     * @param info Test info.
+     * @param log  The logger for the test.
+     */
+    public static void logTestName(final TestInfo info, final Logger log) {
+        log.info("---------------------------------------------------------------------------------------------------");
+        log.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
+        log.info("---------------------------------------------------------------------------------------------------");
+    }
+
+    /**
+     * Prints the set of test parameters to {@link System#out} before all tests are run.
+     * <p>
+     * This method should be called in a test method marked with {@link BeforeAll}. It is not automatically called here.
+     */
+    public static void printTestParameters() {
+        out.println("--------------------------------------------------------------");
+        out.println("T E S T  P A R A M E T E R S");
+        out.println("--------------------------------------------------------------");
+
+        for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
+            out.println(property.getKey() + " = " + toJson(property.getValue()));
+        }
+
+        out.println();
     }
 
     /**
@@ -260,7 +286,7 @@ public final class TestCommon {
      *
      * @param rows the results to display.
      */
-    static void display(final ResultSet rows) {
+    static void display(@NonNull final ResultSet rows) {
 
         final int width1 = 38;
         final int width2 = 12;
@@ -353,17 +379,6 @@ public final class TestCommon {
         return Arrays.asList(array);
     }
 
-    private static String getVariableName(final String property) {
-
-        final StringBuilder builder = new StringBuilder(property.length());
-
-        property.chars().forEachOrdered(c -> {
-            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
-        });
-
-        return builder.toString();
-    }
-
     /**
      * Queries data, retrying if necessary with a downgraded consistency level.
      *
@@ -394,129 +409,6 @@ public final class TestCommon {
 
         System.out.println("Read succeeded at " + consistencyLevel);
         return rows;
-    }
-
-    /**
-     * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
-     * <p>
-     * Hyphens are removed from the generated {@link UUID} before it is joined to the {@code prefix} with an underscore.
-     *
-     * @param prefix a string that starts the unique name.
-     *
-     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;</i>.
-     */
-    static String uniqueName(final String prefix) {
-        final UUID uuid = UUID.randomUUID();
-        final long suffix = uuid.getLeastSignificantBits() ^ uuid.getMostSignificantBits();
-        return prefix + '_' + Long.toUnsignedString(suffix, Character.MAX_RADIX);
-    }
-
-    /**
-     * Inserts data, retrying if necessary with a downgraded CL.
-     *
-     * @param session          the session for executing requests.
-     * @param consistencyLevel the consistency level to apply or {@code null}.
-     * @param keyspaceName     name of the keyspace to query.
-     * @param tableName        name of the table to query.
-     */
-    static void write(
-        final Session session,
-        final ConsistencyLevel consistencyLevel,
-        final String keyspaceName,
-        final String tableName) {
-
-        out.printf("Writing at %s%n", consistencyLevel);
-
-        final BatchStatement batch = new BatchStatement(UNLOGGED);
-
-        batch.add(new SimpleStatement(format(
-            "INSERT INTO %s.%s "
-                + "(sensor_id, date, timestamp, value) "
-                + "VALUES ("
-                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                + "'2018-02-26',"
-                + "'2018-02-26T13:53:46.345+01:00',"
-                + "2.34)",
-            keyspaceName,
-            tableName)));
-
-        batch.add(new SimpleStatement(format(
-            "INSERT INTO %s.%s "
-                + "(sensor_id, date, timestamp, value) "
-                + "VALUES ("
-                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                + "'2018-02-26',"
-                + "'2018-02-26T13:54:27.488+01:00',"
-                + "2.47)",
-            keyspaceName,
-            tableName)));
-
-        batch.add(new SimpleStatement(format(
-            "INSERT INTO %s.%s "
-                + "(sensor_id, date, timestamp, value) "
-                + "VALUES ("
-                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
-                + "'2018-02-26',"
-                + "'2018-02-26T13:56:33.739+01:00',"
-                + "2.52)",
-            keyspaceName,
-            tableName)));
-
-        batch.setConsistencyLevel(consistencyLevel);
-
-        session.execute(batch);
-        out.println("Write succeeded at " + consistencyLevel);
-    }
-
-    // endregion
-    
-    // region Privates
-    
-    /**
-     * Draws a line to isolate headings from rows.
-     *
-     * @param widths the column widths.
-     */
-    private static void drawLine(final int... widths) {
-        for (final int width : widths) {
-            for (int i = 1; i < width; i++) {
-                out.print('-');
-            }
-            out.print('+');
-        }
-        out.println();
-    }
-
-    /**
-     * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
-     * address.
-     * <p>
-     * Retrieve the {@code hostname} and {@code port} from the returned {@link Matcher Matcher} like this:
-     * <pre>{@code
-     * String hostname = matcher.group("hostname")
-     * String port = matcher.group("port")
-     * }</pre>
-     *
-     * @param value a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
-     *
-     * @return a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
-     * address.
-     */
-    @NonNull
-    private static Matcher matchSocketAddress(final String value) {
-        final Matcher matcher = HOSTNAME_AND_PORT.matcher(value);
-        assertThat(matcher.matches()).isTrue();
-        return matcher;
-    }
-
-    private static InetSocketAddress parseInetSocketAddress(final String value) {
-
-        final Matcher matcher = matchSocketAddress(value);
-
-        final String hostname = matcher.group("hostname");
-        final int port = Integer.parseUnsignedInt(matcher.group("port"));
-
-        return new InetSocketAddress(hostname, port);
     }
 
     static void testAllStatements(@NonNull final Session session) {
@@ -623,6 +515,150 @@ public final class TestCommon {
         } finally {
             cleanUp(session, tableName);
         }
+    }
+
+    /**
+     * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
+     * <p>
+     * Hyphens are removed from the generated {@link UUID} before it is joined to the {@code prefix} with an underscore.
+     *
+     * @param prefix a string that starts the unique name.
+     *
+     * @return a unique name of the form <i>&lt;prefix&gt;</i><b><code>_</code></b><i>&lt;random-uuid&gt;</i>.
+     */
+    @NonNull
+    static String uniqueName(@NonNull final String prefix) {
+
+        final UUID uuid = UUID.randomUUID();
+        final long id = uuid.getLeastSignificantBits() ^ uuid.getMostSignificantBits();
+
+        return prefix + Long.toUnsignedString(id, Character.MAX_RADIX);
+    }
+
+    /**
+     * Inserts data, retrying if necessary with a downgraded CL.
+     *
+     * @param session          the session for executing requests.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
+     * @param keyspaceName     name of the keyspace to query.
+     * @param tableName        name of the table to query.
+     */
+    static void write(
+        final Session session,
+        final ConsistencyLevel consistencyLevel,
+        final String keyspaceName,
+        final String tableName) {
+
+        out.printf("Writing at %s%n", consistencyLevel);
+
+        final BatchStatement batch = new BatchStatement(UNLOGGED);
+
+        batch.add(new SimpleStatement(format(
+            "INSERT INTO %s.%s "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:53:46.345+01:00',"
+                + "2.34)",
+            keyspaceName,
+            tableName)));
+
+        batch.add(new SimpleStatement(format(
+            "INSERT INTO %s.%s "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:54:27.488+01:00',"
+                + "2.47)",
+            keyspaceName,
+            tableName)));
+
+        batch.add(new SimpleStatement(format(
+            "INSERT INTO %s.%s "
+                + "(sensor_id, date, timestamp, value) "
+                + "VALUES ("
+                + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
+                + "'2018-02-26',"
+                + "'2018-02-26T13:56:33.739+01:00',"
+                + "2.52)",
+            keyspaceName,
+            tableName)));
+
+        batch.setConsistencyLevel(consistencyLevel);
+
+        session.execute(batch);
+        out.println("Write succeeded at " + consistencyLevel);
+    }
+
+    /**
+     * Draws a line to isolate headings from rows.
+     *
+     * @param widths the column widths.
+     */
+    private static void drawLine(final int... widths) {
+        for (final int width : widths) {
+            for (int i = 1; i < width; i++) {
+                out.print('-');
+            }
+            out.print('+');
+        }
+        out.println();
+    }
+
+    // endregion
+    
+    // region Privates
+    
+    private static String getVariableName(final String property) {
+
+        final StringBuilder builder = new StringBuilder(property.length());
+
+        property.chars().forEachOrdered(c -> {
+            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
+        });
+
+        return builder.toString();
+    }
+
+    /**
+     * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
+     * address.
+     * <p>
+     * Retrieve the {@code hostname} and {@code port} from the returned {@link Matcher Matcher} like this:
+     * <pre>{@code
+     * String hostname = matcher.group("hostname")
+     * String port = matcher.group("port")
+     * }</pre>
+     *
+     * @param value a socket address of the form <i>&lt;hostname&gt;</i><b>:</b><i>&lt;port&gt;</i>
+     *
+     * @return a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
+     * address.
+     */
+    @NonNull
+    private static Matcher matchSocketAddress(final String value) {
+        final Matcher matcher = HOSTNAME_AND_PORT.matcher(value);
+        assertThat(matcher.matches()).isTrue();
+        return matcher;
+    }
+
+    private static InetSocketAddress parseInetSocketAddress(final String value) {
+
+        final Matcher matcher = matchSocketAddress(value);
+
+        final String hostname = matcher.group("hostname");
+        final int port = Integer.parseUnsignedInt(matcher.group("port"));
+
+        return new InetSocketAddress(hostname, port);
+    }
+
+    private static void setProperty(@NonNull final String name, @NonNull final Object value) {
+        final String string = value.toString();
+        PROPERTIES.put(name, string);
+        System.setProperty(name, string);
+        System.setProperty(getVariableName(name), string);
     }
 
     // endregion
