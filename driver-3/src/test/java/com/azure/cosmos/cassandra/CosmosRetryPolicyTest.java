@@ -41,6 +41,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -136,7 +137,7 @@ public class CosmosRetryPolicyTest {
     @Test
     @Tag("checkin")
     @Tag("integration")
-    //@Timeout(2 * TIMEOUT_IN_SECONDS)
+    @Timeout(120)
     public void canRetryAsExpectedWhenThrottled() {
 
         // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
