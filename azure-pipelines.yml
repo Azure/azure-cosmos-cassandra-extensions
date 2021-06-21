@@ -43,15 +43,15 @@ variables:
 - name: Stage-Artifacts
   value: |
     $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *.jar -Exclude *-sources.jar,*-javadoc.jar).Name)
-    $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY $packageName)
+    $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
 
     Copy-Item *.jar $targetDirectory
     Copy-Item ../pom.xml $targetDirectory/$packageName.pom
 
     $packageName = $packageName.Split("-extensions-") -join "-"
-    $targetDirectory = New-Item -ErrorAction SilentlyContinue -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+    $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY $packageName)
 
-    Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
+    Copy-Item (Join-Path .., .., pom.xml, $targetDirectory, $packageName.pom)
   readonly: true
 
 - name: Update-GithubSubmodules
