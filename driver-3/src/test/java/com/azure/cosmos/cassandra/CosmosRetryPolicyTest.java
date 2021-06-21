@@ -53,6 +53,7 @@ import static com.azure.cosmos.cassandra.TestCommon.cosmosClusterBuilder;
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -137,7 +138,7 @@ public class CosmosRetryPolicyTest {
     @Test
     @Tag("checkin")
     @Tag("integration")
-    @Timeout(120)
+    @Timeout(value = 5, unit = MINUTES)
     public void canRetryAsExpectedWhenThrottled() {
 
         // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
