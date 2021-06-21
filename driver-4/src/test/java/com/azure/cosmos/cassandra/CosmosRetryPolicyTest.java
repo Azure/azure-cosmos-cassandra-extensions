@@ -346,7 +346,8 @@ public final class CosmosRetryPolicyTest {
      */
     @BeforeAll
     @Timeout(TIMEOUT_IN_SECONDS)
-    public static void connect() {
+    public static void init() {
+        TestCommon.printTestParameters();
         session = checkState(CqlSession.builder().build());
     }
 
@@ -357,9 +358,7 @@ public final class CosmosRetryPolicyTest {
      */
     @BeforeEach
     public void logTestName(final TestInfo info) {
-        LOG.info("---------------------------------------------------------------------------------------------------");
-        LOG.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
-        LOG.info("---------------------------------------------------------------------------------------------------");
+        TestCommon.logTestName(info, LOG);
     }
 
     /**

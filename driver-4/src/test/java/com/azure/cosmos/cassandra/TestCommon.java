@@ -21,6 +21,9 @@ import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.update.Update;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -48,10 +51,6 @@ import static org.assertj.core.api.Assertions.fail;
  * A utility class that implements common static methods useful for writing tests.
  */
 public final class TestCommon {
-
-    private TestCommon() {
-        throw new UnsupportedOperationException();
-    }
 
     // region Fields
 
@@ -161,10 +160,31 @@ public final class TestCommon {
         TRUSTSTORE_PASSWORD = value;
     }
 
+    private TestCommon() {
+        throw new UnsupportedOperationException();
+    }
+
+    // endregion
+
+    // region Methods
+
+    /**
+     * Logs the name of each test before it is executed.
+     *
+     * @param info Test info.
+     * @param log  The logger for the test.
+     */
+    public static void logTestName(final TestInfo info, final Logger log) {
+        log.info("---------------------------------------------------------------------------------------------------");
+        log.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
+        log.info("---------------------------------------------------------------------------------------------------");
+    }
+
     /**
      * Prints the set of test parameters to {@link System#out} before all tests are run.
+     * <p>
+     * This method should be called in a test method marked with {@link BeforeAll}. It is not automatically called here.
      */
-    @BeforeAll
     public static void printTestParameters() {
         out.println("--------------------------------------------------------------");
         out.println("T E S T  P A R A M E T E R S");
@@ -214,10 +234,6 @@ public final class TestCommon {
             fail("could not create schema due to: {}", toJson(error));
         }
     }
-
-    // endregion
-
-    // region Methods
 
     /**
      * Displays the results on the console.
@@ -560,6 +576,10 @@ public final class TestCommon {
         out.println("Write succeeded at " + consistencyLevel);
     }
 
+    // endregion
+
+    // region Privates
+
     /**
      * Draws a line to isolate headings from rows.
      *
@@ -586,10 +606,6 @@ public final class TestCommon {
         return builder.toString();
     }
 
-    // endregion
-    
-    // region Privates
-    
     /**
      * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
      * address.

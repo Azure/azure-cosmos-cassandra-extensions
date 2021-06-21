@@ -16,7 +16,10 @@ import com.datastax.oss.driver.internal.core.connection.ConstantReconnectionPoli
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.assertj.core.api.Condition;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -65,6 +68,24 @@ public final class CosmosLoadBalancingPolicyTest {
     // endregion
 
     // region Methods
+
+    /**
+     * Prints the parameters for this test class on {@link System#out}.
+     */
+    @BeforeAll
+    public static void init() {
+        TestCommon.printTestParameters();
+    }
+
+    /**
+     * Logs the name of each test before it is executed.
+     *
+     * @param info Test info.
+     */
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        TestCommon.logTestName(info, LOG);
+    }
 
     /**
      * Verifies that a {@link CosmosLoadBalancingPolicy} with preferred regions routes requests correctly.

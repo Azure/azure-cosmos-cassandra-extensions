@@ -23,6 +23,7 @@ import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
@@ -98,13 +99,10 @@ public class CosmosCassandraIntegrationTest {
 
     // region Fields
 
-    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
-
     static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
         getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.consistency-level",
             "QUORUM"));
-
     static final File REPORTING_DIRECTORY = new File(
         getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.reporting-directory",
@@ -114,7 +112,7 @@ public class CosmosCassandraIntegrationTest {
                 "var",
                 "lib",
                 "azure-cosmos-cassandra-driver-4-extensions").toString()));
-
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
     private static final String TABLE_NAME = uniqueName("sensor_data_");
     private static final int TIMEOUT_IN_SECONDS = 30;
 
@@ -222,9 +220,7 @@ public class CosmosCassandraIntegrationTest {
     @BeforeAll
     public static void init(final TestInfo info) {
 
-        LOG.info("---------------------------------------------------------------------------------------------------");
-        LOG.info("{}", info.getTestClass().orElseGet(() -> fail("expected test to be called with test class")));
-        LOG.info("---------------------------------------------------------------------------------------------------");
+        TestCommon.printTestParameters();
 
         if (REPORTING_DIRECTORY.exists()) {
             final Path path = REPORTING_DIRECTORY.toPath();
@@ -232,6 +228,16 @@ public class CosmosCassandraIntegrationTest {
         }
 
         assertThatCode(REPORTING_DIRECTORY::mkdirs).doesNotThrowAnyException();
+    }
+
+    /**
+     * Logs the name of each test before it is executed.
+     *
+     * @param info Test info.
+     */
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        TestCommon.logTestName(info, LOG);
     }
 
     // region Privates
