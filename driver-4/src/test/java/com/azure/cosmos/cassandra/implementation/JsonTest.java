@@ -81,6 +81,12 @@ public class JsonTest {
     private static Stream<Arguments> provideSession() {
 
         final CqlSession session = CqlSession.builder().build();
+
+        assertThatCode(() ->
+            // Give the driver time to initialize all regional endpoints
+            // node addresses are not resolved until then
+            Thread.sleep(2_000)).doesNotThrowAnyException();
+
         final DefaultDriverContext driverContext = (DefaultDriverContext) session.getContext();
         final Metadata metadata = session.getMetadata();
 
@@ -252,7 +258,10 @@ public class JsonTest {
 
         try (CqlSession session = CqlSession.builder().build()) {
 
-            assertThatCode(() -> Thread.sleep(2_000)).doesNotThrowAnyException();
+            assertThatCode(() ->
+                // Give the driver time to initialize all regional endpoints
+                // node addresses are not resolved until then
+                Thread.sleep(2_000)).doesNotThrowAnyException();
 
             return Stream.of(
                 Arguments.of(
