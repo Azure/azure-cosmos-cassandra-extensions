@@ -348,7 +348,7 @@ public final class CosmosRetryPolicyTest {
     @Timeout(TIMEOUT_IN_SECONDS)
     public static void init() {
         TestCommon.printTestParameters();
-        session = checkState(CqlSession.builder().build());
+        session = checkState(CqlSession.builder().build(), 2_000L);
     }
 
     /**
@@ -376,7 +376,11 @@ public final class CosmosRetryPolicyTest {
 
     // region Privates
 
-    private static CqlSession checkState(final CqlSession session) {
+    private static CqlSession checkState(final CqlSession session, final long delayInMillis) {
+
+        if (delayInMillis > 0) {
+            assertThatCode(() -> Thread.sleep(delayInMillis)).doesNotThrowAnyException();
+        }
 
         final DriverContext context = session.getContext();
         final DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
