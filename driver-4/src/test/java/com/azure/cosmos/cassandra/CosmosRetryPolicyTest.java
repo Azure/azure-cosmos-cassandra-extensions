@@ -50,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_ADDRESS;
@@ -64,6 +65,7 @@ import static com.azure.cosmos.cassandra.TestCommon.write;
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES;
 import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES_ON_OTHER_ERROR;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
@@ -189,7 +191,7 @@ public final class CosmosRetryPolicyTest {
     @Test
     @Tag("checkin")
     @Tag("integration")
-    @Timeout(2 * TIMEOUT_IN_SECONDS)
+    @Timeout(value = 5, unit = MINUTES)
     public void canRetryAsExpectedWhenThrottled() {
 
         // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
