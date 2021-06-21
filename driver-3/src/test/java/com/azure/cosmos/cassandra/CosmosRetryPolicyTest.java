@@ -180,7 +180,7 @@ public class CosmosRetryPolicyTest {
 
                     final ResultSetFuture future = session.executeAsync(statement);
 
-                    Futures.addCallback(future, new FutureCallback<>() {
+                    Futures.addCallback(future, new FutureCallback<ResultSet>() {
                         @Override
                         public void onFailure(@NonNull final Throwable error) {
 
