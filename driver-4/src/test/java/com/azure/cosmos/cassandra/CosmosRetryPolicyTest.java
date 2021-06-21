@@ -52,7 +52,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT;
+import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_ADDRESS;
 import static com.azure.cosmos.cassandra.TestCommon.KEYSPACE_NAME;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
@@ -421,7 +421,7 @@ public final class CosmosRetryPolicyTest {
         final RetryDecision expectedRetryDecision) {
 
         final CoordinatorException coordinatorException = new OverloadedException(new DefaultNode(
-            new DefaultEndPoint(GLOBAL_ENDPOINT),
+            new DefaultEndPoint(GLOBAL_ENDPOINT_ADDRESS),
             (InternalDriverContext) session.getContext()));
 
         final Request request = SimpleStatement.newInstance("SELECT * FROM retry");

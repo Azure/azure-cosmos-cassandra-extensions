@@ -7,7 +7,6 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.annotation.JsonAppend;
-import com.fasterxml.jackson.databind.annotation.JsonAppend.Prop;
 
 /**
  * A mix-in for serializing {@link Request} instances to JSON for use in log messages.

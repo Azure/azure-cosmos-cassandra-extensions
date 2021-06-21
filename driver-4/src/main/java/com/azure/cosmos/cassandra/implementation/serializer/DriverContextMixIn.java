@@ -12,11 +12,14 @@ import com.fasterxml.jackson.databind.annotation.JsonAppend;
  * A mix-in for serializing {@link DriverContext} instances to JSON for use in log messages.
  */
 @JsonAppend()
-@JsonPropertyOrder(value = { "sessionName" }, alphabetic = true)
+@JsonPropertyOrder(value = { "sessionName", "protocolVersion", "startupOptions" }, alphabetic = true)
 @JsonIncludeProperties({
+    "authProvider",
     "loadBalancingPolicies",
     "protocolVersion",
-    "reconnectionPolicies",
+    "reconnectionPolicy",
+    "requestThrottler",
+    "requestTracker",
     "retryPolicies",
     "sessionName",
     "speculativeExecutionPolicies",

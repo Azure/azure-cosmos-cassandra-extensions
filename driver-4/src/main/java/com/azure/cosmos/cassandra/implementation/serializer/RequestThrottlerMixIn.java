@@ -3,14 +3,14 @@
 
 package com.azure.cosmos.cassandra.implementation.serializer;
 
-import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.fasterxml.jackson.databind.annotation.JsonAppend;
 import com.fasterxml.jackson.databind.annotation.JsonAppend.Prop;
 
 /**
- * A mix-in for serializing {@link LoadBalancingPolicy} instances to JSON for use in log messages.
+ * A mix-in for serializing {@link RequestThrottler} instances to JSON for use in log messages.
  */
 @JsonAppend(props = @Prop(value = TypePropertyWriter.class, name = "type", type = String.class), prepend = true)
-public abstract class LoadBalancingPolicyMixIn {
-    public static final Class<LoadBalancingPolicy> HANDLED_TYPE = LoadBalancingPolicy.class;
+public abstract class RequestThrottlerMixIn {
+    public static final Class<RequestThrottler> HANDLED_TYPE = RequestThrottler.class;
 }

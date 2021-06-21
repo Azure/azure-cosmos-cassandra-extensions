@@ -8,14 +8,24 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
+import com.datastax.oss.driver.api.querybuilder.delete.Delete;
+import com.datastax.oss.driver.api.querybuilder.insert.Insert;
+import com.datastax.oss.driver.api.querybuilder.select.Select;
+import com.datastax.oss.driver.api.querybuilder.update.Update;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.junit.jupiter.api.BeforeAll;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +37,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.azure.cosmos.cassandra.implementation.Json.toJson;
+import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
@@ -43,17 +55,20 @@ public final class TestCommon {
 
     // region Fields
 
-    public static final InetSocketAddress GLOBAL_ENDPOINT;
-    static final String LOCAL_DATACENTER;
-    static final List<String> PREFERRED_REGIONS;
-    static final List<SocketAddress> REGIONAL_ENDPOINTS;
-    static final String TRUSTSTORE_PATH;
-    static final String TRUSTSTORE_PASSWORD;
-
-    static final String KEYSPACE_NAME = "test_common";
+    public static final String GLOBAL_ENDPOINT;
+    public static final InetSocketAddress GLOBAL_ENDPOINT_ADDRESS;
+    public static final String GLOBAL_ENDPOINT_HOSTNAME;
+    public static final int GLOBAL_ENDPOINT_PORT;
+    public static final String KEYSPACE_NAME = "test_driver_4";
+    public static final boolean MULTI_REGION_WRITES;
+    public static final String PASSWORD;
+    public static final List<String> PREFERRED_REGIONS;
+    public static final List<InetSocketAddress> REGIONAL_ENDPOINTS;
+    public static final String TRUSTSTORE_PASSWORD;
+    public static final String TRUSTSTORE_PATH;
+    public static final String USERNAME;
 
     private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
-
     private static final Map<String, String> PROPERTIES = new TreeMap<>();
 
     static {
@@ -62,10 +77,55 @@ public final class TestCommon {
 
         String value = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.global-endpoint",
+            "localhost");
+
+        assertThat(value).isNotBlank();
+        final int index = value.lastIndexOf(':');
+
+        if (index == -1) {
+            GLOBAL_ENDPOINT = value + ":10350";
+            GLOBAL_ENDPOINT_HOSTNAME = value;
+            GLOBAL_ENDPOINT_PORT = 10350;
+        } else {
+            assertThat(index).isGreaterThan(0);
+            assertThat(index).isLessThan(value.length() - 1);
+            GLOBAL_ENDPOINT = value;
+            GLOBAL_ENDPOINT_HOSTNAME = GLOBAL_ENDPOINT.substring(0, index);
+            GLOBAL_ENDPOINT_PORT = Integer.parseUnsignedInt(GLOBAL_ENDPOINT.substring(index + 1));
+        }
+
+        GLOBAL_ENDPOINT_ADDRESS = new InetSocketAddress(GLOBAL_ENDPOINT_HOSTNAME, GLOBAL_ENDPOINT_PORT);
+
+        setProperty("azure.cosmos.cassandra.global-endpoint-address", GLOBAL_ENDPOINT_ADDRESS);
+        setProperty("azure.cosmos.cassandra.global-endpoint-hostname", GLOBAL_ENDPOINT_HOSTNAME);
+        setProperty("azure.cosmos.cassandra.global-endpoint-port", GLOBAL_ENDPOINT_PORT);
+
+        // USERNAME
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.username",
             null);
 
         assertThat(value).isNotBlank();
-        GLOBAL_ENDPOINT = parseSocketAddress(value);
+        USERNAME = value;
+
+        // PASSWORD
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.password",
+            null);
+
+        assertThat(value).isNotBlank();
+        PASSWORD = value;
+
+        // MULTI_REGION_WRITES
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.multi-region-writes",
+            "true");
+
+        assertThat(value).isNotBlank();
+        MULTI_REGION_WRITES = Boolean.parseBoolean(value);
 
         // PREFERRED_REGIONS
 
@@ -76,14 +136,6 @@ public final class TestCommon {
         assertThat(list).isNotEmpty();
         PREFERRED_REGIONS = list;
 
-        // LOCAL_DATACENTER
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.local-datacenter",
-            PREFERRED_REGIONS.get(0));
-
-        LOCAL_DATACENTER = value;
-
         // REGIONAL_ENDPOINTS
 
         list = getPropertyOrEnvironmentVariableList(
@@ -91,7 +143,7 @@ public final class TestCommon {
             "azure.cosmos.cassandra.regional-endpoint-");
 
         assertThat(list).isNotEmpty();
-        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseInetSocketAddress).collect(Collectors.toList());
 
         value = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.truststore-path",
@@ -107,21 +159,23 @@ public final class TestCommon {
 
         assertThat(value).isNotEmpty();
         TRUSTSTORE_PASSWORD = value;
+    }
 
+    /**
+     * Prints the set of test parameters to {@link System#out} before all tests are run.
+     */
+    @BeforeAll
+    public static void printTestParameters() {
         out.println("--------------------------------------------------------------");
         out.println("T E S T  P A R A M E T E R S");
         out.println("--------------------------------------------------------------");
 
         for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
-            out.println(property.getKey() + " = " + property.getValue());
+            out.println(property.getKey() + " = " + toJson(property.getValue()));
         }
 
         out.println();
     }
-
-    // endregion
-
-    // region Methods
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
@@ -157,10 +211,13 @@ public final class TestCommon {
             Thread.sleep(5_000L);  // allows time for schema propagation
 
         } catch (final Throwable error) {
-            //noinspection ResultOfMethodCallIgnored
             fail("could not create schema due to: {}", toJson(error));
         }
     }
+
+    // endregion
+
+    // region Methods
 
     /**
      * Displays the results on the console.
@@ -258,17 +315,6 @@ public final class TestCommon {
         return Arrays.asList(array);
     }
 
-    private static String getVariableName(final String property) {
-
-        final StringBuilder builder = new StringBuilder(property.length());
-
-        property.chars().forEachOrdered(c -> {
-            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
-        });
-
-        return builder.toString();
-    }
-
     /**
      * Queries data, retrying if necessary with a downgraded consistency level.
      *
@@ -336,6 +382,124 @@ public final class TestCommon {
         return session.executeAsync(statement).toCompletableFuture();
     }
 
+    @SuppressWarnings("SameParameterValue")
+    static void testAllStatements(@NonNull final CqlSession session) {
+
+        final String tableName = uniqueName("sensor_data_");
+
+        try {
+
+            createSchema(session, KEYSPACE_NAME, tableName, 10_000);
+
+            // SimpleStatements
+
+            session.execute(SimpleStatement.newInstance(format(
+                "SELECT * FROM %s.%s WHERE sensor_id=uuid() and date=toDate(now())",
+                KEYSPACE_NAME,
+                tableName)));
+
+            session.execute(SimpleStatement.newInstance(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
+                KEYSPACE_NAME,
+                tableName)));
+
+            session.execute(SimpleStatement.newInstance(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp=toTimestamp("
+                    + "now())",
+                KEYSPACE_NAME,
+                tableName)));
+
+            session.execute(SimpleStatement.newInstance(format(
+                "DELETE FROM %s.%s WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp=toTimestamp(now())",
+                KEYSPACE_NAME,
+                tableName)));
+
+            // Built statements
+
+            final LocalDate date = LocalDate.of(2016, 6, 30);
+            final Instant timestamp = Instant.now();
+            final UUID uuid = UUID.randomUUID();
+
+            final Select select = QueryBuilder.selectFrom(KEYSPACE_NAME, tableName)
+                .all()
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
+            session.execute(select.build());
+
+            final Insert insert = QueryBuilder.insertInto(KEYSPACE_NAME, tableName)
+                .value("sensor_id", literal(uuid))
+                .value("date", literal(date))
+                .value("timestamp", literal(timestamp));
+
+            session.execute(insert.build());
+
+            final Update update = QueryBuilder.update(KEYSPACE_NAME, tableName)
+                .setColumn("value", literal(1.0))
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
+            session.execute(update.build());
+
+            final Delete delete = QueryBuilder.deleteFrom(KEYSPACE_NAME, tableName)
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
+            session.execute(delete.build());
+
+            // BoundStatements
+
+            PreparedStatement preparedStatement = session.prepare(format(
+                "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
+                KEYSPACE_NAME,
+                tableName));
+
+            BoundStatement boundStatement = preparedStatement.bind(uuid, date);
+            session.execute(boundStatement);
+
+            preparedStatement = session.prepare(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
+                KEYSPACE_NAME,
+                tableName));
+
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
+
+            preparedStatement = session.prepare(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                KEYSPACE_NAME,
+                tableName));
+
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
+
+            preparedStatement = session.prepare(format(
+                "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                KEYSPACE_NAME,
+                tableName));
+
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
+
+            // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
+
+            final BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
+                .add(boundStatement)
+                .add(boundStatement);
+
+            session.execute(batchStatement);
+
+        } finally {
+            assertThatCode(() -> session.execute(SchemaBuilder.dropTable(KEYSPACE_NAME, tableName)
+                .ifExists()
+                .build()))
+                .doesNotThrowAnyException();
+        }
+    }
+
     /**
      * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
      * <p>
@@ -396,10 +560,6 @@ public final class TestCommon {
         out.println("Write succeeded at " + consistencyLevel);
     }
 
-    // endregion
-    
-    // region Privates
-    
     /**
      * Draws a line to isolate headings from rows.
      *
@@ -415,6 +575,21 @@ public final class TestCommon {
         out.println();
     }
 
+    private static String getVariableName(final String property) {
+
+        final StringBuilder builder = new StringBuilder(property.length());
+
+        property.chars().forEachOrdered(c -> {
+            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
+        });
+
+        return builder.toString();
+    }
+
+    // endregion
+    
+    // region Privates
+    
     /**
      * Returns a {@link Matcher Matcher} that matches the {@code hostname} and {@code port} parts of a network socket
      * address.
@@ -437,7 +612,7 @@ public final class TestCommon {
         return matcher;
     }
 
-    private static InetSocketAddress parseSocketAddress(final String value) {
+    private static InetSocketAddress parseInetSocketAddress(final String value) {
 
         final Matcher matcher = matchSocketAddress(value);
 
@@ -445,6 +620,13 @@ public final class TestCommon {
         final int port = Integer.parseUnsignedInt(matcher.group("port"));
 
         return new InetSocketAddress(hostname, port);
+    }
+
+    private static void setProperty(@NonNull final String name, @NonNull final Object value) {
+        final String string = value.toString();
+        PROPERTIES.put(name, string);
+        System.setProperty(name, string);
+        System.setProperty(getVariableName(name), string);
     }
 
     // endregion

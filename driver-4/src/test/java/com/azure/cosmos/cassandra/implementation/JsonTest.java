@@ -9,10 +9,12 @@ import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Tag;
@@ -48,14 +50,16 @@ public class JsonTest {
         assertThat(observed).isEqualTo(expected);
     }
 
+    @SuppressWarnings({ "TryFinallyCanBeTryWithResources" })
     @ParameterizedTest
     @Tag("checkin")
     @MethodSource("provideSession")
-    public void canSerializeSession(final Session session) {
+    public void canSerializeSession(@NonNull final Session input, @NonNull final String expected) {
         try {
-            final String json = toJson(session);
+            final String observed = toJson(input);
+            assertThat(observed).isEqualTo(expected);
         } finally {
-            session.close();
+            input.close();
         }
     }
 
@@ -75,7 +79,48 @@ public class JsonTest {
 
     @NonNull
     private static Stream<Arguments> provideSession() {
-        return Stream.of(Arguments.of(CqlSession.builder().build()));
+
+        final CqlSession session = CqlSession.builder().build();
+        final DefaultDriverContext driverContext = (DefaultDriverContext) session.getContext();
+        final Metadata metadata = session.getMetadata();
+
+        return Stream.of(Arguments.of(session, format("{\"name\":%s,"
+                + "\"context\":{"
+                + "\"sessionName\":%s,"
+                + "\"protocolVersion\":%s,"
+                + "\"startupOptions\":%s,"
+                + "\"authProvider\":%s,"
+                + "\"loadBalancingPolicies\":{\"default\":%s},"
+                + "\"reconnectionPolicy\":%s,"
+                + "\"requestThrottler\":%s,"
+                + "\"requestTracker\":%s,"
+                + "\"retryPolicies\":{\"default\":%s},"
+                + "\"speculativeExecutionPolicies\":{\"default\":%s}"
+                + "},"
+                + "\"keyspace\":null,"
+                + "\"metadata\":{"
+                + "\"nodes\":%s,"
+                + "\"keyspaces\":%s,"
+                + "\"tokenMap\":null,"
+                + "\"clusterName\":%s"
+                + "},"
+                + "\"metrics\":%s"
+                + "}",
+            toJson(session.getName()),
+            toJson(driverContext.getSessionName()),
+            toJson(driverContext.getProtocolVersion()),
+            toJson(driverContext.getStartupOptions()),
+            toJson(driverContext.getAuthProvider()),
+            toJson(driverContext.getLoadBalancingPolicy("default")),
+            toJson(driverContext.getReconnectionPolicy()),
+            toJson(driverContext.getRequestThrottler()),
+            toJson(driverContext.getRequestTracker()),
+            toJson(driverContext.getRetryPolicy("default")),
+            toJson(driverContext.getSpeculativeExecutionPolicy("default")),
+            toJson(metadata.getNodes()),
+            toJson(metadata.getKeyspaces()),
+            toJson(metadata.getClusterName()),
+            toJson(session.getMetrics()))));
     }
 
     @NonNull
@@ -201,12 +246,13 @@ public class JsonTest {
                     + "\"serialConsistencyLevel\":null,\"timeout\":null,\"tracing\":false}"));
     }
 
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11")
     @NonNull
     private static Stream<Arguments> provideThrowables() {
 
         try (CqlSession session = CqlSession.builder().build()) {
 
-            assertThatCode(() -> Thread.sleep(1_000)).doesNotThrowAnyException();
+            assertThatCode(() -> Thread.sleep(2_000)).doesNotThrowAnyException();
 
             return Stream.of(
                 Arguments.of(
