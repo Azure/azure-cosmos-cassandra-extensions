@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,6 +136,10 @@ public class CosmosRetryPolicyTest {
     @SuppressFBWarnings({ "SIC_INNER_SHOULD_BE_STATIC_ANON" })
     @SuppressWarnings({ "UnstableApiUsage" })
     @Test
+    @DisabledIfEnvironmentVariable(
+        named = "BUILD_BUILDID",
+        matches = ".+",
+        disabledReason = "Unreliable in concurrent cross-platform CI test runs")
     @Tag("checkin")
     @Tag("integration")
     @Timeout(value = 5, unit = MINUTES)
