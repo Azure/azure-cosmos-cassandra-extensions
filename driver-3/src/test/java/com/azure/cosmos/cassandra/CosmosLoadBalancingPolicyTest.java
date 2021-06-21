@@ -54,7 +54,7 @@ public final class CosmosLoadBalancingPolicyTest {
     // region Fields
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-    private static final int TIMEOUT_IN_SECONDS = 240;
+    private static final int TIMEOUT_IN_SECONDS = 300;
 
     // endregion
 
