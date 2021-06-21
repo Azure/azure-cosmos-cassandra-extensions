@@ -51,7 +51,6 @@ import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Shows how to use the Cosmos extensions for DataStax Java Driver 4 for Apache Cassandra.

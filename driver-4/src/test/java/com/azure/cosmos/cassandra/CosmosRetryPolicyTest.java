@@ -50,7 +50,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_ADDRESS;
@@ -68,7 +67,6 @@ import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.fail;
 
 /**
  * This test illustrates use of the {@link CosmosRetryPolicy} class.
@@ -135,7 +133,7 @@ public final class CosmosRetryPolicyTest {
     private static final int MAX_RETRIES = CosmosRetryPolicyOption.MAX_RETRIES.getDefaultValue(Integer.class);
 
     private static final String TABLE_NAME = uniqueName("sensor_data_");
-    private static final int TIMEOUT_IN_SECONDS = 60;
+    private static final int TIMEOUT_IN_SECONDS = 30;
 
     private static CqlSession session = null;
 
