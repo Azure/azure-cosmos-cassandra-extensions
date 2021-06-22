@@ -30,16 +30,16 @@ public final class MetadataSerializer extends StdSerializer<Metadata> {
     public void serialize(
         @NonNull final Metadata value,
         @NonNull final JsonGenerator generator,
-        @NonNull final SerializerProvider serializerProvider) throws IOException {
+        @NonNull final SerializerProvider provider) throws IOException {
 
         requireNonNull(value, "expected non-null value");
         requireNonNull(value, "expected non-null generator");
-        requireNonNull(value, "expected non-null serializerProvider");
+        requireNonNull(value, "expected non-null provider");
 
         generator.writeStartObject();
-        serializerProvider.defaultSerializeField("clusterName", value.getClusterName(), generator);
-        serializerProvider.defaultSerializeField("hosts", value.getAllHosts(), generator);
-        serializerProvider.defaultSerializeField("keyspaces", value.getKeyspaces(), generator);
+        provider.defaultSerializeField("clusterName", value.getClusterName(), generator);
+        provider.defaultSerializeField("hosts", value.getAllHosts(), generator);
+        provider.defaultSerializeField("keyspaces", value.getKeyspaces(), generator);
         generator.writeEndObject();
     }
 }

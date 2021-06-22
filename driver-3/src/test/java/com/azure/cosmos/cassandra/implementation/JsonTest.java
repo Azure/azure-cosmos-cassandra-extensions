@@ -8,6 +8,7 @@ import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.AuthenticationException;
@@ -65,7 +66,7 @@ public class JsonTest {
 
             final Map<String, Object> expected;
 
-            json =  format("{\"clusterName\":\"%s\",\"closed\":%s,\"metadata\":%s,\"metrics\":%s}",
+            json = format("{\"clusterName\":\"%s\",\"closed\":%s,\"metadata\":%s,\"metrics\":%s}",
                 cluster.getClusterName(),
                 cluster.isClosed(),
                 toJson(cluster.getMetadata()),
@@ -98,25 +99,6 @@ public class JsonTest {
     @ParameterizedTest
     @Tag("checkin")
     @MethodSource("provideClusterBuilder")
-    public void canSerializeMetadata(final Cluster.Builder builder) {
-
-        try (Cluster cluster = builder.build()) {
-
-            final Metadata metadata = cluster.getMetadata();
-            final String observed = toJson(metadata);
-
-            final String expected = format("{\"clusterName\":\"%s\",\"hosts\":%s,\"keyspaces\":%s}",
-                metadata.getClusterName(),
-                toJson(metadata.getAllHosts()),
-                toJson(metadata.getKeyspaces().stream().map(KeyspaceMetadata::toString).collect(Collectors.toList())));
-
-            assertThat(observed).isEqualTo(expected);
-        }
-    }
-
-    @ParameterizedTest
-    @Tag("checkin")
-    @MethodSource("provideClusterBuilder")
     public void canSerializeHost(final Cluster.Builder builder) {
 
         try (Cluster cluster = builder.build()) {
@@ -140,9 +122,40 @@ public class JsonTest {
         }
     }
 
+    @ParameterizedTest
+    @Tag("checkin")
+    @MethodSource("provideClusterBuilder")
+    public void canSerializeMetadata(final Cluster.Builder builder) {
+
+        try (Cluster cluster = builder.build()) {
+
+            final Metadata metadata = cluster.getMetadata();
+            final String observed = toJson(metadata);
+
+            final String expected = format("{\"clusterName\":\"%s\",\"hosts\":%s,\"keyspaces\":%s}",
+                metadata.getClusterName(),
+                toJson(metadata.getAllHosts()),
+                toJson(metadata.getKeyspaces().stream().map(KeyspaceMetadata::toString).collect(Collectors.toList())));
+
+            assertThat(observed).isEqualTo(expected);
+        }
+    }
+
     @ParameterizedTest()
     @Tag("checkin")
-    @MethodSource("provideStatements")
+    @MethodSource("provideSession")
+    public void canSerializeSession(@NonNull final Session input, @NonNull final String expected) {
+        try {
+            final String observed = toJson(input);
+            assertThat(observed).isEqualTo(expected);
+        } finally {
+            input.getCluster().close();
+        }
+    }
+
+    @ParameterizedTest()
+    @Tag("checkin")
+    @MethodSource("provideStatement")
     public void canSerializeStatement(@NonNull final Statement input, @NonNull final String expected) {
         final String observed = toJson(input);
         assertThat(observed).isEqualTo(expected);
@@ -150,8 +163,8 @@ public class JsonTest {
 
     @ParameterizedTest()
     @Tag("checkin")
-    @MethodSource("provideThrowables")
-    public void canSerializeThrowables(@NonNull final Throwable input, @NonNull final String expected) {
+    @MethodSource("provideThrowable")
+    public void canSerializeThrowable(@NonNull final Throwable input, @NonNull final String expected) {
         final String value = toJson(input);
         assertThat(value).isEqualTo(expected);
     }
@@ -170,11 +183,34 @@ public class JsonTest {
     }
 
     @NonNull
-    private static Stream<Arguments> provideStatements() {
+    private static Stream<Arguments> provideSession() {
+
+        final Cluster cluster = cosmosClusterBuilder()
+            .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
+            .withCredentials(USERNAME, PASSWORD)
+            .withoutMetrics()
+            .build();
+
+        final Session session = cluster.connect();
+
+        return Stream.of(Arguments.of(session, format("{\"cluster\":{"
+                + "\"clusterName\":%s,"
+                + "\"closed\":false,"
+                + "\"metadata\":%s,"
+                + "\"metrics\":%s},"
+                + "\"closed\":false,"
+                + "\"loggedKeyspace\":null}",
+            toJson(cluster.getClusterName()),
+            toJson(cluster.getMetadata()),
+            toJson(cluster.getMetrics()))));
+    }
+
+    @NonNull
+    private static Stream<Arguments> provideStatement() {
         return Stream.of(
             Arguments.of(new SimpleStatement("CREATE KEYSPACE IF NOT EXISTS keyspace "
-                + "WITH replication = {'class':'SimpleStrategy','replication_factor':3} "
-                + "WITH cosmosdb_provisioned_throughput=400"),
+                    + "WITH replication = {'class':'SimpleStrategy','replication_factor':3} "
+                    + "WITH cosmosdb_provisioned_throughput=400"),
                 "{\"queryString\":\"CREATE KEYSPACE IF NOT EXISTS keyspace WITH replication = "
                     + "{'class':'SimpleStrategy','replication_factor':3} WITH cosmosdb_provisioned_throughput=400\","
                     + "\"tracing\":false,\"fetchSize\":0,\"readTimeoutMillis\":-2147483648,"
@@ -238,7 +274,7 @@ public class JsonTest {
     }
 
     @NonNull
-    private static Stream<Arguments> provideThrowables() {
+    private static Stream<Arguments> provideThrowable() {
 
         final Cluster.Builder builder = cosmosClusterBuilder()
             .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
@@ -252,9 +288,9 @@ public class JsonTest {
                     globalEndPoint,
                     "Indicates an error during the authentication phase while connecting to a node.")),
                 format("{\"error\":\"com.datastax.driver.core.exceptions.AuthenticationException\",\"cause\":null,"
-                    + "\"message\":\"Authentication error on host %s: Indicates an error during the authentication "
-                    + "phase while connecting to a node.\",\"stackTrace\":%s,\"suppressed\":[],\"address\":\"%s\","
-                    + "\"endPoint\":\"%s\",\"host\":\"%s\"}",
+                        + "\"message\":\"Authentication error on host %s: Indicates an error during the authentication "
+                        + "phase while connecting to a node.\",\"stackTrace\":%s,\"suppressed\":[],\"address\":\"%s\","
+                        + "\"endPoint\":\"%s\",\"host\":\"%s\"}",
                     globalEndPoint,
                     STACK_TRACE_JSON,
                     GLOBAL_ENDPOINT,
@@ -266,10 +302,10 @@ public class JsonTest {
                     "Indicates a syntactically correct but invalid query.",
                     fixupStackTrace(new DriverException("Underlying cause of the InvalidQueryException")))),
                 format("{\"error\":\"com.datastax.driver.core.exceptions.InvalidQueryException\",\"cause\":{"
-                    + "\"error\":\"com.datastax.driver.core.exceptions.DriverException\",\"cause\":null,"
-                    + "\"message\":\"Underlying cause of the InvalidQueryException\",\"stackTrace\":%s,"
-                    + "\"suppressed\":[]},\"message\":\"Indicates a syntactically correct but invalid query.\","
-                    + "\"stackTrace\":%s,\"suppressed\":[],\"address\":\"%s\",\"endPoint\":\"%s\",\"host\":\"%s\"}",
+                        + "\"error\":\"com.datastax.driver.core.exceptions.DriverException\",\"cause\":null,"
+                        + "\"message\":\"Underlying cause of the InvalidQueryException\",\"stackTrace\":%s,"
+                        + "\"suppressed\":[]},\"message\":\"Indicates a syntactically correct but invalid query.\","
+                        + "\"stackTrace\":%s,\"suppressed\":[],\"address\":\"%s\",\"endPoint\":\"%s\",\"host\":\"%s\"}",
                     STACK_TRACE_JSON,
                     STACK_TRACE_JSON,
                     GLOBAL_ENDPOINT,

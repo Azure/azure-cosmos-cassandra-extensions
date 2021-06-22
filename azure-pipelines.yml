@@ -115,6 +115,7 @@ jobs:
     env:
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
   - task: Maven@3
     displayName: 'Verify java-driver-app example'
     inputs:
@@ -131,6 +132,7 @@ jobs:
       AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS: $(AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS)
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
   - task: PowerShell@2
     displayName: 'Stage driver-3 artifacts'
     inputs:
@@ -197,9 +199,9 @@ jobs:
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:
-      AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS: $(AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS)
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
   - task: Maven@3
     displayName: 'Verify java-driver-app example'
     inputs:
@@ -215,6 +217,7 @@ jobs:
     env:
       AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
       AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
   - task: PowerShell@2
     displayName: 'Stage driver-3 artifacts'
     inputs:
