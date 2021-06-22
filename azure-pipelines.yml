@@ -225,13 +225,6 @@ jobs:
       script: $(Stage-Artifacts)
       pwsh: true
       workingDirectory: '$(Build.Repository.LocalPath)/driver-3/target'
-  - task: PowerShell@2
-    displayName: 'Stage spring-data artifacts'
-    inputs:
-      targetType: 'inline'
-      script: $(Stage-Artifacts)
-      pwsh: true
-      workingDirectory: '$(Build.Repository.LocalPath)/driver-3/target'
   - task: PublishPipelineArtifact@1
     displayName: 'Publish staged artifacts'
     inputs:
