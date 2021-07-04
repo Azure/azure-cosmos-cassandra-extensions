@@ -11,17 +11,20 @@ import com.fasterxml.jackson.databind.annotation.JsonAppend;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.jar.JarFile;
 
 import static java.util.Objects.requireNonNull;
 
@@ -42,9 +45,8 @@ public final class Json {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final SimpleModule MODULE = new SimpleModule();
-    private static final ConcurrentHashMap<Class<?>, String> SIMPLE_CLASS_NAMES = new ConcurrentHashMap<>();
-
     private static final JsonRegistrar REGISTRAR = new JsonRegistrar();
+    private static final ConcurrentHashMap<Class<?>, String> SIMPLE_CLASS_NAMES = new ConcurrentHashMap<>();
     private static final ObjectWriter WRITER;
 
     static {
@@ -56,6 +58,111 @@ public final class Json {
     // endregion
 
     // region Methods
+
+    /**
+     * Registers a serializer for a type.
+     *
+     * @param type       A {@link Class class}.
+     * @param serializer A {@link JsonSerializer serializer}.
+     * @param <T>        The type of the class to be serialized.
+     *
+     * @return A reference to the module to which {@code serializer} was added. This is the value of {@link #module}.
+     */
+    public static <T> SimpleModule addSerializer(
+        @NonNull final Class<? extends T> type,
+        @NonNull final JsonSerializer<T> serializer) {
+
+        return MODULE.addSerializer(type, serializer);
+    }
+
+    /**
+     * Registers all the serializers in the named package, including mix-in classes.
+     * <p>
+     * Instances of all {@link JsonSerializer} types are added to {@link #module}. All mix-in classes (i.e., classes
+     * annotated with {@link JsonAppend}) are added to {@link #objectMapper}. Nested classes are not considered. Mix-in
+     * classes must contain this static member or must be added to {@link #objectMapper} manually:
+     * <pre>{@code public static final Class<?> HANDLED_TYPE = handled_type;}</pre>
+     *
+     * @param packageName The name of the package containing serializers and mix-in classes to be added.
+     */
+    @SuppressWarnings("unchecked")
+    public static void addSerializersAndMixIns(@NonNull final String packageName) {
+
+        requireNonNull(packageName, "expected non-null packageName");
+
+        // Enumerate class in the named package
+
+        final String packagePath = packageName.replace('.', '/');
+        final ClassLoader loader = Json.class.getClassLoader();
+        final URI uri;
+
+        try {
+            uri = requireNonNull(loader.getResource(packagePath)).toURI();
+        } catch (final NullPointerException | URISyntaxException cause) {
+            final ExceptionInInitializerError error = new ExceptionInInitializerError(
+                "Could not get resource URI for package "
+                    + packageName
+                    + " due to "
+                    + cause);
+            LOG.error("Class initialization failed due to: ", cause);
+            throw error;
+        }
+
+        final Set<String> resourceNames = new TreeSet<>();
+
+        try {
+            scan(uri, packagePath + '/', resourceNames);
+        } catch (final IOException | URISyntaxException cause) {
+            final ExceptionInInitializerError error = new ExceptionInInitializerError(
+                "Could not get classes in package "
+                    + packageName
+                    + " due to "
+                    + cause);
+            LOG.error("Class initialization failed due to: ", cause);
+            throw error;
+        }
+
+        final ExceptionInInitializerError error = new ExceptionInInitializerError();
+        final String prefix = packageName + '.';
+        final int trim = ".class".length();
+
+        resourceNames.stream()
+            .filter(resourceName -> resourceName.endsWith(".class")).map(name -> {
+                final String className = prefix + name.substring(0, name.length() - trim).replace('/', '.');
+                try {
+                    return Class.forName(className);
+                } catch (final ClassNotFoundException exception) {
+                    error.addSuppressed(exception);
+                    return null;
+                }
+            })
+            .filter(Objects::nonNull).forEachOrdered(cls -> {
+                try {
+                    if (JsonSerializer.class.isAssignableFrom(cls)) {
+                        final JsonSerializer<Object> serializer = (JsonSerializer<Object>) cls
+                            .getDeclaredField("INSTANCE")
+                            .get(null);
+                        MODULE.addSerializer(serializer.handledType(), serializer);
+                    } else if (cls.isAnnotationPresent(JsonAppend.class)) {
+                        try {
+                            final Object value = cls.getDeclaredField("HANDLED_TYPE").get(null);
+                            if (value.getClass() == Class.class) {
+                                MAPPER.addMixIn((Class<?>) value, cls);
+                            }
+                        } catch (final NoSuchFieldException ignored) {
+                            // nothing to do
+                        }
+                    }
+                } catch (IllegalAccessException | NoSuchFieldException exception) {
+                    error.addSuppressed(exception);
+                }
+            });
+
+        if (error.getSuppressed().length > 0) {
+            LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
+            throw error;
+        }
+    }
 
     /**
      * Returns the {@link SimpleModule module} used by this class.
@@ -129,104 +236,6 @@ public final class Json {
     }
 
     /**
-     * Registers a serializer for a type.
-     *
-     * @param type          A {@link Class class}.
-     * @param serializer    A {@link JsonSerializer serializer}.
-     * @param <T>           The type of the class to be serialized.
-     *
-     * @return              A reference to the module to which {@code serializer} was added. This is the value of
-     *                      {@link #module}.
-     */
-    public static <T> SimpleModule addSerializer(
-        @NonNull final Class<? extends T> type,
-        @NonNull final JsonSerializer<T> serializer) {
-
-        return MODULE.addSerializer(type, serializer);
-    }
-
-    /**
-     * Registers all the serializers in the named package, including mix-in classes.
-     * <p>
-     * Instances of all {@link JsonSerializer} types are added to {@link #module}. All mix-in classes (i.e., classes
-     * annotated with {@link JsonAppend}) are added to {@link #objectMapper}. Nested classes are not considered.
-     * Mix-in classes must contain this static member or must be added to {@link #objectMapper} manually:
-     * <pre>{@code public static final Class<?> HANDLED_TYPE = handled_type;}</pre>
-     *
-     * @param packageName The name of the package containing serializers and mix-in classes to be added.
-     */
-    @SuppressWarnings("unchecked")
-    public static void addSerializersAndMixIns(@NonNull final String packageName) {
-
-        final String packagePath = requireNonNull(packageName, "expected non-null packageName").replace('.', '/');
-
-        try (InputStream stream = Json.class.getClassLoader().getResourceAsStream(packagePath)) {
-
-            if (stream == null) {
-                final ExceptionInInitializerError error = new ExceptionInInitializerError(
-                    "Could not open stream to enumerate classes in package "
-                        + packageName);
-                LOG.error("Class initialization failed due to: ", error);
-                throw error;
-            }
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-
-                final ExceptionInInitializerError error = new ExceptionInInitializerError();
-
-                reader.lines()
-                    .filter(line -> line.endsWith(".class")).map(line -> {
-
-                        final String simpleClassName = line.substring(0, line.lastIndexOf('.'));
-
-                        try {
-                            return Class.forName(packageName + "." + simpleClassName);
-                        } catch (final ClassNotFoundException exception) {
-                            error.addSuppressed(exception);
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull).forEachOrdered(cls -> {
-
-                        try {
-
-                            if (JsonSerializer.class.isAssignableFrom(cls)) {
-
-                                final JsonSerializer<Object> serializer = (JsonSerializer<Object>) cls
-                                    .getDeclaredField("INSTANCE")
-                                    .get(null);
-
-                                MODULE.addSerializer(serializer.handledType(), serializer);
-
-                            } else if (cls.isAnnotationPresent(JsonAppend.class)) {
-
-                                try {
-                                    final Object value = cls.getDeclaredField("HANDLED_TYPE").get(null);
-                                    if (value.getClass() == Class.class) {
-                                        MAPPER.addMixIn((Class<?>) value, cls);
-                                    }
-                                } catch (final NoSuchFieldException ignored) {
-                                    // nothing to do
-                                }
-                            }
-                        } catch (IllegalAccessException | NoSuchFieldException exception) {
-                            error.addSuppressed(exception);
-                        }
-                    });
-
-                if (error.getSuppressed().length > 0) {
-                    LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
-                    throw error;
-                }
-            }
-
-        } catch (final IOException error) {
-            LOG.error("[{}] Class initialization failed due to: ", Json.class, error);
-            throw new ExceptionInInitializerError(error);
-        }
-    }
-
-    /**
      * Converts the given value to JSON.
      *
      * @param value The value to convert.
@@ -280,4 +289,62 @@ public final class Json {
     }
 
     // endregion
+
+    // region Privates
+
+    private static void scan(
+        @NonNull final URI uri,
+        @NonNull final String packagePath,
+        @NonNull final Set<String> resourceNames) throws IOException, URISyntaxException {
+
+        final String scheme = uri.getScheme();
+
+        if (scheme.equalsIgnoreCase("file")) {
+
+            final File file = new File(uri);
+
+            if (file.isDirectory()) {
+                scanDirectory(file, "", resourceNames);
+            }
+
+        } else if (scheme.equalsIgnoreCase("jar")) {
+
+            final String fileEntry = uri.getSchemeSpecificPart();
+            final File file = new File(new URI(fileEntry.substring(0, fileEntry.lastIndexOf('!'))));
+
+            scanJarFile(file, packagePath, resourceNames);
+        }
+    }
+
+    @SuppressFBWarnings(value = "NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE", justification = "False alarm on 'files'")
+    private static void scanDirectory(
+        @NonNull final File directory,
+        @NonNull final String packagePrefix,
+        @NonNull final Set<String> resources) {
+
+        final File[] files = requireNonNull(directory.listFiles(), "expected non-null Files");
+
+        for (final File file : files) {
+            final String name = file.getName();
+            if (file.isDirectory()) {
+                scanDirectory(file, packagePrefix + name + "/", resources);
+            } else {
+                final String resourceName = packagePrefix + name;
+                resources.add(resourceName);
+            }
+        }
+    }
+
+    private static void scanJarFile(
+        @NonNull final File file,
+        @NonNull final String packagePath,
+        @NonNull final Set<String> resources) throws IOException {
+
+        try (JarFile jarFile = new JarFile(file)) {
+            final int start = packagePath.length();
+            jarFile.stream()
+                .filter(entry -> !entry.isDirectory() && entry.getName().startsWith(packagePath))
+                .forEach(entry -> resources.add(entry.getName().substring(start)));
+        }
+    }
 }
