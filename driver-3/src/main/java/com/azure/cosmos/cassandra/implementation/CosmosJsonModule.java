@@ -185,74 +185,6 @@ public final class CosmosJsonModule extends SimpleModule {
     // region Types
 
     /**
-     * A {@link VirtualBeanPropertyWriter} for adding the {@link Class#getName class name} to the JSON representation of
-     * an object.
-     * <p>
-     * Use it with {@link JsonAppend} to add virtual properties in addition to regular ones.
-     *
-     * @see ThrowableMixIn
-     */
-    public static final class ClassPropertyWriter extends VirtualBeanPropertyWriter {
-
-        private static final long serialVersionUID = -8203269538522149446L;
-
-        /**
-         * Initializes a newly created {@link ClassPropertyWriter}.
-         * <p>
-         * Jackson requires a parameterless constructor for all {@link PropertyWriter} classes.
-         */
-        public ClassPropertyWriter() {
-            super();
-        }
-
-        /**
-         * Initializes a newly created {@link ClassPropertyWriter}.
-         * <p>
-         * Jackson requires a constructor with these parameters for all {@link PropertyWriter} classes. This method
-         *
-         * @param propertyDefinition A property definition.
-         * @param annotations        The annotations present on the property.
-         * @param javaType           The {@link JavaType} of the property value to be written.
-         */
-        public ClassPropertyWriter(
-            final BeanPropertyDefinition propertyDefinition,
-            final Annotations annotations,
-            final JavaType javaType) {
-
-            super(propertyDefinition, annotations, javaType);
-        }
-
-        /**
-         * A factory method for constructing a {@link ClassPropertyWriter}.
-         *
-         * @param mapperConfig       Mapper configuration.
-         * @param annotatedClass     An annotated class.
-         * @param propertyDefinition A property definition.
-         * @param javaType           The {@link JavaType} of the property value to be written.
-         *
-         * @return A newly created ClassNamePropertyWriter instance.
-         */
-        @Override
-        public VirtualBeanPropertyWriter withConfig(
-            final MapperConfig<?> mapperConfig,
-            final AnnotatedClass annotatedClass,
-            final BeanPropertyDefinition propertyDefinition,
-            final JavaType javaType) {
-
-            return new ClassPropertyWriter(propertyDefinition, annotatedClass.getAnnotations(), javaType);
-        }
-
-        @Override
-        protected Object value(
-            final Object bean,
-            final JsonGenerator generator,
-            final SerializerProvider provider) {
-
-            return bean.getClass().getName();
-        }
-    }
-
-    /**
      * A {@link JsonSerializer} for serializing a {@link Cluster} object into JSON.
      */
     public static final class ClusterSerializer extends StdSerializer<Cluster> {
@@ -391,11 +323,79 @@ public final class CosmosJsonModule extends SimpleModule {
     /**
      * A mix-in for serializing a {@link Throwable} object into JSON.
      */
-    @JsonAppend(props = @Prop(value = ClassPropertyWriter.class, name = "error", type = String.class), prepend = true)
+    @JsonAppend(props = @Prop(value = TypePropertyWriter.class, name = "error", type = String.class), prepend = true)
     @JsonPropertyOrder(value = { "cause", "message", "stackTrace", "suppressed" }, alphabetic = true)
     @JsonIgnoreProperties({ "localizedMessage" })
     public abstract static class ThrowableMixIn {
         public static final Class<Throwable> HANDLED_TYPE = Throwable.class;
+    }
+
+    /**
+     * A {@link VirtualBeanPropertyWriter property writer} for adding the {@link Class#getName class name} to the JSON
+     * representation of an object.
+     * <p>
+     * Use it with {@link JsonAppend} to add virtual properties in addition to regular ones.
+     *
+     * @see ThrowableMixIn
+     */
+    public static final class TypePropertyWriter extends VirtualBeanPropertyWriter {
+
+        private static final long serialVersionUID = -8203269538522149446L;
+
+        /**
+         * Initializes a newly created {@link TypePropertyWriter}.
+         * <p>
+         * Jackson requires a parameterless constructor for all {@link PropertyWriter} classes.
+         */
+        public TypePropertyWriter() {
+            super();
+        }
+
+        /**
+         * Initializes a newly created {@link TypePropertyWriter}.
+         * <p>
+         * Jackson requires a constructor with these parameters for all {@link PropertyWriter} classes.
+         *
+         * @param propertyDefinition A property definition.
+         * @param annotations        The annotations present on the property.
+         * @param javaType           The {@link JavaType} of the property value to be written.
+         */
+        public TypePropertyWriter(
+            final BeanPropertyDefinition propertyDefinition,
+            final Annotations annotations,
+            final JavaType javaType) {
+
+            super(propertyDefinition, annotations, javaType);
+        }
+
+        /**
+         * A factory method for constructing a {@link TypePropertyWriter}.
+         *
+         * @param mapperConfig       Mapper configuration.
+         * @param annotatedClass     An annotated class.
+         * @param propertyDefinition A property definition.
+         * @param javaType           The {@link JavaType} of the property value to be written.
+         *
+         * @return A newly created ClassNamePropertyWriter instance.
+         */
+        @Override
+        public VirtualBeanPropertyWriter withConfig(
+            final MapperConfig<?> mapperConfig,
+            final AnnotatedClass annotatedClass,
+            final BeanPropertyDefinition propertyDefinition,
+            final JavaType javaType) {
+
+            return new TypePropertyWriter(propertyDefinition, annotatedClass.getAnnotations(), javaType);
+        }
+
+        @Override
+        protected Object value(
+            final Object bean,
+            final JsonGenerator generator,
+            final SerializerProvider provider) {
+
+            return bean.getClass().getName();
+        }
     }
 
     // endregion
