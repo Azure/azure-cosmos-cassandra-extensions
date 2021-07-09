@@ -4,8 +4,7 @@
 module com.azure.cosmos.cassandra {
 
     exports com.azure.cosmos.cassandra;
-    exports com.azure.cosmos.cassandra.implementation to com.azure.cosmos.cassandra.config;
-    exports com.azure.cosmos.cassandra.implementation.serializer to com.fasterxml.jackson.databind;
+    exports com.azure.cosmos.cassandra.implementation to com.fasterxml.jackson.databind;
 
     // Named modules
 

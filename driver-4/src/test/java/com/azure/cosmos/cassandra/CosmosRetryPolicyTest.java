@@ -3,7 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.implementation.Json;
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.MetricRegistry;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
@@ -53,6 +52,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_ADDRESS;
 import static com.azure.cosmos.cassandra.TestCommon.KEYSPACE_NAME;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
@@ -62,7 +62,6 @@ import static com.azure.cosmos.cassandra.TestCommon.display;
 import static com.azure.cosmos.cassandra.TestCommon.read;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static com.azure.cosmos.cassandra.TestCommon.write;
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES;
 import static com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric.RETRIES_ON_OTHER_ERROR;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -199,7 +198,7 @@ public final class CosmosRetryPolicyTest {
 
         // TODO (DANOBLE) create and then drop <perf_ks>.<perf_tbl> here.
 
-        LOG.info("{}", Json.toString(session));
+        LOG.info("{}", CosmosJson.toString(session));
 
         final CompletableFuture<AsyncResultSet>[] futures = (CompletableFuture<AsyncResultSet>[]) Array.newInstance(
             CompletableFuture.class,

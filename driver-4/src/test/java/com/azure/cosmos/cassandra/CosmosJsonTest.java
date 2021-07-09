@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-package com.azure.cosmos.cassandra.implementation;
+package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -17,6 +17,7 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -27,20 +28,28 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 @SuppressFBWarnings(value = "UPM_UNCALLED_PRIVATE_METHOD", justification = "JUnit makes use of all uncalled methods")
-public class JsonTest {
+public class CosmosJsonTest {
 
     private static final StackTraceElement[] STACK_TRACE = Thread.currentThread().getStackTrace();
 
     private static final String STACK_TRACE_JSON = toJson(Arrays.stream(STACK_TRACE)
         .map(StackTraceElement::toString)
         .collect(Collectors.toList()));
+
+    /**
+     * Prints the parameters for this test class on {@link System#out}.
+     */
+    @BeforeAll
+    public static void init() {
+        TestCommon.printTestParameters();
+    }
 
     @ParameterizedTest()
     @Tag("checkin")

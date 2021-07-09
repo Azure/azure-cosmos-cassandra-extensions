@@ -45,6 +45,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.KEYSPACE_NAME;
 import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
 import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
@@ -102,6 +103,7 @@ public class CosmosCassandraIntegrationTest {
         getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.consistency-level",
             "QUORUM"));
+
     static final File REPORTING_DIRECTORY = new File(
         getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.reporting-directory",
@@ -111,6 +113,7 @@ public class CosmosCassandraIntegrationTest {
                 "var",
                 "lib",
                 "azure-cosmos-cassandra-driver-4-extensions").toString()));
+
     private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
     private static final String TABLE_NAME = uniqueName("sensor_data_");
     private static final int TIMEOUT_IN_SECONDS = 30;
@@ -133,9 +136,10 @@ public class CosmosCassandraIntegrationTest {
     @ValueSource(booleans = { false, true })
     public void canIntegrate(final boolean multiRegionWrites) {
 
-        final CqlSessionBuilder builder = CqlSession.builder().withConfigLoader(newConfigLoader(multiRegionWrites));
+        final DriverConfigLoader configLoader = newProgrammaticConfigLoader(multiRegionWrites);
+        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
 
-        try (CqlSession session = builder.build()) {
+        try (CqlSession session =  CqlSession.builder().withConfigLoader(configLoader).build()) {
 
             //noinspection SimplifyOptionalCallChains
             if (!session.getMetrics().isPresent()) {
@@ -315,7 +319,7 @@ public class CosmosCassandraIntegrationTest {
         System.out.println();
     }
 
-    private static DriverConfigLoader newConfigLoader(final boolean multiRegionWrites) {
+    private static DriverConfigLoader newProgrammaticConfigLoader(final boolean multiRegionWrites) {
         return DriverConfigLoader.programmaticBuilder()
             .withBoolean(CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES, multiRegionWrites)
             .withStringList(DefaultDriverOption.METRICS_NODE_ENABLED, Collections.singletonList("cql-messages"))

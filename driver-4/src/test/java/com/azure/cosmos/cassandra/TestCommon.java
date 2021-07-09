@@ -38,7 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static java.lang.System.out;
@@ -175,7 +175,9 @@ public final class TestCommon {
      */
     public static void logTestName(final TestInfo info, final Logger log) {
         log.info("---------------------------------------------------------------------------------------------------");
-        log.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
+        log.info("{} {}",
+            info.getTestMethod().orElseThrow(null).getName(),
+            info.getDisplayName());
         log.info("---------------------------------------------------------------------------------------------------");
     }
 

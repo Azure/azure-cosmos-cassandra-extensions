@@ -3,7 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
@@ -34,12 +33,12 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Random;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.FIXED_BACKOFF_TIME;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.GROWING_BACKOFF_TIME;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.MAX_RETRIES;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.READ_TIMEOUT_RETRIES;
 import static com.azure.cosmos.cassandra.CosmosRetryPolicyOption.WRITE_TIMEOUT_RETRIES;
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 
 /**
  * A {@link RetryPolicy} implementation with back-offs for {@link OverloadedException} failures.
@@ -520,7 +519,7 @@ public final class CosmosRetryPolicy implements RetryPolicy {
 
     @Override
     public String toString() {
-        return Json.toString(this);
+        return CosmosJson.toString(this);
     }
 
     // endregion

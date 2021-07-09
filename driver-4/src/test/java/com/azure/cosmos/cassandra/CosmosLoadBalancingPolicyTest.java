@@ -35,13 +35,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_ADDRESS;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
 import static com.azure.cosmos.cassandra.TestCommon.testAllStatements;
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -74,7 +74,12 @@ public final class CosmosLoadBalancingPolicyTest {
      */
     @BeforeAll
     public static void init() {
-        TestCommon.printTestParameters();
+        try {
+            TestCommon.printTestParameters();
+        } catch (final Throwable error) {
+            LOG.error("error: ", error);
+            throw error;
+        }
     }
 
     /**
@@ -123,6 +128,8 @@ public final class CosmosLoadBalancingPolicyTest {
                 CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
                 PREFERRED_REGIONS)
             .build();
+
+        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
 
         try (CqlSession session = this.connect(configLoader, multiRegionWritesEnabled)) {
 
@@ -250,6 +257,8 @@ public final class CosmosLoadBalancingPolicyTest {
                 CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
                 Collections.emptyList())
             .build();
+
+        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
 
         try (CqlSession session = this.connect(configLoader, multiRegionWritesEnabled)) {
 
@@ -424,10 +433,9 @@ public final class CosmosLoadBalancingPolicyTest {
         try {
 
             do {
-                iterations++;
                 testAllStatements(session);
                 nodes = metadata.getNodes();
-            } while (nodes.size() != REGIONAL_ENDPOINTS.size());
+            } while (nodes.size() != REGIONAL_ENDPOINTS.size() && ++iterations < 10);
 
             return nodes;
 
