@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
@@ -34,7 +35,6 @@ import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.cosmosClusterBuilder;
 import static com.azure.cosmos.cassandra.TestCommon.testAllStatements;
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -264,7 +264,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
             try (Session session = cluster.connect()) {
 
-                // Here we check after the cluster is fully operation, usually shortly before or shortly after the
+                // Here we check after the cluster is fully operational, usually shortly before or shortly after the
                 // first session is created. Our checks now require that regional (failover) hosts are fully
                 // enumerated. We do a full check on the host failover sequence.
 
@@ -315,10 +315,9 @@ public final class CosmosLoadBalancingPolicyTest {
         try {
 
             do {
-                iterations++;
                 testAllStatements(session);
                 hosts = metadata.getAllHosts();
-            } while (hosts.size() != REGIONAL_ENDPOINTS.size());
+            } while (hosts.size() != REGIONAL_ENDPOINTS.size() && ++iterations < 10);
 
             return hosts;
 

@@ -3,7 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.implementation.Json;
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.MetricRegistry;
 import com.datastax.driver.core.Cluster;
@@ -45,12 +44,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
 import static com.azure.cosmos.cassandra.TestCommon.PASSWORD;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.USERNAME;
 import static com.azure.cosmos.cassandra.TestCommon.cosmosClusterBuilder;
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -155,11 +154,11 @@ public class CosmosRetryPolicyTest {
 
         try (Cluster cluster = builder.build()) {
 
-            LOG.info("{}", Json.toString(cluster));
+            LOG.info("{}", CosmosJson.toString(cluster));
 
             try (Session session = cluster.connect()) {
 
-                LOG.info("{}", Json.toString(session));
+                LOG.info("{}", CosmosJson.toString(session));
 
                 final ResultSetFuture[] futures = (ResultSetFuture[]) Array.newInstance(ResultSetFuture.class, 100);
 

@@ -3,14 +3,14 @@
 
 module com.azure.cosmos.cassandra {
 
-    exports com.azure.cosmos.cassandra.implementation.serializer to com.fasterxml.jackson.databind;
-    opens com.azure.cosmos.cassandra.implementation.serializer to com.fasterxml.jackson.databind;
     exports com.azure.cosmos.cassandra;
+    exports com.azure.cosmos.cassandra.implementation to com.fasterxml.jackson.databind;
 
     // Named modules
 
     requires com.fasterxml.jackson.core;
     requires com.fasterxml.jackson.databind;
+    requires com.fasterxml.jackson.datatype.jdk8;
 
     // Automatic modules
 

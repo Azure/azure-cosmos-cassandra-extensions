@@ -3,7 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.implementation.Json;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
@@ -40,7 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -375,7 +374,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (this.hostsForReading.stream().anyMatch(host::equals)) {
                 throw new IllegalStateException(
                     "Host without a datacenter should not be in list of hosts for reading: "
-                        + Json.toString(host));
+                        + CosmosJson.toString(host));
             }
 
             if (!this.multiRegionWritesEnabled) {
@@ -385,7 +384,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 if (this.hostsForWriting.stream().anyMatch(host::equals)) {
                     throw new IllegalStateException(
                         "Host without a datacenter should not be in list of hosts for writing: "
-                            + Json.toString(host));
+                            + CosmosJson.toString(host));
                 }
             }
 
@@ -462,7 +461,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public String toString() {
-        return Json.toString(this);
+        return CosmosJson.toString(this);
     }
 
     // endregion

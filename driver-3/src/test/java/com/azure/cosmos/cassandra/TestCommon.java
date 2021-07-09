@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.azure.cosmos.cassandra.implementation.Json.toJson;
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.datastax.driver.core.BatchStatement.Type.UNLOGGED;
 import static com.datastax.driver.core.HostDistance.LOCAL;
 import static com.datastax.driver.core.HostDistance.REMOTE;
@@ -215,7 +215,9 @@ public final class TestCommon {
      */
     public static void logTestName(final TestInfo info, final Logger log) {
         log.info("---------------------------------------------------------------------------------------------------");
-        log.info("{}", info.getTestMethod().orElseGet(() -> fail("expected test to be called with test method")));
+        log.info("{} {}",
+            info.getTestMethod().orElseThrow(null).getName(),
+            info.getDisplayName());
         log.info("---------------------------------------------------------------------------------------------------");
     }
 
