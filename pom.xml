@@ -51,7 +51,7 @@ Licensed under the MIT License.
     <javadoc.options/>
     <!-- Package dependency version numbers -->
     <version.cassandra-driver>[3.8,3.11)</version.cassandra-driver>
-    <version.jackson>[2.12,2.13)</version.jackson>
+    <version.jackson>[2.12,2.12.5)</version.jackson>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
     <version.spotbugs>[4.2.3,4.3)</version.spotbugs>
     <!-- Test dependency version numbers -->
@@ -81,12 +81,22 @@ Licensed under the MIT License.
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${version.jackson}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
         <version>${version.jackson}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
+        <version>${version.jackson}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.datatype</groupId>
+        <artifactId>jackson-datatype-jdk8</artifactId>
         <version>${version.jackson}</version>
       </dependency>
       <dependency>
