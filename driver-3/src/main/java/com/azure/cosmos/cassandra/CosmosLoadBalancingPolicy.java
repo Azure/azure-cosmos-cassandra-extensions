@@ -57,12 +57,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Fields
 
-    private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
     private static final Method GET_CONTACT_POINTS;
-
-    private final boolean multiRegionWritesEnabled;
-    private final NavigableSet<Host> hostsForReading;
-    private final NavigableSet<Host> hostsForWriting;
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
 
     static {
         try {
@@ -87,21 +83,13 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
     }
 
+    private final NavigableSet<Host> hostsForReading;
+    private final NavigableSet<Host> hostsForWriting;
+    private final boolean multiRegionWritesEnabled;
+
     // endregion
 
     // region Constructors
-
-    private CosmosLoadBalancingPolicy(
-        @NonNull final List<String> preferredRegions,
-        final boolean multiRegionWritesEnabled) {
-
-        this.multiRegionWritesEnabled = multiRegionWritesEnabled;
-        this.hostsForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
-
-        this.hostsForWriting = this.multiRegionWritesEnabled
-            ? this.hostsForReading
-            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
-    }
 
     /**
      * Initializes a newly constructed {@link CosmosLoadBalancingPolicy} instance with default settings.
@@ -110,6 +98,29 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     public CosmosLoadBalancingPolicy() {
         this(Collections.emptyList(), false);
+    }
+
+    private CosmosLoadBalancingPolicy(
+        @NonNull final List<String> preferredRegions,
+        final boolean multiRegionWritesEnabled) {
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("CosmosLoadBalancingPolicy(preferredRegions: {}, multiRegionWriteEnabled: {})",
+                preferredRegions,
+                multiRegionWritesEnabled);
+        }
+
+        this.multiRegionWritesEnabled = multiRegionWritesEnabled;
+        this.hostsForReading = new ConcurrentSkipListSet<>(
+            new PreferredRegionsComparator(preferredRegions));
+
+        this.hostsForWriting = this.multiRegionWritesEnabled
+            ? this.hostsForReading
+            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("CosmosLoadBalancingPolicy -> {}", toJson(this));
+        }
     }
 
     // endregion
@@ -650,11 +661,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return xHostId.compareTo(yHostId);
         }
 
+        List<String> getPreferredRegions() {
+            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
+        }
+
         /**
          * Called by {@link #init} to add the datacenters for all contact points to the list of preferred regions.
-         *
-         * These regions will appear last in the list of preferred regions following those specified using
-         * {@link CosmosLoadBalancingPolicy#builder()}.
+         * These regions will appear last in the list of preferred regions following those specified using {@link
+         * CosmosLoadBalancingPolicy#builder()}.
          * <p>
          * This method is not thread safe and can only be called once. It should only be called by {@link #init}.
          *
@@ -674,10 +688,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         boolean hasPreferredRegion(final String name) {
             return this.indexes.containsKey(name);
-        }
-
-        List<String> getPreferredRegions() {
-            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
         }
 
         private List<String> collectPreferredRegions() {
