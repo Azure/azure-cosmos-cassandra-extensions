@@ -91,6 +91,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @SuppressWarnings({ "unchecked" })
     public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("CosmosLoadBalancingPolicy(driverContext: {}, profileName: {})",
+                toJson(driverContext),
+                toJson(profileName));
+        }
+
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
         this.driverContext = (InternalDriverContext) driverContext;
 
@@ -102,6 +108,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.nodesForWriting = this.multiRegionWritesEnabled
             ? this.nodesForReading
             : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("CosmosLoadBalancingPolicy -> {}", toJson(this));
+        }
     }
 
     // endregion
