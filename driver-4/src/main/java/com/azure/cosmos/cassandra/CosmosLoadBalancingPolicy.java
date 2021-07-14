@@ -92,8 +92,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosLoadBalancingPolicy(driverContext: {}, profileName: {})",
-                toJson(driverContext),
+            LOG.debug("CosmosLoadBalancingPolicy(sessionName: {}, profileName: {})",
+                toJson(driverContext.getSessionName()),
                 toJson(profileName));
         }
 

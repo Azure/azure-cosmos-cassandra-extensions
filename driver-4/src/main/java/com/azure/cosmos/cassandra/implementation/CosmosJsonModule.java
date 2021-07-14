@@ -220,11 +220,10 @@ public final class CosmosJsonModule extends SimpleModule {
      * A mix-in for serializing {@link DriverContext} instances to JSON.
      */
     @JsonAppend()
-    @JsonPropertyOrder(value = { "sessionName", "protocolVersion", "startupOptions" }, alphabetic = true)
+    @JsonPropertyOrder(value = { "sessionName", "startupOptions" }, alphabetic = true)
     @JsonIncludeProperties({
         "authProvider",
         "loadBalancingPolicies",
-        "protocolVersion",
         "reconnectionPolicy",
         "requestThrottler",
         "requestTracker",

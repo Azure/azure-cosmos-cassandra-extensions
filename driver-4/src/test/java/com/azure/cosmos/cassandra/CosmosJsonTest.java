@@ -102,7 +102,6 @@ public class CosmosJsonTest {
         return Stream.of(Arguments.of(session, format("{\"name\":%s,"
                 + "\"context\":{"
                 + "\"sessionName\":%s,"
-                + "\"protocolVersion\":%s,"
                 + "\"startupOptions\":%s,"
                 + "\"authProvider\":%s,"
                 + "\"loadBalancingPolicies\":{\"default\":%s},"
@@ -123,7 +122,6 @@ public class CosmosJsonTest {
                 + "}",
             toJson(session.getName()),
             toJson(driverContext.getSessionName()),
-            toJson(driverContext.getProtocolVersion()),
             toJson(driverContext.getStartupOptions()),
             toJson(driverContext.getAuthProvider()),
             toJson(driverContext.getLoadBalancingPolicy("default")),
