@@ -91,8 +91,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @SuppressWarnings({ "unchecked" })
     public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosLoadBalancingPolicy(sessionName: {}, profileName: {})",
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosLoadBalancingPolicy(sessionName: {}, profileName: {})",
                 toJson(driverContext.getSessionName()),
                 toJson(profileName));
         }
@@ -109,8 +109,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             ? this.nodesForReading
             : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosLoadBalancingPolicy -> {}", toJson(this));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosLoadBalancingPolicy -> {}", toJson(this));
         }
     }
 
@@ -212,8 +212,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("init({})", toJson(nodes.values()));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("init({})", toJson(nodes.values()));
         }
 
         final MetadataManager metadataManager = this.driverContext.getMetadataManager();
@@ -276,9 +276,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (error != null) {
                 LOG.error("node refresh failed due to ", error);
             } else {
-                if (LOG.isDebugEnabled()) {
+                if (LOG.isTraceEnabled()) {
                     final Map<UUID, Node> refreshedNodes = metadataManager.getMetadata().getNodes();
-                    LOG.debug("refreshed nodes: {}", toJson(refreshedNodes));
+                    LOG.trace("refreshed nodes: {}", toJson(refreshedNodes));
                 }
             }
 
@@ -308,8 +308,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @NonNull
     public Queue<Node> newQueryPlan(@Nullable final Request request, @Nullable final Session session) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan(request: {}, session: {})",
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("newQueryPlan(request: {}, session: {})",
                 toJson(request),
                 toJson(session == null ? null : session.getName()));
         }
@@ -328,8 +328,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onAdd(@NonNull final Node node) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onAdd({})", toJson(node));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onAdd({})", toJson(node));
         }
         this.onUp(node);
     }
@@ -337,8 +337,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void onDown(@NonNull final Node node) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onDown({})", toJson(node));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onDown({})", toJson(node));
         }
 
         requireNonNull(node, "expected non-null node");
@@ -365,15 +365,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onDown -> {}", this);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onDown -> {}", this);
         }
     }
 
     @Override
     public void onRemove(@NonNull final Node node) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onRemove({})", toJson(node));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onRemove({})", toJson(node));
         }
         this.onDown(node);
     }
@@ -381,8 +381,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void onUp(@NonNull final Node node) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp({})", toJson(node));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUp({})", toJson(node));
         }
 
         PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
@@ -404,8 +404,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp -> {}", this);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUp -> {}", this);
         }
     }
 

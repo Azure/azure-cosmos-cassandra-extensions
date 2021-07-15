@@ -106,8 +106,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
     @SuppressWarnings("unused")
     public CosmosRetryPolicy(final DriverContext driverContext, final String profileName) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosRetryPolicy(sessionName: {}, profileName: {})",
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosRetryPolicy(sessionName: {}, profileName: {})",
                 toJson(driverContext.getSessionName()),
                 toJson(profileName));
         }
@@ -120,8 +120,8 @@ public final class CosmosRetryPolicy implements RetryPolicy {
         this.readTimeoutRetriesEnabled = READ_TIMEOUT_RETRIES.getValue(profile, Boolean.class);
         this.writeTimeoutRetriesEnabled = WRITE_TIMEOUT_RETRIES.getValue(profile, Boolean.class);
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosRetryPolicy -> {}", toJson(this));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosRetryPolicy -> {}", toJson(this));
         }
     }
 

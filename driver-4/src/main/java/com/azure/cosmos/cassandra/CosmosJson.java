@@ -134,7 +134,7 @@ public final class CosmosJson {
         try {
             return objectWriter().writeValueAsString(value);
         } catch (final JsonProcessingException error) {
-            LOG.debug("could not convert {} value to JSON due to:", value != null ? value.getClass() : null, error);
+            LOG.trace("could not convert {} value to JSON due to:", value != null ? value.getClass() : null, error);
             try {
                 return "{\"error\":" + objectWriter().writeValueAsString(error.toString()) + '}';
             } catch (final JsonProcessingException exception) {
