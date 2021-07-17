@@ -361,17 +361,16 @@ public final class CosmosLoadBalancingPolicyTest {
 
         final DriverContext driverContext = session.getContext();
         final Map<UUID, Node> nodes = session.getMetadata().getNodes();
-        final String profileName = driverContext.getConfig().getDefaultProfile().getName();
+        final DriverExecutionProfile profile = driverContext.getConfig().getDefaultProfile();
 
         // Check that the driver has got the nodes we expect: one per region because we're connected to Cosmos DB
 
         assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(REGIONAL_ENDPOINTS);
-        assertThat(REGIONAL_ENDPOINTS.size()).isEqualTo(PREFERRED_REGIONS.size()); // sanity check on test parameters
         assertThat(nodes.size()).isEqualTo(REGIONAL_ENDPOINTS.size());
 
         // Check that we've got the load balancing policy we think we have
 
-        final LoadBalancingPolicy loadBalancingPolicy = driverContext.getLoadBalancingPolicy(profileName);
+        final LoadBalancingPolicy loadBalancingPolicy = driverContext.getLoadBalancingPolicy(profile.getName());
 
         assertThat(loadBalancingPolicy).isExactlyInstanceOf(CosmosLoadBalancingPolicy.class);
 
@@ -379,15 +378,36 @@ public final class CosmosLoadBalancingPolicyTest {
 
         assertThat(cosmosLoadBalancingPolicy.getMultiRegionWritesEnabled()).isEqualTo(multiRegionWrites);
 
+        final List<String> configuredPreferredRegions = profile.getStringList(CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS);
+
+        final List<String> preferredReadRegions = cosmosLoadBalancingPolicy.getPreferredReadRegions();
+        final List<String> preferredWriteRegions = cosmosLoadBalancingPolicy.getPreferredWriteRegions();
+
+        assertThat(preferredReadRegions.size()).isBetween(
+            configuredPreferredRegions.size(),
+            configuredPreferredRegions.size() + 1);
+
+        assertThat(preferredWriteRegions.size()).isBetween(
+            configuredPreferredRegions.size(),
+            configuredPreferredRegions.size() + 1);
+
+        assertThat(preferredReadRegions).hasSize(preferredWriteRegions.size());
+
         final List<Node> nodesForReading = cosmosLoadBalancingPolicy.getNodesForReading();
+
+        if (preferredReadRegions.size() == configuredPreferredRegions.size()) {
+            final SocketAddress address = getSocketAddress(nodesForReading, preferredReadRegions.size() - 1);
+            assertThat(address).isEqualTo(GLOBAL_ENDPOINT_ADDRESS);
+        }
 
         if (multiRegionWrites) {
             assertThat(cosmosLoadBalancingPolicy.getNodesForWriting()).isEqualTo(nodesForReading);
         } else {
             final List<Node> nodesForWriting = cosmosLoadBalancingPolicy.getNodesForWriting();
-            assertThat(nodesForWriting.size()).isEqualTo(1);
-            final SocketAddress address = nodesForWriting.get(0).getEndPoint().resolve();
-            assertThat(address).isEqualTo(GLOBAL_ENDPOINT_ADDRESS);
+            if (preferredReadRegions.size() == configuredPreferredRegions.size()) {
+                final SocketAddress address = getSocketAddress(nodesForWriting, 0);
+                assertThat(address).isEqualTo(GLOBAL_ENDPOINT_ADDRESS);
+            }
         }
 
         LOG.info("[{}] connected to nodes {} with load balancing policy {}",
@@ -396,6 +416,10 @@ public final class CosmosLoadBalancingPolicyTest {
             loadBalancingPolicy);
 
         return session;
+    }
+
+    private static SocketAddress getSocketAddress(List<Node> nodesForWriting, int i) {
+        return nodesForWriting.get(i).getEndPoint().resolve();
     }
 
     @NonNull
@@ -465,9 +489,9 @@ public final class CosmosLoadBalancingPolicyTest {
      * @param globalNode               The {@link Node} representing the global endpoint.
      * @param multiRegionWritesEnabled {@code true} if multi-region writes are enabled.
      * @param expectedPreferredRegions The expected list of preferred regions for read and--if multi-region writes are
-     * @param expectedPreferredHosts   The expected list preferred hosts, mapping one-to-one with {@code
+     * @param expectedPreferredNodes   The expected list preferred hosts, mapping one-to-one with {@code
      *                                 expectedPreferredRegions}.
-     * @param expectedFailoverHosts    The list of hosts not in any of the preferred regions, sorted in alphabetic order
+     * @param expectedFailoverNodes    The list of hosts not in any of the preferred regions, sorted in alphabetic order
      *                                 by datacenter name.
      */
     private static void validateOperationalState(
@@ -475,19 +499,33 @@ public final class CosmosLoadBalancingPolicyTest {
         final Node globalNode,
         final boolean multiRegionWritesEnabled,
         final List<String> expectedPreferredRegions,
-        final Node[] expectedPreferredHosts,
-        final Node[] expectedFailoverHosts) {
+        final Node[] expectedPreferredNodes,
+        final Node[] expectedFailoverNodes) {
 
         assertThat(policy.getPreferredReadRegions()).containsExactlyElementsOf(expectedPreferredRegions);
 
-        assertThat(policy.getNodesForReading()).hasSize(expectedPreferredHosts.length + expectedFailoverHosts.length);
-        assertThat(policy.getNodesForReading()).startsWith(expectedPreferredHosts);
-        assertThat(policy.getNodesForReading()).endsWith(expectedFailoverHosts);
+        assertThat(policy.getNodesForReading()).hasSize(expectedPreferredNodes.length + expectedFailoverNodes.length);
+        assertThat(policy.getNodesForReading()).startsWith(expectedPreferredNodes);
+        assertThat(policy.getNodesForReading()).endsWith(expectedFailoverNodes);
 
         if (multiRegionWritesEnabled) {
+
             assertThat(policy.getNodesForWriting()).containsExactlyElementsOf(policy.getNodesForReading());
+
         } else {
-            assertThat(policy.getNodesForWriting()).containsExactly(globalNode);
+
+            final List<Node> nodesForWriting = policy.getNodesForWriting();
+            assertThat(nodesForWriting).hasSize(expectedPreferredNodes.length + expectedFailoverNodes.length);
+
+            if (nodesForWriting.get(0).equals(globalNode)) {
+                for (int i = 1; i < expectedPreferredNodes.length; i++) {
+                    assertThat(nodesForWriting.get(i)).isEqualTo(expectedPreferredNodes[i - 1]);
+                }
+            } else {
+                assertThat(nodesForWriting).startsWith(expectedPreferredNodes);
+            }
+
+            assertThat(nodesForWriting).endsWith(expectedFailoverNodes);
         }
     }
 

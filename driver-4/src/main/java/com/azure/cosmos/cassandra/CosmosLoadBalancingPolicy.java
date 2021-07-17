@@ -107,7 +107,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.nodesForWriting = this.multiRegionWritesEnabled
             ? this.nodesForReading
-            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
+            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
 
         if (LOG.isTraceEnabled()) {
             LOG.trace("CosmosLoadBalancingPolicy -> {}", toJson(this));
@@ -176,7 +176,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Gets the list of preferred regions for failover on read operations.
+     * Gets the list of preferred regions for failover on write operations.
      * <p>
      * When multi-region writes are enabled, this list will be the same as the one returned by {@link
      * #getPreferredReadRegions}.
@@ -212,18 +212,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
+        requireNonNull(nodes, "expected non-null cluster");
+        requireNonNull(distanceReporter, "expected non-null hosts");
+
         if (LOG.isTraceEnabled()) {
             LOG.trace("init({})", toJson(nodes.values()));
         }
 
         final MetadataManager metadataManager = this.driverContext.getMetadataManager();
         final Set<Node> contactPoints = this.getContactPointsOrThrow();
+        this.distanceReporter = distanceReporter;
 
         PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
         assert comparator != null;
-        comparator.addPreferredRegions(contactPoints);
-
-        this.distanceReporter = distanceReporter;
+        comparator.addPreferredRegionsLast(contactPoints);
 
         for (final Node node : nodes.values()) {
             if (comparator.hasPreferredRegion(node.getDatacenter())) {
@@ -231,7 +233,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             } else {
                 distanceReporter.setDistance(node, NodeDistance.REMOTE);
             }
-            this.nodesForReading.add(node);  // When multiRegionWrites is true, nodesForReading == nodesForWriting
+            this.nodesForReading.add(node);
         }
 
         if (this.multiRegionWritesEnabled) {
@@ -245,15 +247,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
             comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
             assert comparator != null;
-            comparator.addPreferredRegions(contactPoints);
+            comparator.addPreferredRegionsFirst(contactPoints);
 
-            for (final Node node : contactPoints) {
+            for (final Node node : nodes.values()) {
                 if (comparator.hasPreferredRegion(node.getDatacenter())) {
                     distanceReporter.setDistance(node, NodeDistance.LOCAL);
                 } else {
                     distanceReporter.setDistance(node, NodeDistance.REMOTE);
                 }
-                assert nodes.containsKey(node.getHostId());
                 this.nodesForWriting.add(node);
             }
         }
@@ -399,9 +400,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         } else {
             comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
             assert comparator != null;
-            if (comparator.hasPreferredRegion(node.getDatacenter())) {
-                this.nodesForWriting.add(node);
-            }
+            this.nodesForWriting.add(node);
         }
 
         if (LOG.isTraceEnabled()) {
@@ -537,7 +536,29 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         /**
-         * Called by {@link #init} to add the datacenters for all contact points to the list of preferred regions.
+         * Called by {@link #init} to prepend the datacenters for all contact points to the list of preferred regions.
+         *
+         * These regions will appear first in the list of preferred regions following those specified in configuration
+         * using {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
+         * <p>
+         * This method is not thread safe and can only be called once. It should only be called by {@link #init}.
+         *
+         * @param contactPoints A set of contact points.
+         *
+         * @throws IllegalStateException if this method is called more than once.
+         */
+        void addPreferredRegionsFirst(final Set<Node> contactPoints) {
+            if (this.preferredRegions != null) {
+                throw new IllegalStateException("attempt to add preferred regions more than once");
+            }
+            contactPoints.stream()
+                .map(Node::getDatacenter)
+                .forEachOrdered(region -> this.indexes.put(region, -this.indexes.size()));
+            this.preferredRegions = this.collectPreferredRegions();
+        }
+
+        /**
+         * Called by {@link #init} to append the datacenters for all contact points to the list of preferred regions.
          *
          * These regions will appear last in the list of preferred regions following those specified in configuration
          * using {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
@@ -548,7 +569,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
          *
          * @throws IllegalStateException if this method is called more than once.
          */
-        void addPreferredRegions(final Set<Node> contactPoints) {
+        void addPreferredRegionsLast(final Set<Node> contactPoints) {
             if (this.preferredRegions != null) {
                 throw new IllegalStateException("attempt to add preferred regions more than once");
             }
