@@ -240,11 +240,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
 
-            // Here we assume that all contact points are write capable. If you're connected to a Cosmos DB Cassandra
-            // API instance, there should be a single contact point, the global endpoint. If you're connected to an
-            // Apache Cassandra instance, we assume that the contact points are in the datacenters to which you wish
-            // to write.
-
             comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
             assert comparator != null;
             comparator.addPreferredRegionsFirst(contactPoints);
@@ -535,6 +530,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             return xHostId.compareTo(yHostId);
         }
 
+        List<String> getPreferredRegions() {
+            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
+        }
+
         /**
          * Called by {@link #init} to prepend the datacenters for all contact points to the list of preferred regions.
          *
@@ -581,10 +580,6 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         boolean hasPreferredRegion(final String name) {
             return this.indexes.containsKey(name);
-        }
-
-        List<String> getPreferredRegions() {
-            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
         }
 
         private List<String> collectPreferredRegions() {
