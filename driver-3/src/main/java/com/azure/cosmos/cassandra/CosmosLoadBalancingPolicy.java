@@ -104,22 +104,21 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         @NonNull final List<String> preferredRegions,
         final boolean multiRegionWritesEnabled) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosLoadBalancingPolicy(preferredRegions: {}, multiRegionWriteEnabled: {})",
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosLoadBalancingPolicy(preferredRegions: {}, multiRegionWriteEnabled: {})",
                 preferredRegions,
                 multiRegionWritesEnabled);
         }
 
         this.multiRegionWritesEnabled = multiRegionWritesEnabled;
-        this.hostsForReading = new ConcurrentSkipListSet<>(
-            new PreferredRegionsComparator(preferredRegions));
+        this.hostsForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
 
         this.hostsForWriting = this.multiRegionWritesEnabled
             ? this.hostsForReading
             : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("CosmosLoadBalancingPolicy -> {}", toJson(this));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosLoadBalancingPolicy -> {}", toJson(this));
         }
     }
 
@@ -185,7 +184,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Gets the list of preferred regions for failover on read operations.
+     * Gets the list of preferred regions for failover on write operations.
      * <p>
      * When multi-region writes are enabled, this list will be the same as the one returned by {@link
      * #getPreferredReadRegions}.
@@ -243,8 +242,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public HostDistance distance(final Host host) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("distance({})", toJson(host));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("distance({})", toJson(host));
         }
 
         final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
@@ -256,8 +255,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             ? HostDistance.IGNORED
             : comparator.hasPreferredRegion(datacenter) ? HostDistance.LOCAL : HostDistance.REMOTE;
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("distance -> returns({}) from {}", toJson(distance), this);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("distance -> returns({}) from {}", toJson(distance), this);
         }
 
         return distance;
@@ -271,59 +270,27 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void init(@NonNull final Cluster cluster, @NonNull final Collection<Host> hosts) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("init({})", toJson(hosts));
-        }
-
         requireNonNull(cluster, "expected non-null cluster");
         requireNonNull(hosts, "expected non-null hosts");
 
-        // Finalize the list of preferred regions
-
-        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
-        assert comparator != null;
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("init({})", toJson(hosts));
+        }
 
         final List<Host> contactPoints = getContactPointsOrThrow(cluster);
-        comparator.addPreferredRegions(contactPoints);
+
+        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
+        assert comparator != null : "expected non-null comparator";
+        comparator.addPreferredRegionsLast(contactPoints);
+        this.addAllHosts(hosts, this.hostsForReading);
 
         if (this.multiRegionWritesEnabled) {
             assert this.hostsForReading == this.hostsForWriting;
         } else {
             comparator = (PreferredRegionsComparator) this.hostsForWriting.comparator();
-            assert comparator != null;
-            comparator.addPreferredRegions(contactPoints);
-        }
-        // Initialize the hosts for read and write requests
-
-        this.hostsForReading.addAll(hosts.stream()
-            .filter(host -> {
-                requireNonNull(host, "expected non-null host");
-                final String datacenter = host.getDatacenter();
-                if (datacenter == null) {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("init -> Datacenter for host is unknown: {}", toJson(host));
-                    }
-                    return false;
-                }
-                return true;
-            })
-            .collect(Collectors.toList()));
-
-        if (this.multiRegionWritesEnabled) {
-            assert this.hostsForReading == this.hostsForWriting;
-        } else {
-
-            // Here we assume that all contact points are write capable. If you're connected to a Cosmos DB Cassandra
-            // API instance, there should be a single contact point, the global endpoint. This likely won't be the case
-            // if you're connected to an Apache Cassandra instance. Since this CosmosLoadBalancingPolicy is configured
-            // with multi-region writes disabled, we assume that the contact points are in the datacenters to which
-            // write requests should be sent.
-
-            for (final Host host : hosts) {
-                if (contactPoints.contains(host)) {
-                    this.hostsForWriting.add(host);
-                }
-            }
+            assert comparator != null : "expected non-null comparator";
+            comparator.addPreferredRegionsFirst(contactPoints);
+            this.addAllHosts(hosts, this.hostsForWriting);
         }
 
         // TODO (DANOBLE) consider brining in the semaphore code to increase the probability we've got a full list of
@@ -348,8 +315,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public Iterator<Host> newQueryPlan(final String loggedKeyspace, final Statement statement) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan(loggedKeyspace: {}, statement: {})",
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("newQueryPlan(loggedKeyspace: {}, statement: {})",
                 toJson(loggedKeyspace),
                 toJson(statement));
         }
@@ -365,8 +332,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onAdd(final Host host) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onAdd({})", toJson(host));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onAdd({})", toJson(host));
         }
         this.onUp(host);
     }
@@ -374,8 +341,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void onDown(final Host host) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onDown({})", toJson(host));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onDown({})", toJson(host));
         }
 
         requireNonNull(host, "expected non-null host");
@@ -426,15 +393,15 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onDown -> {}", this);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onDown -> {}", this);
         }
     }
 
     @Override
     public void onRemove(final Host host) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onRemove({})", toJson(host));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onRemove({})", toJson(host));
         }
         this.onDown(host);
     }
@@ -442,8 +409,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void onUp(final Host host) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp({})", toJson(host));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUp({})", toJson(host));
         }
 
         assert host.getDatacenter() != null;
@@ -465,8 +432,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
         }
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp -> {}", this);
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUp -> {}", this);
         }
     }
 
@@ -478,6 +445,26 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     // endregion
 
     // region Privates
+
+    private void addAllHosts(@NonNull final Collection<Host> hosts, @NonNull final NavigableSet<Host> hostsForWriting) {
+
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForWriting.comparator();
+        assert comparator != null;
+
+        hostsForWriting.addAll(hosts.stream()
+            .filter(host -> {
+                requireNonNull(host, "expected non-null host");
+                final String datacenter = host.getDatacenter();
+                if (datacenter == null) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("init -> Datacenter for host is unknown: {}", toJson(host));
+                    }
+                    return false;
+                }
+                return true;
+            })
+            .collect(Collectors.toList()));
+    }
 
     private static CosmosLoadBalancingPolicy buildFrom(final Builder builder) {
         return new CosmosLoadBalancingPolicy(builder.preferredRegions, builder.multiRegionWrites);
@@ -667,6 +654,27 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         /**
          * Called by {@link #init} to add the datacenters for all contact points to the list of preferred regions.
+         * These regions will appear first in the list of preferred regions following those specified using {@link
+         * CosmosLoadBalancingPolicy#builder()}.
+         * <p>
+         * This method is not thread safe and can only be called once. It should only be called by {@link #init}.
+         *
+         * @param contactPoints A set of contact points.
+         *
+         * @throws IllegalStateException if this method is called more than once.
+         */
+        void addPreferredRegionsFirst(final List<Host> contactPoints) {
+            if (this.preferredRegions != null) {
+                throw new IllegalStateException("attempt to add preferred regions more than once");
+            }
+            contactPoints.stream()
+                .map(Host::getDatacenter)
+                .forEachOrdered(region -> this.indexes.put(region, -this.indexes.size()));
+            this.preferredRegions = this.collectPreferredRegions();
+        }
+
+        /**
+         * Called by {@link #init} to add the datacenters for all contact points to the list of preferred regions.
          * These regions will appear last in the list of preferred regions following those specified using {@link
          * CosmosLoadBalancingPolicy#builder()}.
          * <p>
@@ -676,7 +684,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
          *
          * @throws IllegalStateException if this method is called more than once.
          */
-        void addPreferredRegions(final List<Host> contactPoints) {
+        void addPreferredRegionsLast(final List<Host> contactPoints) {
             if (this.preferredRegions != null) {
                 throw new IllegalStateException("attempt to add preferred regions more than once");
             }

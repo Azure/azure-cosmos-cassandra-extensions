@@ -141,10 +141,9 @@ public class CosmosJsonTest {
             final Metadata metadata = cluster.getMetadata();
             final String observed = toJson(metadata);
 
-            final String expected = format("{\"clusterName\":\"%s\",\"hosts\":%s,\"keyspaces\":%s}",
+            final String expected = format("{\"clusterName\":\"%s\",\"hosts\":%s}",
                 metadata.getClusterName(),
-                toJson(metadata.getAllHosts()),
-                toJson(metadata.getKeyspaces().stream().map(KeyspaceMetadata::toString).collect(Collectors.toList())));
+                toJson(metadata.getAllHosts()));
 
             assertThat(observed).isEqualTo(expected);
         }

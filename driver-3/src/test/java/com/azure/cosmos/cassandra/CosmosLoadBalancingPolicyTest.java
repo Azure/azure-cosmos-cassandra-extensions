@@ -7,7 +7,9 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.Session;
-import org.assertj.core.api.Condition;
+import com.datastax.driver.core.policies.LoadBalancingPolicy;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import jnr.ffi.annotations.In;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -18,13 +20,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
@@ -110,9 +116,10 @@ public final class CosmosLoadBalancingPolicyTest {
 
         try (Cluster cluster = builder.build()) {
 
-            final CosmosLoadBalancingPolicy policy = (CosmosLoadBalancingPolicy) cluster.getConfiguration()
-                .getPolicies()
-                .getLoadBalancingPolicy();
+            final CosmosLoadBalancingPolicy policy = getCosmosLoadBalancingPolicy(
+                cluster,
+                multiRegionWritesEnabled,
+                PREFERRED_REGIONS);
 
             final Metadata clusterMetadata = cluster.getMetadata();
 
@@ -211,6 +218,8 @@ public final class CosmosLoadBalancingPolicyTest {
     @ValueSource(booleans = { false, true })
     public void testWithoutPreferredRegions(final boolean multiRegionWritesEnabled) {
 
+        final List<String> preferredRegions = Collections.emptyList();
+
         final Cluster.Builder builder = cosmosClusterBuilder(
             CosmosLoadBalancingPolicy.builder()
                 .withMultiRegionWrites(multiRegionWritesEnabled)
@@ -222,9 +231,10 @@ public final class CosmosLoadBalancingPolicyTest {
 
         try (Cluster cluster = builder.build()) {
 
-            final CosmosLoadBalancingPolicy policy = (CosmosLoadBalancingPolicy) cluster.getConfiguration()
-                .getPolicies()
-                .getLoadBalancingPolicy();
+            final CosmosLoadBalancingPolicy policy = getCosmosLoadBalancingPolicy(
+                cluster,
+                multiRegionWritesEnabled,
+                preferredRegions);
 
             final Metadata clusterMetadata = cluster.getMetadata();
 
@@ -295,6 +305,26 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // region Privates
 
+    private static CosmosLoadBalancingPolicy getCosmosLoadBalancingPolicy(
+        @NonNull final Cluster cluster,
+        final boolean multiRegionWrites,
+        @NonNull final List<String> configuredPreferredRegions) {
+
+        final LoadBalancingPolicy policy = cluster.getConfiguration().getPolicies().getLoadBalancingPolicy();
+        assertThat(policy).isExactlyInstanceOf(CosmosLoadBalancingPolicy.class);
+
+        final CosmosLoadBalancingPolicy cosmosLoadBalancingPolicy = (CosmosLoadBalancingPolicy) policy;
+        assertThat(cosmosLoadBalancingPolicy.getMultiRegionWritesEnabled()).isEqualTo(multiRegionWrites);
+
+        final List<String> preferredReadRegions = cosmosLoadBalancingPolicy.getPreferredReadRegions();
+        assertThat(preferredReadRegions).containsExactlyElementsOf(configuredPreferredRegions);
+
+        final List<String> preferredWriteRegions = cosmosLoadBalancingPolicy.getPreferredWriteRegions();
+        assertThat(preferredWriteRegions).containsExactlyElementsOf(configuredPreferredRegions);
+
+        return cosmosLoadBalancingPolicy;
+    }
+
     /**
      * Runs tests until all regional hosts are enumerated by the driver or the calling test times out.
      * <p>
@@ -310,27 +340,32 @@ public final class CosmosLoadBalancingPolicyTest {
 
         final Metadata metadata = session.getCluster().getMetadata();
         Set<Host> hosts = Collections.emptySet();
-        int iterations = 0;
+        int iterations = 1;
 
         try {
 
             do {
                 testAllStatements(session);
                 hosts = metadata.getAllHosts();
-            } while (hosts.size() != REGIONAL_ENDPOINTS.size() && ++iterations < 10);
+            } while (hosts.size() != REGIONAL_ENDPOINTS.size() && ++iterations <= 5);
 
             return hosts;
 
         } finally {
 
-            assertThat(hosts).hasSize(REGIONAL_ENDPOINTS.size());
+            final Stream<InetSocketAddress> addresses = hosts.stream().map(host -> host.getEndPoint().resolve());
+            final Set<Host> finalHosts = hosts;
 
-            assertThat(hosts).are(new Condition<>(
-                host -> REGIONAL_ENDPOINTS.contains(host.getBroadcastRpcAddress()),
-                "regional endpoint"));
+            assertThat(hosts).withFailMessage(() ->
+                "Expected all hosts to match a regional endpoint: {"
+                    + "\"hosts\":" + toJson(finalHosts) + ","
+                    + "\"host-addresses\":" + toJson(addresses.collect(Collectors.toList())) + ","
+                    + "\"regional-endpoint-addresses\":" + toJson(REGIONAL_ENDPOINTS) + "}")
+                .allMatch(host -> REGIONAL_ENDPOINTS.contains(host.getEndPoint().resolve()));
 
-            LOG.info("[{}] regional endpoints enumerated in iteration {}: {}",
+            LOG.info("[{}] {} regional endpoints enumerated in iteration {}: {}",
                 session.getCluster().getClusterName(),
+                hosts.size(),
                 iterations,
                 toJson(hosts));
         }

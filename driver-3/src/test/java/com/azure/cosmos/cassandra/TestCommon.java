@@ -156,6 +156,8 @@ public final class TestCommon {
             "azure.cosmos.cassandra.truststore-path",
             null);
 
+        // TRUSTSTORE
+
         assertThat(value).isNotEmpty();
         assertThat(new File(value)).exists().canRead();
         TRUSTSTORE_PATH = value;
@@ -166,6 +168,9 @@ public final class TestCommon {
 
         assertThat(value).isNotEmpty();
         TRUSTSTORE_PASSWORD = value;
+
+        System.setProperty("javax.net.ssl.trustStore", TRUSTSTORE_PATH);
+        System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
     }
 
     private TestCommon() {
