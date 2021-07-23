@@ -4,6 +4,7 @@
 package com.azure.cosmos.cassandra.implementation;
 
 import com.azure.cosmos.cassandra.CosmosJson;
+import com.codahale.metrics.MetricFilter;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.Host;
@@ -224,7 +225,14 @@ public final class CosmosJsonModule extends SimpleModule {
                 }
             }
 
-            provider.defaultSerializeField("metrics", metrics, generator);
+            generator.writeFieldName("metrics");
+
+            if (metrics == null) {
+                generator.writeNull();
+            } else {
+                provider.defaultSerializeValue(metrics.getRegistry().getMeters(MetricFilter.ALL), generator);
+            }
+
             generator.writeEndObject();
         }
     }

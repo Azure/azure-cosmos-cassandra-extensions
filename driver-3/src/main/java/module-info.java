@@ -15,6 +15,7 @@ module com.azure.cosmos.cassandra {
     // Automatic modules
 
     requires cassandra.driver.core;
+    requires com.codahale.metrics;
     requires com.github.spotbugs.annotations;
     requires org.slf4j;
 }

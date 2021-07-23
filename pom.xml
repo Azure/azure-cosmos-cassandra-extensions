@@ -52,6 +52,7 @@ Licensed under the MIT License.
     <!-- Package dependency version numbers -->
     <version.cassandra-driver>[3.8,3.11)</version.cassandra-driver>
     <version.jackson>[2.12,2.12.5)</version.jackson>
+    <version.metrics>4.2.3</version.metrics>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
     <version.spotbugs>[4.2.3,4.3)</version.spotbugs>
     <!-- Test dependency version numbers -->
@@ -103,6 +104,11 @@ Licensed under the MIT License.
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-annotations</artifactId>
         <version>${version.spotbugs}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${version.metrics}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
