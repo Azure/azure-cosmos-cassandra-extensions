@@ -4,7 +4,6 @@
 package com.azure.cosmos.cassandra.implementation;
 
 import com.azure.cosmos.cassandra.CosmosJson;
-import com.codahale.metrics.MetricFilter;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.Host;
@@ -210,6 +209,7 @@ public final class CosmosJsonModule extends SimpleModule {
             generator.writeStartObject();
             provider.defaultSerializeField("clusterName", value.getClusterName(), generator);
             provider.defaultSerializeField("closed", value.isClosed(), generator);
+            provider.defaultSerializeField("configuration", value.getConfiguration(), generator);
 
             Metrics metrics = null;
 
@@ -225,14 +225,7 @@ public final class CosmosJsonModule extends SimpleModule {
                 }
             }
 
-            generator.writeFieldName("metrics");
-
-            if (metrics == null) {
-                generator.writeNull();
-            } else {
-                provider.defaultSerializeValue(metrics.getRegistry().getMeters(MetricFilter.ALL), generator);
-            }
-
+            generator.writeObjectField("metrics", metrics);
             generator.writeEndObject();
         }
     }
@@ -304,6 +297,33 @@ public final class CosmosJsonModule extends SimpleModule {
             provider.defaultSerializeField("clusterName", value.getClusterName(), generator);
             provider.defaultSerializeField("hosts", value.getAllHosts(), generator);
             generator.writeEndObject();
+        }
+    }
+
+
+    /**
+     * A {@link JsonSerializer} for serializing a {@link Host} object into JSON.
+     */
+    public static final class MetricsSerializer extends StdSerializer<Metrics> {
+
+        public static final MetricsSerializer INSTANCE = new MetricsSerializer();
+        private static final long serialVersionUID = 4148025457460099373L;
+
+        private MetricsSerializer() {
+            super(Metrics.class);
+        }
+
+        @Override
+        public void serialize(
+            @NonNull final Metrics value,
+            @NonNull final JsonGenerator generator,
+            @NonNull final SerializerProvider provider) throws IOException {
+
+            requireNonNull(value, "expected non-null value");
+            requireNonNull(value, "expected non-null generator");
+            requireNonNull(value, "expected non-null provider");
+
+            provider.defaultSerializeValue(value.getRegistry().getMetrics(), generator);
         }
     }
 

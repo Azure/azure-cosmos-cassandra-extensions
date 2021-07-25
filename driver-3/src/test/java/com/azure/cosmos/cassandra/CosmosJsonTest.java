@@ -48,14 +48,6 @@ public class CosmosJsonTest {
         .map(StackTraceElement::toString)
         .collect(Collectors.toList()));
 
-    /**
-     * Prints the parameters for this test class on {@link System#out}.
-     */
-    @BeforeAll
-    public static void init() {
-        TestCommon.printTestParameters();
-    }
-
     @ParameterizedTest
     @Tag("checkin")
     @MethodSource("provideClusterBuilder")
@@ -75,9 +67,10 @@ public class CosmosJsonTest {
 
             final Map<String, Object> expected;
 
-            json = format("{\"clusterName\":\"%s\",\"closed\":%s,\"metadata\":%s,\"metrics\":%s}",
+            json = format("{\"clusterName\":\"%s\",\"closed\":%s,\"configuration\":%s,\"metadata\":%s,\"metrics\":%s}",
                 cluster.getClusterName(),
                 cluster.isClosed(),
+                toJson(cluster.getConfiguration()),
                 toJson(cluster.getMetadata()),
                 toJson(cluster.getMetrics()));
 
@@ -177,6 +170,14 @@ public class CosmosJsonTest {
         assertThat(value).isEqualTo(expected);
     }
 
+    /**
+     * Prints the parameters for this test class on {@link System#out}.
+     */
+    @BeforeAll
+    public static void init() {
+        TestCommon.printTestParameters();
+    }
+
     @NonNull
     private static Throwable fixupStackTrace(final Throwable error) {
         error.setStackTrace(STACK_TRACE);
@@ -187,7 +188,8 @@ public class CosmosJsonTest {
     private static Stream<Arguments> provideClusterBuilder() {
         return Stream.of(Arguments.of(cosmosClusterBuilder()
             .addContactPoint(GLOBAL_ENDPOINT_HOSTNAME)
-            .withCredentials(USERNAME, PASSWORD)));
+            .withCredentials(USERNAME, PASSWORD)
+            .withoutJMXReporting()));
     }
 
     @NonNull
@@ -204,11 +206,13 @@ public class CosmosJsonTest {
         return Stream.of(Arguments.of(session, format("{\"cluster\":{"
                 + "\"clusterName\":%s,"
                 + "\"closed\":false,"
+                + "\"configuration\":%s,"
                 + "\"metadata\":%s,"
                 + "\"metrics\":%s},"
                 + "\"closed\":false,"
                 + "\"loggedKeyspace\":null}",
             toJson(cluster.getClusterName()),
+            toJson(cluster.getConfiguration()),
             toJson(cluster.getMetadata()),
             toJson(cluster.getMetrics()))));
     }
