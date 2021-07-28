@@ -12,6 +12,7 @@ import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchableStatement;
+import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -233,6 +234,15 @@ public final class CosmosJsonModule extends SimpleModule {
         "startupOptions" })
     public abstract static class DriverContextMixIn {
         public static final Class<DriverContext> HANDLED_TYPE = DriverContext.class;
+    }
+
+    /**
+     * A mix-in for serializing {@link com.datastax.oss.driver.api.core.cql.ExecutionInfo} instances to JSON.
+     */
+    @JsonAppend()
+    @JsonIgnoreProperties({ "incomingPayload", "pagingState", "queryTrace", "queryTraceAsync", "safePagingState" })
+    public abstract static class ExecutionInfoMixIn {
+        public static final Class<ExecutionInfo> HANDLED_TYPE = ExecutionInfo.class;
     }
 
     /**
