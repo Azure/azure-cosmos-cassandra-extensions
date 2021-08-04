@@ -301,6 +301,9 @@ Licensed under the MIT License.
           <includeTests>true</includeTests>
           <threshold>Low</threshold>
           <xmlOutput>true</xmlOutput>
+          <systemPropertyVariables>
+            <javax.net.ssl.trustStoreType>PKCS12</javax.net.ssl.trustStoreType>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>
