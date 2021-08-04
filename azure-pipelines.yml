@@ -110,7 +110,7 @@ jobs:
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
       goals: 'verify'
-      options: -Dcheckstyle.skip -Dmaven.main.skip -DargLine="-Djavax.net.ssl.trustStoreType=PKCS12"
+      options: -Dcheckstyle.skip -Dmaven.main.skip
       testResultsFiles: '**/surefire-reports/TEST-*.xml'
       publishJUnitResults: true
     env:

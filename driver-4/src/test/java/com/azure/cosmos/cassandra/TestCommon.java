@@ -157,6 +157,12 @@ public final class TestCommon {
 
         assertThat(value).isNotEmpty();
         TRUSTSTORE_PASSWORD = value;
+
+        System.setProperty("javax.net.ssl.trustStore",
+            System.getProperty("azure.cosmos.cassandra.truststore-path"));
+
+        System.setProperty("javax.net.ssl.trustStorePassword",
+            System.getProperty("azure.cosmos.cassandra.truststore-password"));
     }
 
     private TestCommon() {
@@ -187,6 +193,7 @@ public final class TestCommon {
      * This method should be called in a test method marked with {@link BeforeAll}. It is not automatically called here.
      */
     public static void printTestParameters() {
+
         out.println("--------------------------------------------------------------");
         out.println("T E S T  P A R A M E T E R S");
         out.println("--------------------------------------------------------------");
@@ -194,6 +201,13 @@ public final class TestCommon {
         for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
             out.println(property.getKey() + " = " + toJson(property.getValue()));
         }
+
+        out.println("javax.net.ssl.trustStore" + " = "
+            + toJson(System.getProperty("javax.net.ssl.trustStore")));
+        out.println("javax.net.ssl.trustStoreType" + " = "
+            + toJson(System.getProperty("javax.net.ssl.trustStoreType")));
+        out.println("javax.net.ssl.trustStorePassword" + " = "
+            + toJson(System.getProperty("javax.net.ssl.trustStorePassword")));
 
         out.println();
     }
