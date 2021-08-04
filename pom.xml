@@ -289,7 +289,7 @@ Licensed under the MIT License.
         <configuration>
           <useModulePath>false</useModulePath>
           <systemPropertyVariables>
-            <javax.net.ssl.trustStoreType>PKCS12</javax.net.ssl.trustStoreType>
+            <javax.net.ssl.trustStoreType>JKS</javax.net.ssl.trustStoreType>
           </systemPropertyVariables>
         </configuration>
       </plugin>
