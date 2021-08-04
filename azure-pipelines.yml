@@ -225,6 +225,7 @@ variables:
 - name: New-JavaTruststore
   value: |
     Set-Content -Path "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}" -AsByteStream -Value ([System.Convert]::FromBase64String("${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT}"))
+    "Keystore path: ${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}"
     keytool -list -keystore "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}" -storepass "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD}"
 
 - name: Stage-Artifacts
