@@ -137,7 +137,7 @@ public final class CosmosJsonModule extends SimpleModule {
                 } else {
                     final int index = parts[2].indexOf('-');
                     if (index < 0) {
-                        patch = Integer.parseUnsignedInt(parts[3]);
+                        patch = Integer.parseUnsignedInt(parts[2]);
                         snapshotInfo = null;
                     } else {
                         patch = Integer.parseUnsignedInt(parts[2].substring(0, index));
