@@ -1,0 +1,72 @@
+#!/usr/bin/env bash 
+
+set -o errexit -o nounset
+
+declare -ra arg_line=()
+declare -r log_directory=~/.local/var/log
+declare -r reporting_directory="$log_directory"
+
+echo -----------------------------------------------------------------------------------------------------------------------
+echo " B U I L D"
+echo -----------------------------------------------------------------------------------------------------------------------
+echo
+echo "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT=$AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT"
+echo "AZURE_COSMOS_CASSANDRA_USERNAME=$AZURE_COSMOS_CASSANDRA_USERNAME"
+echo "AZURE_COSMOS_CASSANDRA_PASSWORD=${AZURE_COSMOS_CASSANDRA_PASSWORD//?/*}"
+echo "AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES=$AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITES"
+echo "AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS=$AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS"
+echo "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS=$AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINTS"
+echo "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD=${AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD//?/*}"
+echo "AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH=$AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH"
+echo "AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS=$AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS"
+echo
+
+git submodule update --init --recursive
+mvn clean install -DskipTests
+rm -rf $log_directory/azure-cosmos-cassandra*.log || true
+rm -rf $reporting_directory/*cql-{requests,messages}.csv || true
+
+echo -----------------------------------------------------------------------------------------------------------------------
+echo " V E R I F Y"
+echo -----------------------------------------------------------------------------------------------------------------------
+
+function verify() {
+
+    local -ra options=(-Dcheckstyle.skip -Dmaven.main.skip)
+    local successes=()
+    local failures=()
+
+    # Package tests
+
+    set -o xtrace
+    if mvn --file driver-3/pom.xml "${options[@]}" -DargLine="${*:-}" verify; then
+        successes+=(driver-3)
+    else
+        failures+=(driver-3)
+    fi
+    set +o xtrace
+
+    # Tests of examples
+
+    for app in $(find examples -depth 1 -type d); do
+        set -o xtrace
+        if mvn --file $app/pom.xml "${options[@]}" -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar" verify; then
+            successes+=("$app")
+        else
+            failures+=("$app")
+        fi
+        set +o xtrace
+    done
+    
+    if [[ ${#failures[@]} -eq 0 ]]; then
+        echo
+        echo "VERIFICATION SUCCESS"
+    else 
+        echo
+        echo "VERIFICATION FAILURE"
+        echo "  SUCCEEDED: ${successes[*]}"
+        echo "  FAILED: ${failures[*]}"
+    fi
+}
+
+time verify "${arg_line[@]}"

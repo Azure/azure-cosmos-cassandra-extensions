@@ -12,44 +12,226 @@ pr:
 
 variables:
 
-- name: Log.Filename
+- name: Azure.Cosmos.Cassandra.Preferred.Regions
+  value: '$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_1),$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_2),$(AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_3)'
+  readonly: true
+
+- name: Azure.Cosmos.Cassandra.Regional.Endpoints
+  value: '$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_1),$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_2),$(AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_3)'
+
+- name: Azure.Cosmos.Cassandra.Truststore.Content
+  value: >
+    /u3+7QAAAAIAAAAEAAAAAgAzY29zbW9zLWNhc3NhbmRyYS0zLmNhc3NhbmRyYS5jb3Ntb3MuYXp1
+    cmUuY29tOjEwMzUwAAABexQ0DP8ABVguNTA5AAAJUDCCCUwwggc0oAMCAQICExIAEqiF6zup2Oy0
+    z9IAAAASqIUwDQYJKoZIhvcNAQELBQAwTzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29m
+    dCBDb3Jwb3JhdGlvbjEgMB4GA1UEAxMXTWljcm9zb2Z0IFJTQSBUTFMgQ0EgMDEwHhcNMjEwNzA1
+    MDAwMTAwWhcNMjIwNzA1MDAwMTAwWjAlMSMwIQYDVQQDDBoqLnRhYmxlLmNvc21vc2RiLmF6dXJl
+    LmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN/r2ypKMo2PzC328asU7gyQeaVL
+    z6pO4HxiBuWAWZgRQBumHcO5TIEHUPu6vyJ8dALVH+Z2ooKYJ2ZHblZOJ6njAxTw59mP6GNqxaD5
+    Qq2Qh5tJ2VkG0bEvEWOHrtWpOhYm9pCFaWkCs8JH/Aipd9OshyBzZnVIntiELDXey0MvpxNdB21e
+    cj1Z9a+Aw/zSsz7od18zlXNGOPfS+gJXhRs4Fstf9ifER3Q3n80Lwe5ht8r1PqmX7yLvZC5xws0n
+    pijukZbOek7nwVajhIwUPRQMsDbhcPj82Sf0GnNz2j5SOC9ojKErNqsVdN3vlESjBfw/JqcXXV7n
+    IAT0sbQvcYkCAwEAAaOCBUkwggVFMIIBfQYKKwYBBAHWeQIEAgSCAW0EggFpAWcAdgApeb7wnjk5
+    IfBWc59jpXflvld9nGAK+PlNXSZcJV3HhAAAAXp0AQ6HAAAEAwBHMEUCIFJM2ksa1fMvMO7vYuB/
+    ZyC1C0jXXYYIIjM3r8r5rt9DAiEAiLz17jo4zhC+3BdfOJvnIo10QUxHZcmEql0GlGhI4GIAdQBR
+    o7D1/QF5nFZtuDd4jwykeswbJ8v3nohCmg3+1IsF5QAAAXp0AQ/nAAAEAwBGMEQCIC8VYiJ119a/
+    MKXjJPkW8oZVfA1/sVA4mOmMCfsE1iHrAiBpGytjTJxpph+ATo/M6/9v94Za/Hbhp/oEfNPNT0++
+    lAB2AEalVet1+pEgMLWiiWn0830RLEF0vv1JuIWr8vxw/m1HAAABenQBDtoAAAQDAEcwRQIhAILw
+    Iv2RH50kIVZWwBs1BNgGGDlnX9vZhk1/v7GIv0BzAiBXIYSPXMJJ9OgAvb/4FHXwnw8PyEwEV+/R
+    /LCRQi2PGTAnBgkrBgEEAYI3FQoEGjAYMAoGCCsGAQUFBwMBMAoGCCsGAQUFBwMCMD4GCSsGAQQB
+    gjcVBwQxMC8GJysGAQQBgjcVCIfahnWD7tkBgsmFG4G1nmGF9OtggV2Fho5Bh8KYUAIBZAIBJzCB
+    hwYIKwYBBQUHAQEEezB5MFMGCCsGAQUFBzAChkdodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
+    L21zY29ycC9NaWNyb3NvZnQlMjBSU0ElMjBUTFMlMjBDQSUyMDAxLmNydDAiBggrBgEFBQcwAYYW
+    aHR0cDovL29jc3AubXNvY3NwLmNvbTAdBgNVHQ4EFgQUv/+GC8BLisxGKwifNs+H9YVFbV8wDgYD
+    VR0PAQH/BAQDAgSwMIIBUgYDVR0RBIIBSTCCAUWCHCouZ3JlbWxpbi5jb3Ntb3NkYi5henVyZS5j
+    b22CHiouY2Fzc2FuZHJhLmNvc21vc2RiLmF6dXJlLmNvbYIaKi50YWJsZS5jb3Ntb3NkYi5henVy
+    ZS5jb22CGCouc3FsLmNvc21vc2RiLmF6dXJlLmNvbYIZKi5ldGNkLmNvc21vc2RiLmF6dXJlLmNv
+    bYIaKi5ncmVtbGluLmNvc21vcy5henVyZS5jb22CGCoubW9uZ28uY29zbW9zLmF6dXJlLmNvbYIc
+    Ki5jYXNzYW5kcmEuY29zbW9zLmF6dXJlLmNvbYIYKi50YWJsZS5jb3Ntb3MuYXp1cmUuY29tghYq
+    LnNxbC5jb3Ntb3MuYXp1cmUuY29tghcqLmV0Y2QuY29zbW9zLmF6dXJlLmNvbYIVKi5kb2N1bWVu
+    dHMuYXp1cmUuY29tMIGwBgNVHR8EgagwgaUwgaKggZ+ggZyGTWh0dHA6Ly9tc2NybC5taWNyb3Nv
+    ZnQuY29tL3BraS9tc2NvcnAvY3JsL01pY3Jvc29mdCUyMFJTQSUyMFRMUyUyMENBJTIwMDEuY3Js
+    hktodHRwOi8vY3JsLm1pY3Jvc29mdC5jb20vcGtpL21zY29ycC9jcmwvTWljcm9zb2Z0JTIwUlNB
+    JTIwVExTJTIwQ0ElMjAwMS5jcmwwVwYDVR0gBFAwTjBCBgkrBgEEAYI3KgEwNTAzBggrBgEFBQcC
+    ARYnaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraS9tc2NvcnAvY3BzMAgGBmeBDAECATAfBgNV
+    HSMEGDAWgBS1dgwwEc7HkkJNTMdcLMipDOgLZDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUH
+    AwIwDQYJKoZIhvcNAQELBQADggIBAEXuJ0cvCOw2Xj7CDjVrTgbRxI02Sqf1mW2EjYZJ2Rd6vvUk
+    dftdh52D+u7t/hvd351vGaV/ZAeOi6xhSrP0vLIh6lgmn00ZzfmOw2CtNzlwtVlnimfL3nMULO+X
+    nuiYF3QJRSp0ie9fO/TPH4stwuI+zIKH8JL71O4/JRa/Or4+y3ZjK+m3nPeFbmhqjeSRZq4Vt5zp
+    gVinqsJkwbmr977tUiWOpHRNH+vcXQVUSXX1s+cnNdXJyY/8WZMnGp6BxQCyUnjzM+wp9oBsp257
+    MJgfyUAe1vWUXR2sD0GseaW6R9o/hzCAm6eu6Df2PYpBFyfhnHSGsNIR/0ZNzpawH304RQUSkUtB
+    z+/EH9e/NtQNBsNZ8Pi4qbFrz5hC6DyM9SQK5x5gpisRnF7DdzrOVhBv7IlAeBhfwpLYSPBft3Pr
+    mKeEsaPy9kh84AMF+/ZmbPzjI8VV8tV7+esb2dWZrvyAkU5m15L93t1lxxNWV15+6kSfloF4jHR4
+    nB6GixbhumMhwd8hSnb6RGYzAzr4mB2nD3A93kph6Qw7THc+UXJhCZtyYu/OCpJcwXVYkt0ZDmIP
+    xb4BRh36CmH+W+7C0mWIbC37Df8aw9lNgUA3eB5T8L4/uPbIU634JAeYU0MYXMC3h9nXbG2k/L0/
+    JMLheQScD5IAOSX3Ca+Uymi9czaDAAAAAgA6Y29zbW9zLWNhc3NhbmRyYS0zLXdlc3R1cy5jYXNz
+    YW5kcmEuY29zbW9zLmF6dXJlLmNvbToxMDM1MAAAAXsUNAhGAAVYLjUwOQAACVAwgglMMIIHNKAD
+    AgECAhMSABKohes7qdjstM/SAAAAEqiFMA0GCSqGSIb3DQEBCwUAME8xCzAJBgNVBAYTAlVTMR4w
+    HAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xIDAeBgNVBAMTF01pY3Jvc29mdCBSU0EgVExT
+    IENBIDAxMB4XDTIxMDcwNTAwMDEwMFoXDTIyMDcwNTAwMDEwMFowJTEjMCEGA1UEAwwaKi50YWJs
+    ZS5jb3Ntb3NkYi5henVyZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDf69sq
+    SjKNj8wt9vGrFO4MkHmlS8+qTuB8YgblgFmYEUAbph3DuUyBB1D7ur8ifHQC1R/mdqKCmCdmR25W
+    Tiep4wMU8OfZj+hjasWg+UKtkIebSdlZBtGxLxFjh67VqToWJvaQhWlpArPCR/wIqXfTrIcgc2Z1
+    SJ7YhCw13stDL6cTXQdtXnI9WfWvgMP80rM+6HdfM5VzRjj30voCV4UbOBbLX/YnxEd0N5/NC8Hu
+    YbfK9T6pl+8i72QuccLNJ6Yo7pGWznpO58FWo4SMFD0UDLA24XD4/Nkn9Bpzc9o+UjgvaIyhKzar
+    FXTd75REowX8PyanF11e5yAE9LG0L3GJAgMBAAGjggVJMIIFRTCCAX0GCisGAQQB1nkCBAIEggFt
+    BIIBaQFnAHYAKXm+8J45OSHwVnOfY6V35b5XfZxgCvj5TV0mXCVdx4QAAAF6dAEOhwAABAMARzBF
+    AiBSTNpLGtXzLzDu72Lgf2cgtQtI112GCCIzN6/K+a7fQwIhAIi89e46OM4QvtwXXzib5yKNdEFM
+    R2XJhKpdBpRoSOBiAHUAUaOw9f0BeZxWbbg3eI8MpHrMGyfL956IQpoN/tSLBeUAAAF6dAEP5wAA
+    BAMARjBEAiAvFWIiddfWvzCl4yT5FvKGVXwNf7FQOJjpjAn7BNYh6wIgaRsrY0ycaaYfgE6PzOv/
+    b/eGWvx24af6BHzTzU9PvpQAdgBGpVXrdfqRIDC1oolp9PN9ESxBdL79SbiFq/L8cP5tRwAAAXp0
+    AQ7aAAAEAwBHMEUCIQCC8CL9kR+dJCFWVsAbNQTYBhg5Z1/b2YZNf7+xiL9AcwIgVyGEj1zCSfTo
+    AL2/+BR18J8PD8hMBFfv0fywkUItjxkwJwYJKwYBBAGCNxUKBBowGDAKBggrBgEFBQcDATAKBggr
+    BgEFBQcDAjA+BgkrBgEEAYI3FQcEMTAvBicrBgEEAYI3FQiH2oZ1g+7ZAYLJhRuBtZ5hhfTrYIFd
+    hYaOQYfCmFACAWQCAScwgYcGCCsGAQUFBwEBBHsweTBTBggrBgEFBQcwAoZHaHR0cDovL3d3dy5t
+    aWNyb3NvZnQuY29tL3BraS9tc2NvcnAvTWljcm9zb2Z0JTIwUlNBJTIwVExTJTIwQ0ElMjAwMS5j
+    cnQwIgYIKwYBBQUHMAGGFmh0dHA6Ly9vY3NwLm1zb2NzcC5jb20wHQYDVR0OBBYEFL//hgvAS4rM
+    RisInzbPh/WFRW1fMA4GA1UdDwEB/wQEAwIEsDCCAVIGA1UdEQSCAUkwggFFghwqLmdyZW1saW4u
+    Y29zbW9zZGIuYXp1cmUuY29tgh4qLmNhc3NhbmRyYS5jb3Ntb3NkYi5henVyZS5jb22CGioudGFi
+    bGUuY29zbW9zZGIuYXp1cmUuY29tghgqLnNxbC5jb3Ntb3NkYi5henVyZS5jb22CGSouZXRjZC5j
+    b3Ntb3NkYi5henVyZS5jb22CGiouZ3JlbWxpbi5jb3Ntb3MuYXp1cmUuY29tghgqLm1vbmdvLmNv
+    c21vcy5henVyZS5jb22CHCouY2Fzc2FuZHJhLmNvc21vcy5henVyZS5jb22CGCoudGFibGUuY29z
+    bW9zLmF6dXJlLmNvbYIWKi5zcWwuY29zbW9zLmF6dXJlLmNvbYIXKi5ldGNkLmNvc21vcy5henVy
+    ZS5jb22CFSouZG9jdW1lbnRzLmF6dXJlLmNvbTCBsAYDVR0fBIGoMIGlMIGioIGfoIGchk1odHRw
+    Oi8vbXNjcmwubWljcm9zb2Z0LmNvbS9wa2kvbXNjb3JwL2NybC9NaWNyb3NvZnQlMjBSU0ElMjBU
+    TFMlMjBDQSUyMDAxLmNybIZLaHR0cDovL2NybC5taWNyb3NvZnQuY29tL3BraS9tc2NvcnAvY3Js
+    L01pY3Jvc29mdCUyMFJTQSUyMFRMUyUyMENBJTIwMDEuY3JsMFcGA1UdIARQME4wQgYJKwYBBAGC
+    NyoBMDUwMwYIKwYBBQUHAgEWJ2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2kvbXNjb3JwL2Nw
+    czAIBgZngQwBAgEwHwYDVR0jBBgwFoAUtXYMMBHOx5JCTUzHXCzIqQzoC2QwHQYDVR0lBBYwFAYI
+    KwYBBQUHAwEGCCsGAQUFBwMCMA0GCSqGSIb3DQEBCwUAA4ICAQBF7idHLwjsNl4+wg41a04G0cSN
+    Nkqn9ZlthI2GSdkXer71JHX7XYedg/ru7f4b3d+dbxmlf2QHjousYUqz9LyyIepYJp9NGc35jsNg
+    rTc5cLVZZ4pny95zFCzvl57omBd0CUUqdInvXzv0zx+LLcLiPsyCh/CS+9TuPyUWvzq+Pst2Yyvp
+    t5z3hW5oao3kkWauFbec6YFYp6rCZMG5q/e+7VIljqR0TR/r3F0FVEl19bPnJzXVycmP/FmTJxqe
+    gcUAslJ48zPsKfaAbKduezCYH8lAHtb1lF0drA9BrHmlukfaP4cwgJunrug39j2KQRcn4Zx0hrDS
+    Ef9GTc6WsB99OEUFEpFLQc/vxB/XvzbUDQbDWfD4uKmxa8+YQug8jPUkCuceYKYrEZxew3c6zlYQ
+    b+yJQHgYX8KS2EjwX7dz65inhLGj8vZIfOADBfv2Zmz84yPFVfLVe/nrG9nVma78gJFOZteS/d7d
+    ZccTVldefupEn5aBeIx0eJwehosW4bpjIcHfIUp2+kRmMwM6+Jgdpw9wPd5KYekMO0x3PlFyYQmb
+    cmLvzgqSXMF1WJLdGQ5iD8W+AUYd+gph/lvuwtJliGwt+w3/GsPZTYFAN3geU/C+P7j2yFOt+CQH
+    mFNDGFzAt4fZ12xtpPy9PyTC4XkEnA+SADkl9wmvlMpovXM2gwAAAAIAPWNvc21vcy1jYXNzYW5k
+    cmEtMy1jZW50cmFsdXMuY2Fzc2FuZHJhLmNvc21vcy5henVyZS5jb206MTAzNTAAAAF7FDQCrAAF
+    WC41MDkAAAlQMIIJTDCCBzSgAwIBAgITEgASqIXrO6nY7LTP0gAAABKohTANBgkqhkiG9w0BAQsF
+    ADBPMQswCQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSAwHgYDVQQD
+    ExdNaWNyb3NvZnQgUlNBIFRMUyBDQSAwMTAeFw0yMTA3MDUwMDAxMDBaFw0yMjA3MDUwMDAxMDBa
+    MCUxIzAhBgNVBAMMGioudGFibGUuY29zbW9zZGIuYXp1cmUuY29tMIIBIjANBgkqhkiG9w0BAQEF
+    AAOCAQ8AMIIBCgKCAQEA3+vbKkoyjY/MLfbxqxTuDJB5pUvPqk7gfGIG5YBZmBFAG6Ydw7lMgQdQ
+    +7q/Inx0AtUf5naigpgnZkduVk4nqeMDFPDn2Y/oY2rFoPlCrZCHm0nZWQbRsS8RY4eu1ak6Fib2
+    kIVpaQKzwkf8CKl306yHIHNmdUie2IQsNd7LQy+nE10HbV5yPVn1r4DD/NKzPuh3XzOVc0Y499L6
+    AleFGzgWy1/2J8RHdDefzQvB7mG3yvU+qZfvIu9kLnHCzSemKO6Rls56TufBVqOEjBQ9FAywNuFw
+    +PzZJ/Qac3PaPlI4L2iMoSs2qxV03e+URKMF/D8mpxddXucgBPSxtC9xiQIDAQABo4IFSTCCBUUw
+    ggF9BgorBgEEAdZ5AgQCBIIBbQSCAWkBZwB2ACl5vvCeOTkh8FZzn2Old+W+V32cYAr4+U1dJlwl
+    XceEAAABenQBDocAAAQDAEcwRQIgUkzaSxrV8y8w7u9i4H9nILULSNddhggiMzevyvmu30MCIQCI
+    vPXuOjjOEL7cF184m+cijXRBTEdlyYSqXQaUaEjgYgB1AFGjsPX9AXmcVm24N3iPDKR6zBsny/ee
+    iEKaDf7UiwXlAAABenQBD+cAAAQDAEYwRAIgLxViInXX1r8wpeMk+RbyhlV8DX+xUDiY6YwJ+wTW
+    IesCIGkbK2NMnGmmH4BOj8zr/2/3hlr8duGn+gR8081PT76UAHYARqVV63X6kSAwtaKJafTzfREs
+    QXS+/Um4havy/HD+bUcAAAF6dAEO2gAABAMARzBFAiEAgvAi/ZEfnSQhVlbAGzUE2AYYOWdf29mG
+    TX+/sYi/QHMCIFchhI9cwkn06AC9v/gUdfCfDw/ITARX79H8sJFCLY8ZMCcGCSsGAQQBgjcVCgQa
+    MBgwCgYIKwYBBQUHAwEwCgYIKwYBBQUHAwIwPgYJKwYBBAGCNxUHBDEwLwYnKwYBBAGCNxUIh9qG
+    dYPu2QGCyYUbgbWeYYX062CBXYWGjkGHwphQAgFkAgEnMIGHBggrBgEFBQcBAQR7MHkwUwYIKwYB
+    BQUHMAKGR2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2kvbXNjb3JwL01pY3Jvc29mdCUyMFJT
+    QSUyMFRMUyUyMENBJTIwMDEuY3J0MCIGCCsGAQUFBzABhhZodHRwOi8vb2NzcC5tc29jc3AuY29t
+    MB0GA1UdDgQWBBS//4YLwEuKzEYrCJ82z4f1hUVtXzAOBgNVHQ8BAf8EBAMCBLAwggFSBgNVHREE
+    ggFJMIIBRYIcKi5ncmVtbGluLmNvc21vc2RiLmF6dXJlLmNvbYIeKi5jYXNzYW5kcmEuY29zbW9z
+    ZGIuYXp1cmUuY29tghoqLnRhYmxlLmNvc21vc2RiLmF6dXJlLmNvbYIYKi5zcWwuY29zbW9zZGIu
+    YXp1cmUuY29tghkqLmV0Y2QuY29zbW9zZGIuYXp1cmUuY29tghoqLmdyZW1saW4uY29zbW9zLmF6
+    dXJlLmNvbYIYKi5tb25nby5jb3Ntb3MuYXp1cmUuY29tghwqLmNhc3NhbmRyYS5jb3Ntb3MuYXp1
+    cmUuY29tghgqLnRhYmxlLmNvc21vcy5henVyZS5jb22CFiouc3FsLmNvc21vcy5henVyZS5jb22C
+    FyouZXRjZC5jb3Ntb3MuYXp1cmUuY29tghUqLmRvY3VtZW50cy5henVyZS5jb20wgbAGA1UdHwSB
+    qDCBpTCBoqCBn6CBnIZNaHR0cDovL21zY3JsLm1pY3Jvc29mdC5jb20vcGtpL21zY29ycC9jcmwv
+    TWljcm9zb2Z0JTIwUlNBJTIwVExTJTIwQ0ElMjAwMS5jcmyGS2h0dHA6Ly9jcmwubWljcm9zb2Z0
+    LmNvbS9wa2kvbXNjb3JwL2NybC9NaWNyb3NvZnQlMjBSU0ElMjBUTFMlMjBDQSUyMDAxLmNybDBX
+    BgNVHSAEUDBOMEIGCSsGAQQBgjcqATA1MDMGCCsGAQUFBwIBFidodHRwOi8vd3d3Lm1pY3Jvc29m
+    dC5jb20vcGtpL21zY29ycC9jcHMwCAYGZ4EMAQIBMB8GA1UdIwQYMBaAFLV2DDARzseSQk1Mx1ws
+    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
+    cC9NaWNyb3NvZnQlMjBSU0ElMjBUTFMlMjBDQSUyMDAxLmNydDAiBggrBgEFBQcwAYYWaHR0cDov
+    L29jc3AubXNvY3NwLmNvbTAdBgNVHQ4EFgQUv/+GC8BLisxGKwifNs+H9YVFbV8wDgYDVR0PAQH/
+    BAQDAgSwMIIBUgYDVR0RBIIBSTCCAUWCHCouZ3JlbWxpbi5jb3Ntb3NkYi5henVyZS5jb22CHiou
+    Y2Fzc2FuZHJhLmNvc21vc2RiLmF6dXJlLmNvbYIaKi50YWJsZS5jb3Ntb3NkYi5henVyZS5jb22C
+    GCouc3FsLmNvc21vc2RiLmF6dXJlLmNvbYIZKi5ldGNkLmNvc21vc2RiLmF6dXJlLmNvbYIaKi5n
+    cmVtbGluLmNvc21vcy5henVyZS5jb22CGCoubW9uZ28uY29zbW9zLmF6dXJlLmNvbYIcKi5jYXNz
+    YW5kcmEuY29zbW9zLmF6dXJlLmNvbYIYKi50YWJsZS5jb3Ntb3MuYXp1cmUuY29tghYqLnNxbC5j
+    b3Ntb3MuYXp1cmUuY29tghcqLmV0Y2QuY29zbW9zLmF6dXJlLmNvbYIVKi5kb2N1bWVudHMuYXp1
+    cmUuY29tMIGwBgNVHR8EgagwgaUwgaKggZ+ggZyGTWh0dHA6Ly9tc2NybC5taWNyb3NvZnQuY29t
+    L3BraS9tc2NvcnAvY3JsL01pY3Jvc29mdCUyMFJTQSUyMFRMUyUyMENBJTIwMDEuY3JshktodHRw
+    Oi8vY3JsLm1pY3Jvc29mdC5jb20vcGtpL21zY29ycC9jcmwvTWljcm9zb2Z0JTIwUlNBJTIwVExT
+    JTIwQ0ElMjAwMS5jcmwwVwYDVR0gBFAwTjBCBgkrBgEEAYI3KgEwNTAzBggrBgEFBQcCARYnaHR0
+    cDovL3d3dy5taWNyb3NvZnQuY29tL3BraS9tc2NvcnAvY3BzMAgGBmeBDAECATAfBgNVHSMEGDAW
+    gBS1dgwwEc7HkkJNTMdcLMipDOgLZDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDQYJ
+    KoZIhvcNAQELBQADggIBAEXuJ0cvCOw2Xj7CDjVrTgbRxI02Sqf1mW2EjYZJ2Rd6vvUkdftdh52D
+    +u7t/hvd351vGaV/ZAeOi6xhSrP0vLIh6lgmn00ZzfmOw2CtNzlwtVlnimfL3nMULO+XnuiYF3QJ
+    RSp0ie9fO/TPH4stwuI+zIKH8JL71O4/JRa/Or4+y3ZjK+m3nPeFbmhqjeSRZq4Vt5zpgVinqsJk
+    wbmr977tUiWOpHRNH+vcXQVUSXX1s+cnNdXJyY/8WZMnGp6BxQCyUnjzM+wp9oBsp257MJgfyUAe
+    1vWUXR2sD0GseaW6R9o/hzCAm6eu6Df2PYpBFyfhnHSGsNIR/0ZNzpawH304RQUSkUtBz+/EH9e/
+    NtQNBsNZ8Pi4qbFrz5hC6DyM9SQK5x5gpisRnF7DdzrOVhBv7IlAeBhfwpLYSPBft3PrmKeEsaPy
+    9kh84AMF+/ZmbPzjI8VV8tV7+esb2dWZrvyAkU5m15L93t1lxxNWV15+6kSfloF4jHR4nB6Gixbh
+    umMhwd8hSnb6RGYzAzr4mB2nD3A93kph6Qw7THc+UXJhCZtyYu/OCpJcwXVYkt0ZDmIPxb4BRh36
+    CmH+W+7C0mWIbC37Df8aw9lNgUA3eB5T8L4/uPbIU634JAeYU0MYXMC3h9nXbG2k/L0/JMLheQSc
+    D5IAOSX3Ca+Uymi9czaDvNhFUO/T1cXYVuLg8LoYYYoW+tA=
+  readonly: true
+
+- name: Azure.Cosmos.Cassandra.Truststore.Path
+  value: $(Build.Repository.LocalPath)/truststore.p12
+  readonly: true
+
+- name: Azure.Cosmos.Cassandra.Log.File
   value: $(Build.ArtifactStagingDirectory)/azure-cosmos-cassandra-driver-3.log
   readonly: true
 
-- name: Reporting.Directory
+- name: Azure.Cosmos.Cassandra.Reporting.Directory
   value: $(Build.ArtifactStagingDirectory)
   readonly: true
 
-- name: Package.ArgLine
-  value: >
-    -Dazure.cosmos.cassandra.log-file='$(Log.Filename)'
-    -Dazure.cosmos.cassandra.reporting-directory='$(Reporting.Directory)'
-    -Dazure.cosmos.cassandra.contact-point='$(AZURE_COSMOS_CASSANDRA_CONTACT_POINT)'
-    -Dazure.cosmos.cassandra.username='$(AZURE_COSMOS_CASSANDRA_USERNAME)'
-    -Dazure.cosmos.cassandra.password='$(AZURE_COSMOS_CASSANDRA_PASSWORD)'
-    -Dazure.cosmos.cassandra.global-endpoint='$(AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT)'
-    -Dazure.cosmos.cassandra.local-datacenter='$(AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER)'
-    -Dazure.cosmos.cassandra.read-datacenter='$(AZURE_COSMOS_CASSANDRA_READ_DATACENTER)'
-    -Dazure.cosmos.cassandra.write-datacenter='$(AZURE_COSMOS_CASSANDRA_WRITE_DATACENTER)'
-    -Dazure.cosmos.cassandra.nodes='$(AZURE_COSMOS_CASSANDRA_NODES)'
-  readonly: true
-
-- name: Examples.ArgLine
-  value: $(Package.ArgLine)
-  readonly: true
+- name: New-JavaTruststore
+  value: |
+    Set-Content -Path "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}" -AsByteStream -Value ([System.Convert]::FromBase64String("${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_CONTENT}"))
+    "Keystore path: ${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}"
+    keytool -list -keystore "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PATH}" -storepass "${env:AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD}"
 
 - name: Stage-Artifacts
   value: |
     $packageName = [System.IO.Path]::GetFileNameWithoutExtension($(Get-Item *.jar -Exclude *-sources.jar,*-javadoc.jar).Name)
-    $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+    $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY ${packageName})
 
     Copy-Item *.jar $targetDirectory
-    Copy-Item ../pom.xml $targetDirectory/$packageName.pom
+    Copy-Item (Join-Path .. pom.xml) (Join-Path ${targetDirectory} ${packageName}.pom)
 
     $packageName = $packageName.Split("-extensions-") -join "-"
-    $targetDirectory = New-Item -ItemType Directory $Env:BUILD_ARTIFACTSTAGINGDIRECTORY/$packageName
+    $targetDirectory = New-Item -ItemType Directory (Join-Path $Env:BUILD_ARTIFACTSTAGINGDIRECTORY ${packageName})
 
-    Copy-Item ../../pom.xml $targetDirectory/$packageName.pom
+    Copy-Item (Join-Path .. .. pom.xml) (Join-Path ${targetDirectory} ${packageName}.pom)
+  readonly: true
+
+- name: Update-GithubSubmodules
+  value: |
+    git submodule update --init --recursive
   readonly: true
 
 jobs:
@@ -67,6 +249,13 @@ jobs:
   pool:
     vmImage: $(ImageName)
   steps:
+  - task: PowerShell@2
+    displayName: Update GitHub Submodules
+    inputs:
+      targetType: inline
+      script: $(Update-GithubSubmodules)
+      pwsh: true
+      workingDirectory: $(Build.Repository.LocalPath)
   - task: Maven@3
     displayName: 'Build'
     inputs:
@@ -75,40 +264,57 @@ jobs:
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
-      goals: 'help:active-profiles install javadoc:test-javadoc'
-      findBugsRunAnalysis: true
+      goals: 'install'
       options: '-DskipTests'
-  - task: Maven@3
-    displayName: 'Verify package'
-    inputs:
-      mavenPomFile: 'package/pom.xml'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.8'
-      jdkArchitectureOption: 'x64'
-      mavenOptions: '-Xmx3072m'
-      goals: 'verify'
-      options: '-DargLine="$(Package.ArgLine)"'
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      publishJUnitResults: true
-  - task: Maven@3
-    displayName: 'Verify examples'
-    inputs:
-      mavenPomFile: 'examples/pom.xml'
-      mavenOptions: '-Xmx3072m'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.8'
-      jdkArchitectureOption: 'x64'
-      goals: 'verify'
-      options: '-DargLine="$(Examples.ArgLine)"'
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      publishJUnitResults: true
   - task: PowerShell@2
-    displayName: 'Stage artifacts'
+    displayName: 'Create Java truststore'
+    inputs:
+      targetType: 'inline'
+      script: $(New-JavaTruststore)
+      pwsh: true
+      workingDirectory: '$(Build.ArtifactStagingDirectory)'
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+  - task: Maven@3
+    displayName: 'Verify driver-3 extensions'
+    inputs:
+      mavenPomFile: 'driver-3/pom.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      mavenOptions: '-Xmx3072m'
+      goals: 'verify'
+      options: -Dcheckstyle.skip -Dmaven.main.skip
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
+  - task: Maven@3
+    displayName: 'Verify java-driver-app example'
+    inputs:
+      mavenPomFile: 'examples/java-driver-app/pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      goals: 'verify'
+      options: "-Dcheckstyle.skip -Dmaven.main.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS: $(AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS)
+      AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
+  - task: PowerShell@2
+    displayName: 'Stage driver-3 artifacts'
     inputs:
       targetType: 'inline'
       script: $(Stage-Artifacts)
       pwsh: true
-      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
+      workingDirectory: '$(Build.Repository.LocalPath)/driver-3/target'
   - task: PublishPipelineArtifact@1
     displayName: 'Publish staged artifacts'
     inputs:
@@ -129,6 +335,13 @@ jobs:
   pool:
     vmImage: $(ImageName)
   steps:
+  - task: PowerShell@2
+    displayName: Update GitHub Submodules
+    inputs:
+      targetType: inline
+      script: $(Update-GithubSubmodules)
+      pwsh: true
+      workingDirectory: $(Build.Repository.LocalPath)
   - task: Maven@3
     displayName: 'Build'
     inputs:
@@ -137,40 +350,56 @@ jobs:
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       mavenOptions: '-Xmx3072m'
-      goals: 'help:active-profiles install javadoc:test-javadoc'
-      findBugsRunAnalysis: true
+      goals: 'install'
       options: '-DskipTests'
-  - task: Maven@3
-    displayName: 'Verify package'
-    inputs:
-      mavenPomFile: 'package/pom.xml'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.11'
-      jdkArchitectureOption: 'x64'
-      mavenOptions: '-Xmx3072m'
-      goals: 'verify'
-      options: '-DargLine="$(Package.ArgLine)"'
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      publishJUnitResults: true
-  - task: Maven@3
-    displayName: 'Verify examples'
-    inputs:
-      mavenPomFile: 'examples/pom.xml'
-      mavenOptions: '-Xmx3072m'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.11'
-      jdkArchitectureOption: 'x64'
-      goals: 'verify'
-      options: '-DargLine="$(Examples.ArgLine)"'
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      publishJUnitResults: true
   - task: PowerShell@2
-    displayName: 'Stage artifacts'
+    displayName: 'Create Java truststore'
+    inputs:
+      targetType: 'inline'
+      script: $(New-JavaTruststore)
+      pwsh: true
+      workingDirectory: '$(Build.ArtifactStagingDirectory)'
+    env:
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+  - task: Maven@3
+    displayName: 'Verify driver-3 extensions'
+    inputs:
+      mavenPomFile: 'driver-3/pom.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+      jdkArchitectureOption: 'x64'
+      mavenOptions: '-Xmx3072m'
+      goals: 'verify'
+      options: -Dcheckstyle.skip -Dmaven.main.skip
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
+  - task: Maven@3
+    displayName: 'Verify java-driver-app example'
+    inputs:
+      mavenPomFile: 'examples/java-driver-app/pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      goals: 'verify'
+      options: "-Dcheckstyle.skip -Dmaven.main.skip -DargLine=\"-Dazure.cosmos.cassandra.jar='${project.build.directory}/${project.build.finalName}.jar' -Dazure.cosmos.cassandra.log-path='${project.basedir}'\""
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      publishJUnitResults: true
+    env:
+      AZURE_COSMOS_CASSANDRA_PASSWORD: $(AZURE_COSMOS_CASSANDRA_PASSWORD)
+      AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD: $(AZURE_COSMOS_CASSANDRA_TRUSTSTORE_PASSWORD)
+      BUILD_BUILDID: $(Build.BuildId)
+  - task: PowerShell@2
+    displayName: 'Stage driver-3 artifacts'
     inputs:
       targetType: 'inline'
       script: $(Stage-Artifacts)
       pwsh: true
-      workingDirectory: '$(Build.Repository.LocalPath)/package/target'
+      workingDirectory: '$(Build.Repository.LocalPath)/driver-3/target'
   - task: PublishPipelineArtifact@1
     displayName: 'Publish staged artifacts'
     inputs:
