@@ -201,6 +201,8 @@ public final class TestCommon {
                 .setConnectionsPerHost(REMOTE, 1, 10))
             .withReconnectionPolicy(new ConstantReconnectionPolicy(1_000))
             .withRetryPolicy(retryPolicy)
+            .withoutMetrics()
+            .withoutJMXReporting()
             .withPort(GLOBAL_ENDPOINT_PORT)
             .withSSL();
     }

@@ -93,8 +93,13 @@ public class CosmosJsonTest {
 
             // Because metrics serialize without an assist from us and the difficulty of value comparisons--metrics
             // change from moment to moment--we skip all but the check that metrics are represented by a map
-            // judging that more more would be overkill
-            assertThat(observed.get("metrics")).isInstanceOf(Map.class);
+            // judging that more would be overkill
+
+            final Object metrics = observed.get("metrics");
+
+            if (metrics != null) {
+                assertThat(metrics).isInstanceOf(Map.class);
+            }
         }
     }
 

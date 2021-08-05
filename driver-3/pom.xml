@@ -19,6 +19,7 @@ Licensed under the MIT License.
   </parent>
 
   <dependencies>
+    <!-- Main dependencies -->
     <dependency>
       <artifactId>cassandra-driver-core</artifactId>
       <groupId>com.datastax.cassandra</groupId>
@@ -33,6 +34,12 @@ Licensed under the MIT License.
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
       <scope>compile</scope>
+    </dependency>
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-jmx</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
