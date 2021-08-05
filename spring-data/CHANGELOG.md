@@ -1,6 +1,6 @@
 # Release History
 
-## Unreleased
+## 1.1.0
 
 This is the first maintenance release of the Azure Cosmos Extensions for Spring Data for Apache Cassandra. Since 
 1.0.0 we've cleaned up the source, simplified the build, improved test coverage, and overhauled the
