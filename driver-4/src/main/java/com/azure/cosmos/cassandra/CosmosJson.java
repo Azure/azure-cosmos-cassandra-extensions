@@ -1,15 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-package com.azure.cosmos.cassandra.implementation;
+package com.azure.cosmos.cassandra;
 
+import com.azure.cosmos.cassandra.implementation.CosmosJsonModule;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.PropertyFilter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import org.slf4j.Logger;
@@ -18,8 +17,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
@@ -27,43 +24,51 @@ import static java.util.Objects.requireNonNull;
 /**
  * Utility class for serializing and deserializing JSON.
  * <p>
- * This class is used in {@linkplain Object#toString toString} implementations and test code.
+ * This class is used in log messages, test code, and {@linkplain Object#toString toString} implementations. It is
+ * especially useful for producing detailed diagnostic strings for troubleshooting DataStax Java Driver issues.
  */
-public final class Json {
-
-    private Json() {
-        throw new UnsupportedOperationException();
-    }
+public final class CosmosJson {
 
     // region Fields
 
-    private static final SimpleFilterProvider FILTER_PROVIDER = new SimpleFilterProvider();
-    private static final Logger LOG = LoggerFactory.getLogger(Json.class);
+    private static final CosmosJson INSTANCE = new CosmosJson();
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosJson.class);
 
-    private static final SimpleModule MODULE = new SimpleModule()
-        .addSerializer(Duration.class, ToStringSerializer.instance)
-        .addSerializer(Instant.class, ToStringSerializer.instance);
+    private final ObjectMapper objectMapper;
+    private final ObjectWriter objectWriter;
+    private final ConcurrentHashMap<Class<?>, String> simpleClassNames;
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-        .registerModule(MODULE)
-        .setFilterProvider(FILTER_PROVIDER);
+    private CosmosJson() {
+        this.objectMapper = new ObjectMapper()
+            .registerModule(new Jdk8Module())
+            .registerModule(new CosmosJsonModule())
+            .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        this.objectWriter = this.objectMapper.writer();
+        this.simpleClassNames = new ConcurrentHashMap<>();
+    }
 
-    private static final ObjectWriter OBJECT_WRITER = OBJECT_MAPPER.writer();
-    private static final ConcurrentHashMap<Class<?>, String> SIMPLE_CLASS_NAMES = new ConcurrentHashMap<>();
-
-    // endregion
-
-    // region
+    // region Methods
 
     /**
-     * Returns the {@link SimpleModule module} used by this class.
-     * <p>
-     * This is useful for adding custom serializers using the {@link SimpleModule#addSerializer} method.
+     * Returns the {@link ObjectMapper object mapper} used by this class.
      *
-     * @return The {@link SimpleModule module} used by this class.
+     * @return The {@link ObjectMapper object mapper} used by this class.
      */
-    public static SimpleModule module() {
-        return MODULE;
+    public static ObjectMapper objectMapper() {
+        return INSTANCE.objectMapper;
+    }
+
+    /**
+     * Returns The single object writer instantiated by this class.
+     * <p>
+     * This method may be used for specialized serialization tasks. It is less expensive than instantiating one of your
+     * own and ensures that values are serialized consistently.
+     *
+     * @return The object writer instantiated by this class.
+     */
+    @NonNull
+    public static ObjectWriter objectWriter() {
+        return INSTANCE.objectWriter;
     }
 
     /**
@@ -80,7 +85,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final File file, @NonNull final Class<T> type) throws IOException {
         requireNonNull(file, "expected non-null file");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(file, type);
+        return objectMapper().readValue(file, type);
     }
 
     /**
@@ -97,7 +102,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final InputStream stream, @NonNull final Class<T> type) throws IOException {
         requireNonNull(stream, "expected non-null stream");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(stream, type);
+        return objectMapper().readValue(stream, type);
     }
 
     /**
@@ -114,7 +119,7 @@ public final class Json {
     public static <T> T readValue(@NonNull final String string, @NonNull final Class<T> type) throws IOException {
         requireNonNull(string, "expected non-null string");
         requireNonNull(type, "expected non-null type");
-        return OBJECT_MAPPER.readValue(string, type);
+        return objectMapper().readValue(string, type);
     }
 
     /**
@@ -127,11 +132,11 @@ public final class Json {
     @NonNull
     public static String toJson(@Nullable final Object value) {
         try {
-            return OBJECT_WRITER.writeValueAsString(value);
+            return objectWriter().writeValueAsString(value);
         } catch (final JsonProcessingException error) {
-            LOG.debug("could not convert {} value to JSON due to:", value != null ? value.getClass() : null, error);
+            LOG.trace("could not convert {} value to JSON due to:", value != null ? value.getClass() : null, error);
             try {
-                return "{\"error\":" + OBJECT_WRITER.writeValueAsString(error.toString()) + '}';
+                return "{\"error\":" + objectWriter().writeValueAsString(error.toString()) + '}';
             } catch (final JsonProcessingException exception) {
                 return "null";
             }
@@ -151,36 +156,10 @@ public final class Json {
     @NonNull
     public static String toString(@Nullable final Object value) {
         if (value != null) {
-            final String name = SIMPLE_CLASS_NAMES.computeIfAbsent(value.getClass(), Class::getSimpleName);
+            final String name = INSTANCE.simpleClassNames.computeIfAbsent(value.getClass(), Class::getSimpleName);
             return name + '(' + toJson(value) + ')';
         }
         return "null";
-    }
-
-    /**
-     * Returns The single object writer instantiated by this class.
-     * <p>
-     * This method may be used for specialized serialization tasks. It is less expensive than instantiating one of your
-     * own and ensures that values are serialized consistently.
-     *
-     * @return The object writer instantiated by this class.
-     */
-    @NonNull
-    public static ObjectWriter writer() {
-        return OBJECT_WRITER;
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    static void registerPropertyFilter(final Class<?> type, final Class<? extends PropertyFilter> filter) {
-
-        requireNonNull(type, "type");
-        requireNonNull(filter, "filter");
-
-        try {
-            FILTER_PROVIDER.addFilter(type.getSimpleName(), filter.getDeclaredConstructor().newInstance());
-        } catch (final ReflectiveOperationException error) {
-            throw new IllegalStateException(error);
-        }
     }
 
     // endregion

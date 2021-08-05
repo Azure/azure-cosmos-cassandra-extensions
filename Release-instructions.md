@@ -66,12 +66,22 @@
 
     https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4
 
-  - [ ] Verify that the package has been published to:
+  - [ ] Verify that the driver-4 extensions package has been published to:
 
     https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-driver-4-extensions
 
-- [ ] Tag the release on the release branch.
+  - [ ] Verify that the spring-data extensions package has been published to:
+
+    https://repo.maven.apache.org/maven2/com/azure/azure-cosmos-cassandra-spring-data-extensions
+
+- [ ] Tag the release on the release and examples' develop branches.
 
   ```bash
   git tag release-driver-4-${version}
+  cd examples/java-driver-app
+  git tag release-driver-4-${version}
+  cd ../examples/spring-boot-app
+  git tag release-driver-4-${version}
   ```
+  
+  - [ ] Merge the examples` develop branch to main

@@ -20,8 +20,10 @@ import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
+import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
@@ -40,14 +42,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
+import static com.azure.cosmos.cassandra.TestCommon.KEYSPACE_NAME;
+import static com.azure.cosmos.cassandra.TestCommon.getPropertyOrEnvironmentVariable;
+import static com.azure.cosmos.cassandra.TestCommon.uniqueName;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Shows how to use the Cosmos extensions for DataStax Java Driver 4 for Apache Cassandra.
@@ -95,23 +99,14 @@ public class CosmosCassandraIntegrationTest {
 
     // region Fields
 
-    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
-
-    private static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
-        TestCommon.getPropertyOrEnvironmentVariable(
+    static final ConsistencyLevel CONSISTENCY_LEVEL = Enum.valueOf(DefaultConsistencyLevel.class,
+        getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.consistency-level",
-            "AZURE_COSMOS_CASSANDRA_CONSISTENCY_LEVEL",
             "QUORUM"));
 
-    private static final String KEYSPACE_NAME = TestCommon.getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.keyspace-name",
-        "AZURE_COSMOS_CASSANDRA_KEYSPACE_NAME",
-        "downgrading_" + UUID.randomUUID().toString().replace("-", ""));
-
-    private static final File REPORTING_DIRECTORY = new File(
-        TestCommon.getPropertyOrEnvironmentVariable(
+    static final File REPORTING_DIRECTORY = new File(
+        getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.reporting-directory",
-            "AZURE_COSMOS_CASSANDRA_REPORTING_DIRECTORY",
             Paths.get(
                 System.getProperty("user.home"),
                 ".local",
@@ -119,6 +114,8 @@ public class CosmosCassandraIntegrationTest {
                 "lib",
                 "azure-cosmos-cassandra-driver-4-extensions").toString()));
 
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosCassandraIntegrationTest.class);
+    private static final String TABLE_NAME = uniqueName("sensor_data_");
     private static final int TIMEOUT_IN_SECONDS = 30;
 
     // endregion
@@ -139,9 +136,10 @@ public class CosmosCassandraIntegrationTest {
     @ValueSource(booleans = { false, true })
     public void canIntegrate(final boolean multiRegionWrites) {
 
-        final CqlSessionBuilder builder = CqlSession.builder().withConfigLoader(newConfigLoader(multiRegionWrites));
+        final DriverConfigLoader configLoader = newProgrammaticConfigLoader(multiRegionWrites);
+        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
 
-        try (CqlSession session = builder.build()) {
+        try (CqlSession session =  CqlSession.builder().withConfigLoader(configLoader).build()) {
 
             //noinspection SimplifyOptionalCallChains
             if (!session.getMetrics().isPresent()) {
@@ -174,9 +172,10 @@ public class CosmosCassandraIntegrationTest {
                 reporter.report();
 
             } finally {
-                assertThatCode(() ->
-                    session.execute(SimpleStatement.newInstance("DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME))
-                ).doesNotThrowAnyException();
+                assertThatCode(() -> session.execute(SchemaBuilder.dropTable(KEYSPACE_NAME, TABLE_NAME)
+                    .ifExists()
+                    .build()))
+                .doesNotThrowAnyException();
             }
 
         } catch (final AssertionError error) {
@@ -224,9 +223,7 @@ public class CosmosCassandraIntegrationTest {
     @BeforeAll
     public static void init(final TestInfo info) {
 
-        LOG.info("---------------------------------------------------------------------------------------------------");
-        LOG.info("{}", info.getTestClass().orElseGet(() -> fail("expected test to be called with test class")));
-        LOG.info("---------------------------------------------------------------------------------------------------");
+        TestCommon.printTestParameters();
 
         if (REPORTING_DIRECTORY.exists()) {
             final Path path = REPORTING_DIRECTORY.toPath();
@@ -234,6 +231,16 @@ public class CosmosCassandraIntegrationTest {
         }
 
         assertThatCode(REPORTING_DIRECTORY::mkdirs).doesNotThrowAnyException();
+    }
+
+    /**
+     * Logs the name of each test before it is executed.
+     *
+     * @param info Test info.
+     */
+    @BeforeEach
+    public void logTestName(final TestInfo info) {
+        TestCommon.logTestName(info, LOG);
     }
 
     // region Privates
@@ -253,10 +260,10 @@ public class CosmosCassandraIntegrationTest {
                 + "'replication_factor':4"
                 + "}"));
 
-        session.execute(SimpleStatement.newInstance("DROP TABLE IF EXISTS " + KEYSPACE_NAME + ".sensor_date"));
+        session.execute(SimpleStatement.newInstance("DROP TABLE IF EXISTS " + KEYSPACE_NAME + '.' + TABLE_NAME));
 
         session.execute(SimpleStatement.newInstance(
-            "CREATE TABLE " + KEYSPACE_NAME + ".sensor_data ("
+            "CREATE TABLE " + KEYSPACE_NAME + '.' + TABLE_NAME + " ("
                 + "sensor_id uuid,"
                 + "date date,"
                 + "timestamp timestamp,"
@@ -312,7 +319,7 @@ public class CosmosCassandraIntegrationTest {
         System.out.println();
     }
 
-    private static DriverConfigLoader newConfigLoader(final boolean multiRegionWrites) {
+    private static DriverConfigLoader newProgrammaticConfigLoader(final boolean multiRegionWrites) {
         return DriverConfigLoader.programmaticBuilder()
             .withBoolean(CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES, multiRegionWrites)
             .withStringList(DefaultDriverOption.METRICS_NODE_ENABLED, Collections.singletonList("cql-messages"))
@@ -325,11 +332,11 @@ public class CosmosCassandraIntegrationTest {
      */
     private ResultSet read(final CqlSession session) {
 
-        System.out.printf("Read from %s.sensor_data at %s ... ", KEYSPACE_NAME, CONSISTENCY_LEVEL);
+        System.out.printf("Read from %s.%s at %s ... ", KEYSPACE_NAME, TABLE_NAME, CONSISTENCY_LEVEL);
 
         final SimpleStatement statement = SimpleStatement.newInstance(
             "SELECT sensor_id, date, timestamp, value "
-                + "FROM " + KEYSPACE_NAME + ".sensor_data "
+                + "FROM " + KEYSPACE_NAME + '.' + TABLE_NAME + ' '
                 + "WHERE "
                 + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
                 + "date = '2018-02-26' AND "
@@ -347,24 +354,24 @@ public class CosmosCassandraIntegrationTest {
      */
     private long write(final CqlSession session) {
 
-        System.out.printf("Write to %s.sensor_data at %s ... ", KEYSPACE_NAME, CONSISTENCY_LEVEL);
+        System.out.printf("Write to %s.%s at %s ... ", KEYSPACE_NAME, TABLE_NAME, CONSISTENCY_LEVEL);
 
         final BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED)
-            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + ".sensor_data "
+            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + '.' + TABLE_NAME + ' '
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:53:46.345+01:00',"
                 + "2.34)"))
-            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + ".sensor_data "
+            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + '.' + TABLE_NAME + ' '
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"
                 + "'2018-02-26',"
                 + "'2018-02-26T13:54:27.488+01:00',"
                 + "2.47)"))
-            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + ".sensor_data "
+            .add(SimpleStatement.newInstance("INSERT INTO " + KEYSPACE_NAME + '.' + TABLE_NAME + ' '
                 + "(sensor_id, date, timestamp, value) "
                 + "VALUES ("
                 + "756716f7-2e54-4715-9f00-91dcbea6cf50,"

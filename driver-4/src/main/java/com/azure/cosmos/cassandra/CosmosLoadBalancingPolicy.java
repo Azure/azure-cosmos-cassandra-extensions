@@ -3,8 +3,6 @@
 
 package com.azure.cosmos.cassandra;
 
-import com.azure.cosmos.cassandra.implementation.Json;
-import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -17,19 +15,12 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -37,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
+import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -45,7 +36,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Semaphore;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES;
 import static com.azure.cosmos.cassandra.CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS;
 import static java.util.Objects.requireNonNull;
@@ -78,18 +71,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicy.class);
 
-    static {
-        Json.module()
-            .addSerializer(Node.class, NodeSerializer.INSTANCE)
-            .addSerializer(Request.class, RequestSerializer.INSTANCE);
-    }
-
     private final InternalDriverContext driverContext;
-    private final MetadataManager metadataManager;
-    private final boolean multiRegionWrites;
-    private final Set<Node> nodesForReading;
-    private final Set<Node> nodesForWriting;
-    private final List<String> preferredRegions;
+    private final boolean multiRegionWritesEnabled;
+    private final NavigableSet<Node> nodesForReading;
+    private final NavigableSet<Node> nodesForWriting;
     private DistanceReporter distanceReporter;
     private volatile Function<Request, Queue<Node>> getNodes;
 
@@ -106,20 +91,27 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @SuppressWarnings({ "unchecked" })
     public CosmosLoadBalancingPolicy(final DriverContext driverContext, final String profileName) {
 
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosLoadBalancingPolicy(sessionName: {}, profileName: {})",
+                toJson(driverContext.getSessionName()),
+                toJson(profileName));
+        }
+
         final DriverExecutionProfile profile = driverContext.getConfig().getProfile(profileName);
         this.driverContext = (InternalDriverContext) driverContext;
-        this.metadataManager = this.driverContext.getMetadataManager();
 
-        this.multiRegionWrites = MULTI_REGION_WRITES.getValue(profile, Boolean.class);
-        this.preferredRegions = PREFERRED_REGIONS.getValue(profile, List.class);
+        this.multiRegionWritesEnabled = MULTI_REGION_WRITES.getValue(profile, Boolean.class);
+        final List<String> preferredRegions = PREFERRED_REGIONS.getValue(profile, List.class);
 
-        this.nodesForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(
-            this.metadataManager,
-            this.preferredRegions));
+        this.nodesForReading = new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
 
-        this.nodesForWriting = this.multiRegionWrites
+        this.nodesForWriting = this.multiRegionWritesEnabled
             ? this.nodesForReading
-            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(this.metadataManager, this.preferredRegions));
+            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("CosmosLoadBalancingPolicy -> {}", toJson(this));
+        }
     }
 
     // endregion
@@ -131,8 +123,8 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      *
      * @return a value of {@code true}, if multi region writes are enabled; {@code false} otherwise.
      */
-    public boolean getMultiRegionWrites() {
-        return this.multiRegionWrites;
+    public boolean getMultiRegionWritesEnabled() {
+        return this.multiRegionWritesEnabled;
     }
 
     /**
@@ -170,19 +162,41 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     /**
-     * Gets the list of preferred regions for failover.
+     * Gets the list of preferred regions for failover on read operations.
+     * <p>
+     * When multi-region writes are enabled, this list will be the same as the one returned by {@link
+     * #getPreferredWriteRegions}.
      *
-     * @return The list of preferred regions for failover.
+     * @return The list of preferred regions for failover on read operations.
      */
-    public List<String> getPreferredRegions() {
-        return Collections.unmodifiableList(this.preferredRegions);
+    public List<String> getPreferredReadRegions() {
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        assert comparator != null;
+        return Collections.unmodifiableList(comparator.getPreferredRegions());
     }
+
+    /**
+     * Gets the list of preferred regions for failover on write operations.
+     * <p>
+     * When multi-region writes are enabled, this list will be the same as the one returned by {@link
+     * #getPreferredReadRegions}.
+     *
+     * @return The list of preferred regions for failover on write operations.
+     */
+    public List<String> getPreferredWriteRegions() {
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        assert comparator != null;
+        return Collections.unmodifiableList(comparator.getPreferredRegions());
+    }
+
     // endregion
 
     // region Methods
 
     /**
      * Closes the current {@link CosmosLoadBalancingPolicy} instance.
+     * <p>
+     * This method performs no action. It is a noop.
      */
     @Override
     public void close() {
@@ -198,36 +212,44 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @Override
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("init({})", Json.toJson(nodes.values()));
+        requireNonNull(nodes, "expected non-null cluster");
+        requireNonNull(distanceReporter, "expected non-null hosts");
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("init({})", toJson(nodes.values()));
         }
 
+        final MetadataManager metadataManager = this.driverContext.getMetadataManager();
+        final Set<Node> contactPoints = this.getContactPointsOrThrow();
         this.distanceReporter = distanceReporter;
 
+        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        assert comparator != null;
+        comparator.addPreferredRegionsLast(contactPoints);
+
         for (final Node node : nodes.values()) {
-            if (this.preferredRegions.contains(node.getDatacenter())) {
+            if (comparator.hasPreferredRegion(node.getDatacenter())) {
                 distanceReporter.setDistance(node, NodeDistance.LOCAL);
             } else {
                 distanceReporter.setDistance(node, NodeDistance.REMOTE);
             }
-            this.nodesForReading.add(node);  // When multiRegionWrites is true, nodesForReading == nodesForWriting
+            this.nodesForReading.add(node);
         }
 
-        if (this.multiRegionWrites) {
+        if (this.multiRegionWritesEnabled) {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
 
-            // If you're connected to a Cosmos DB Cassandra API instance, there should be a single contact point,
-            // the global endpoint. This code guards against other arrangements with this expectation: All contact
-            // points must write capable.
+            comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
+            assert comparator != null;
+            comparator.addPreferredRegionsFirst(contactPoints);
 
-            for (final Node node : this.getContactPointsOrException()) {
-                if (this.preferredRegions.contains(node.getDatacenter())) {
+            for (final Node node : nodes.values()) {
+                if (comparator.hasPreferredRegion(node.getDatacenter())) {
                     distanceReporter.setDistance(node, NodeDistance.LOCAL);
                 } else {
                     distanceReporter.setDistance(node, NodeDistance.REMOTE);
                 }
-                assert nodes.containsKey(node.getHostId());
                 this.nodesForWriting.add(node);
             }
         }
@@ -245,14 +267,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         permissionToGetNodes.acquireUninterruptibly(Integer.MAX_VALUE);
 
-        this.metadataManager.refreshNodes().whenComplete((ignored, error) -> {
+        metadataManager.refreshNodes().whenComplete((ignored, error) -> {
 
             if (error != null) {
                 LOG.error("node refresh failed due to ", error);
             } else {
-                if (LOG.isDebugEnabled()) {
-                    final Map<UUID, Node> refreshedNodes = this.metadataManager.getMetadata().getNodes();
-                    LOG.debug("refreshed nodes: {}", Json.toJson(refreshedNodes));
+                if (LOG.isTraceEnabled()) {
+                    final Map<UUID, Node> refreshedNodes = metadataManager.getMetadata().getNodes();
+                    LOG.trace("refreshed nodes: {}", toJson(refreshedNodes));
                 }
             }
 
@@ -260,7 +282,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             this.getNodes = this::doGetNodes;
         });
 
-        LOG.debug("init -> returns(void), {}", this);
+        LOG.debug("init -> {}", this);
     }
 
     /**
@@ -282,10 +304,10 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     @NonNull
     public Queue<Node> newQueryPlan(@Nullable final Request request, @Nullable final Session session) {
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan(request: {}, session: {})",
-                Json.toJson(request),
-                Json.toJson(session == null ? null : session.getName()));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("newQueryPlan(request: {}, session: {})",
+                toJson(request),
+                toJson(session == null ? null : session.getName()));
         }
 
         // TODO (DANOBLE) consider caching results so that evaluation is reduced
@@ -294,7 +316,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final Queue<Node> nodes = function.apply(request);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("newQueryPlan -> returns({}), {}", Json.toJson(nodes), this);
+            LOG.debug("newQueryPlan -> returns({}) from {}", toJson(nodes), this);
         }
 
         return nodes;
@@ -302,74 +324,88 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     @Override
     public void onAdd(@NonNull final Node node) {
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onAdd({})", Json.toJson(node));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onAdd({})", toJson(node));
         }
-
-        if (this.preferredRegions.contains(node.getDatacenter())) {
-            this.distanceReporter.setDistance(node, NodeDistance.LOCAL);
-        } else {
-            this.distanceReporter.setDistance(node, NodeDistance.REMOTE);
-        }
-
-        this.nodesForReading.add(node);
-
-        if (!this.multiRegionWrites) {
-            if (this.getContactPointsOrException().contains(node)) {
-                this.nodesForWriting.add(node);
-            }
-        }
-
-        LOG.debug("onAdd -> returns(void), {}", this);
+        this.onUp(node);
     }
 
     @Override
     public void onDown(@NonNull final Node node) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onDown({})", Json.toJson(node));
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onDown({})", toJson(node));
+        }
+
+        requireNonNull(node, "expected non-null node");
+        this.nodesForReading.remove(node);
+
+        if (this.multiRegionWritesEnabled) {
+            assert this.nodesForReading == this.nodesForWriting;
+        } else {
+            this.nodesForWriting.remove(node);
+        }
+
+        if (LOG.isWarnEnabled()) {
+            if (this.multiRegionWritesEnabled) {
+                if (this.nodesForReading.isEmpty()) {
+                    LOG.warn("All nodes have now been removed: {}", toJson(this));
+                }
+            } else {
+                if (this.nodesForReading.isEmpty()) {
+                    LOG.warn("All nodes for reading have now been removed: {}", toJson(this));
+                }
+                if (this.nodesForWriting.isEmpty()) {
+                    LOG.warn("All nodes for writing have now been removed: {}", toJson(this));
+                }
+            }
+        }
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onDown -> {}", this);
         }
     }
 
     @Override
     public void onRemove(@NonNull final Node node) {
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Removing node: onRemove({})", Json.toJson(node));
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onRemove({})", toJson(node));
         }
-
-        this.nodesForReading.remove(node);
-
-        if (!this.multiRegionWrites) {
-            this.nodesForWriting.remove(node);
-        }
-
-        LOG.debug("onRemove -> returns(void), {}", this);
-
-        if (this.multiRegionWrites) {
-            if (this.nodesForReading.isEmpty()) {
-                LOG.warn("All nodes have now been removed: {}", this);
-            }
-        } else {
-            if (this.nodesForReading.isEmpty()) {
-                LOG.warn("All nodes for reading have now been removed: {}", this);
-            }
-            if (this.nodesForWriting.isEmpty()) {
-                LOG.warn("All nodes for writing have now been removed: {}", this);
-            }
-        }
+        this.onDown(node);
     }
 
     @Override
     public void onUp(@NonNull final Node node) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("onUp({})", Json.toJson(node));
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUp({})", toJson(node));
+        }
+
+        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        assert comparator != null;
+
+        this.distanceReporter.setDistance(node, comparator.hasPreferredRegion(node.getDatacenter())
+            ? NodeDistance.LOCAL
+            : NodeDistance.REMOTE);
+
+        this.nodesForReading.add(node);
+
+        if (this.multiRegionWritesEnabled) {
+            assert this.nodesForReading == this.nodesForWriting;
+        } else {
+            comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
+            assert comparator != null;
+            this.nodesForWriting.add(node);
+        }
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("onUp -> {}", this);
         }
     }
 
     @Override
     public String toString() {
-        return Json.toString(this);
+        return CosmosJson.toString(this);
     }
 
     @SuppressWarnings("unchecked")
@@ -379,7 +415,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     @NonNull
-    private Set<Node> getContactPointsOrException() {
+    private Set<Node> getContactPointsOrThrow() {
         return requireNonNull(this.getContactPoints(), "expected non-null contactPoints");
     }
 
@@ -419,64 +455,24 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
     // region Types
 
-    private static class NodeSerializer extends StdSerializer<Node> {
-
-        public static final NodeSerializer INSTANCE = new NodeSerializer(Node.class);
-        private static final long serialVersionUID = -4853942224745141238L;
-
-        NodeSerializer(final Class<Node> type) {
-            super(type);
-        }
-
-        @Override
-        public void serialize(
-            @NonNull final Node value,
-            @NonNull final JsonGenerator generator,
-            @NonNull final SerializerProvider serializerProvider) throws IOException {
-
-            requireNonNull(value, "expected non-null value");
-            requireNonNull(value, "expected non-null generator");
-            requireNonNull(value, "expected non-null serializerProvider");
-
-            generator.writeStartObject();
-            generator.writeStringField("endPoint", value.getEndPoint().toString());
-            generator.writeStringField("datacenter", value.getDatacenter());
-            generator.writeStringField("distance", value.getDistance().toString());
-
-            final UUID hostId = value.getHostId();
-
-            if (hostId == null) {
-                generator.writeNullField("hostId");
-            } else {
-                generator.writeStringField("hostId", hostId.toString());
-            }
-
-            generator.writeNumberField("openConnections", value.getOpenConnections());
-            generator.writeStringField("state", value.getState().toString());
-            generator.writeEndObject();
-        }
-    }
-
     @SuppressFBWarnings("SE_COMPARATOR_SHOULD_BE_SERIALIZABLE")
-    private static class PreferredRegionsComparator implements Comparator<Node> {
+    private static final class PreferredRegionsComparator implements Comparator<Node> {
 
         private final Map<String, Integer> indexes;
-        private final MetadataManager metadataManager;
+        private List<String> preferredRegions;
 
-        PreferredRegionsComparator(
-            @NonNull final MetadataManager metadataManager,
-            @NonNull final List<String> preferredRegions) {
+        PreferredRegionsComparator(@NonNull final List<String> preferredRegions) {
 
-            this.metadataManager = requireNonNull(metadataManager, "expected non-null contactPoints");
+            requireNonNull(preferredRegions, "expected non-null preferredRegions");
 
-            this.indexes = new HashMap<>(
-                requireNonNull(preferredRegions, "expected non-null preferredRegions").size());
-
+            this.indexes = new HashMap<>(preferredRegions.size() + 1);
             int index = 0;
 
             for (final String region : preferredRegions) {
                 this.indexes.put(region, index++);
             }
+
+            this.preferredRegions = null;
         }
 
         /**
@@ -492,136 +488,105 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
          *
          * @return a negative integer, zero, or a positive integer as the first argument is less than, equal to, or
          * greater than the second.
+         *
+         * @throws NullPointerException if x or y have no datacenter name or host ID.
          */
         @SuppressFBWarnings(value = "RC_REF_COMPARISON", justification = "Reference comparison is intentional")
         @SuppressWarnings("NumberEquality")
         @Override
         public int compare(@NonNull final Node x, @NonNull final Node y) {
 
-            requireNonNull(x, "expected non-null x");
-            requireNonNull(y, "expected non-null y");
-
             if (x == y) {
                 return 0;
             }
 
-            final String xDatacenter = x.getDatacenter();
-            final String yDatacenter = y.getDatacenter();
+            final String xDatacenter = requireNonNull(x.getDatacenter(), "expected non-null x::datacenter");
+            final String yDatacenter = requireNonNull(y.getDatacenter(), "expected non-null y::datacenter");
 
-            requireNonNull(xDatacenter, "expected non-null x::datacenter");
-            requireNonNull(yDatacenter, "expected non-null y::datacenter");
+            final int xIndex = this.indexes.getOrDefault(xDatacenter, this.preferredRegions.size());
+            final int yIndex = this.indexes.getOrDefault(yDatacenter, this.preferredRegions.size());
 
-            final int compareDatacenterNames = xDatacenter.compareTo(yDatacenter);
+            int result = Integer.compare(xIndex, yIndex);
 
-            if (compareDatacenterNames != 0) {
-
-                final Integer xIndex = this.indexes.get(xDatacenter);
-                final Integer yIndex = this.indexes.get(yDatacenter);
-
-                int result;
-
-                if (xIndex != yIndex) {
-
-                    if (xIndex == null) {
-                        return -1;  // y is a preferred datacenter and x is not
-                    }
-
-                    if (yIndex == null) {
-                        return 1;  // x is a preferred datacenter and y is not
-                    }
-
-                    result = Integer.compare(xIndex, yIndex);
-
-                    if (result != 0) {
-                        return result; // x and y are preferred datacenters and one has higher priority than the other
-                    }
-                }
-
-                final boolean xIsContactPoint = this.getContactPoints().contains(x);
-                final boolean yIsContactPoint = this.getContactPoints().contains(y);
-
-                result = Boolean.compare(xIsContactPoint, yIsContactPoint);
-
-                if (result != 0) {
-                    return result;  // one of x or y are a contact point
-                }
-
-                if (xIndex == null) {  // x and y are both not in a preferred datacenter
-                    return compareDatacenterNames;
-                }
+            if (result != 0) {
+                return result;  // x and y are in different regions and one sorts before the other
             }
 
-            // We distinguish x and y by Host ID because they're in the same datacenter
+            // This remainder of this method covers Apache Cassandra use cases with some grace
 
-            final UUID xHostId = x.getHostId();
-            final UUID yHostId = y.getHostId();
+            // We first distinguish x and y by datacenter name, lexicographically
 
-            requireNonNull(xHostId, "expected non-null x::hostId");
-            requireNonNull(yHostId, "expected non-null y::hostId");
+            result = xDatacenter.compareTo(yDatacenter);
 
-            return Objects.compare(x.getHostId(), y.getHostId(), UUID::compareTo);
+            if (result != 0) {
+                return result;
+            }
+
+            // We then distinguish x and y by Host ID they're in the same datacenter
+
+            final UUID xHostId = requireNonNull(x.getHostId(), "expected non-null x::hostId");
+            final UUID yHostId = requireNonNull(y.getHostId(), "expected non-null y::hostId");
+
+            return xHostId.compareTo(yHostId);
         }
 
-        @SuppressWarnings("unchecked")
-        @NonNull
-        private Set<Node> getContactPoints() {
-            return (Set<Node>) (Set<?>) this.metadataManager.getContactPoints();
-        }
-    }
-
-    private static class RequestSerializer extends StdSerializer<Request> {
-
-        public static final RequestSerializer INSTANCE = new RequestSerializer(Request.class);
-        private static final long serialVersionUID = -6046496854932624633L;
-
-        RequestSerializer(final Class<Request> type) {
-            super(type);
+        List<String> getPreferredRegions() {
+            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
         }
 
-        @Override
-        public void serialize(
-            @NonNull final Request value,
-            @NonNull final JsonGenerator generator,
-            @NonNull final SerializerProvider serializerProvider) throws IOException {
-
-            requireNonNull(value, "expected non-null value");
-            requireNonNull(value, "expected non-null generator");
-            requireNonNull(value, "expected non-null serializerProvider");
-
-            generator.writeStartObject();
-
-            String query;
-
-            try {
-                final Method getQuery = value.getClass().getMethod("getQuery");
-                query = (String) getQuery.invoke(value);
-            } catch (final NoSuchMethodException | InvocationTargetException | IllegalAccessException error) {
-                query = value.getClass().toString();
+        /**
+         * Called by {@link #init} to prepend the datacenters for all contact points to the list of preferred regions.
+         *
+         * These regions will appear first in the list of preferred regions following those specified in configuration
+         * using {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
+         * <p>
+         * This method is not thread safe and can only be called once. It should only be called by {@link #init}.
+         *
+         * @param contactPoints A set of contact points.
+         *
+         * @throws IllegalStateException if this method is called more than once.
+         */
+        void addPreferredRegionsFirst(final Set<Node> contactPoints) {
+            if (this.preferredRegions != null) {
+                throw new IllegalStateException("attempt to add preferred regions more than once");
             }
+            contactPoints.stream()
+                .map(Node::getDatacenter)
+                .forEachOrdered(region -> this.indexes.put(region, -this.indexes.size()));
+            this.preferredRegions = this.collectPreferredRegions();
+        }
 
-            if (query == null) {
-                generator.writeNullField("query");
-            } else {
-                generator.writeStringField("query", query);
+        /**
+         * Called by {@link #init} to append the datacenters for all contact points to the list of preferred regions.
+         *
+         * These regions will appear last in the list of preferred regions following those specified in configuration
+         * using {@link CosmosLoadBalancingPolicyOption#PREFERRED_REGIONS}.
+         * <p>
+         * This method is not thread safe and can only be called once. It should only be called by {@link #init}.
+         *
+         * @param contactPoints A set of contact points.
+         *
+         * @throws IllegalStateException if this method is called more than once.
+         */
+        void addPreferredRegionsLast(final Set<Node> contactPoints) {
+            if (this.preferredRegions != null) {
+                throw new IllegalStateException("attempt to add preferred regions more than once");
             }
+            contactPoints.stream()
+                .map(Node::getDatacenter)
+                .forEachOrdered(region -> this.indexes.put(region, this.indexes.size()));
+            this.preferredRegions = this.collectPreferredRegions();
+        }
 
-            final CqlIdentifier keyspace = value.getKeyspace();
+        boolean hasPreferredRegion(final String name) {
+            return this.indexes.containsKey(name);
+        }
 
-            if (keyspace == null) {
-                generator.writeNullField("keyspace");
-            } else {
-                generator.writeStringField("keyspace", keyspace.asCql(true));
-            }
-
-            final Duration timeout = value.getTimeout();
-
-            if (timeout == null) {
-                generator.writeNullField("timeout");
-            } else {
-                generator.writeObjectField("timeout", timeout);
-            }
-
-            generator.writeEndObject();
+        private List<String> collectPreferredRegions() {
+            return this.indexes.entrySet().stream()
+                .sorted(Comparator.comparingInt(Map.Entry::getValue))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
         }
     }
 

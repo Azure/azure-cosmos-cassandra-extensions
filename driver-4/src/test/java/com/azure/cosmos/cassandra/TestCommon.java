@@ -5,101 +5,212 @@ package com.azure.cosmos.cassandra;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
+import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
+import com.datastax.oss.driver.api.querybuilder.delete.Delete;
+import com.datastax.oss.driver.api.querybuilder.insert.Insert;
+import com.datastax.oss.driver.api.querybuilder.select.Select;
+import com.datastax.oss.driver.api.querybuilder.update.Update;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInfo;
+import org.slf4j.Logger;
 
+import java.io.File;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Base64;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.azure.cosmos.cassandra.CosmosJson.toJson;
+import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static java.lang.String.format;
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * A utility class that implements common static methods useful for writing tests.
  */
 public final class TestCommon {
 
-    private TestCommon() {
-        throw new UnsupportedOperationException();
-    }
-
     // region Fields
 
-    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+    public static final String GLOBAL_ENDPOINT;
+    public static final InetSocketAddress GLOBAL_ENDPOINT_ADDRESS;
+    public static final String GLOBAL_ENDPOINT_HOSTNAME;
+    public static final int GLOBAL_ENDPOINT_PORT;
+    public static final String KEYSPACE_NAME = "test_driver_4";
+    public static final boolean MULTI_REGION_WRITES;
+    public static final String PASSWORD;
+    public static final List<String> PREFERRED_REGIONS;
+    public static final List<InetSocketAddress> REGIONAL_ENDPOINTS;
+    public static final String TRUSTSTORE_PASSWORD;
+    public static final String TRUSTSTORE_PATH;
+    public static final String USERNAME;
 
-    static final InetSocketAddress GLOBAL_ENDPOINT;
-    static final String LOCAL_DATACENTER;
-    static final List<String> PREFERRED_REGIONS;
-    static final List<SocketAddress> REGIONAL_ENDPOINTS;
+    private static final Pattern HOSTNAME_AND_PORT = Pattern.compile("^\\s*(?<hostname>.*?):(?<port>\\d+)\\s*$");
+    private static final Map<String, String> PROPERTIES = new TreeMap<>();
 
     static {
-
-        out.println("--------------------------------------------------------------");
-        out.println("T E S T  P A R A M E T E R S");
-        out.println("--------------------------------------------------------------");
 
         // GLOBAL_ENDPOINT
 
         String value = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.global-endpoint",
-            "AZURE_COSMOS_CASSANDRA_GLOBAL_ENDPOINT",
+            "localhost");
+
+        assertThat(value).isNotBlank();
+        final int index = value.lastIndexOf(':');
+
+        if (index == -1) {
+            GLOBAL_ENDPOINT = value + ":10350";
+            GLOBAL_ENDPOINT_HOSTNAME = value;
+            GLOBAL_ENDPOINT_PORT = 10350;
+        } else {
+            assertThat(index).isGreaterThan(0);
+            assertThat(index).isLessThan(value.length() - 1);
+            GLOBAL_ENDPOINT = value;
+            GLOBAL_ENDPOINT_HOSTNAME = GLOBAL_ENDPOINT.substring(0, index);
+            GLOBAL_ENDPOINT_PORT = Integer.parseUnsignedInt(GLOBAL_ENDPOINT.substring(index + 1));
+        }
+
+        GLOBAL_ENDPOINT_ADDRESS = new InetSocketAddress(GLOBAL_ENDPOINT_HOSTNAME, GLOBAL_ENDPOINT_PORT);
+
+        setProperty("azure.cosmos.cassandra.global-endpoint-address", GLOBAL_ENDPOINT_ADDRESS);
+        setProperty("azure.cosmos.cassandra.global-endpoint-hostname", GLOBAL_ENDPOINT_HOSTNAME);
+        setProperty("azure.cosmos.cassandra.global-endpoint-port", GLOBAL_ENDPOINT_PORT);
+
+        // USERNAME
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.username",
             null);
 
-        out.println("GLOBAL_ENDPOINT = " + value);
         assertThat(value).isNotBlank();
-        GLOBAL_ENDPOINT = parseSocketAddress(value);
+        USERNAME = value;
+
+        // PASSWORD
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.password",
+            null);
+
+        assertThat(value).isNotBlank();
+        PASSWORD = value;
+
+        // MULTI_REGION_WRITES
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.multi-region-writes",
+            "true");
+
+        assertThat(value).isNotBlank();
+        MULTI_REGION_WRITES = Boolean.parseBoolean(value);
 
         // PREFERRED_REGIONS
 
         List<String> list = getPropertyOrEnvironmentVariableList(
-            "azure.cosmos.cassandra.preferred-region-",
-            "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
-            3);
+            "azure.cosmos.cassandra.preferred-regions",
+            "azure.cosmos.cassandra.preferred-region-");
 
-        out.println("PREFERRED_REGIONS = " + list);
         assertThat(list).isNotEmpty();
         PREFERRED_REGIONS = list;
-
-        // LOCAL_DATACENTER
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.local-datacenter",
-            "AZURE_COSMOS_CASSANDRA_LOCAL_DATACENTER",
-            PREFERRED_REGIONS.get(0));
-
-        out.println("LOCAL_DATACENTER = " + value);
-        LOCAL_DATACENTER = value;
 
         // REGIONAL_ENDPOINTS
 
         list = getPropertyOrEnvironmentVariableList(
-            "azure.cosmos.cassandra.regional-endpoint_",
-            "AZURE_COSMOS_CASSANDRA_REGIONAL_ENDPOINT_",
-            3);
+            "azure.cosmos.cassandra.regional-endpoints",
+            "azure.cosmos.cassandra.regional-endpoint-");
 
-        out.println("REGIONAL_ENDPOINTS = " + list);
         assertThat(list).isNotEmpty();
-        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseSocketAddress).collect(Collectors.toList());
+        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseInetSocketAddress).collect(Collectors.toList());
 
-        out.println();
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.truststore-path",
+            null);
+
+        assertThat(value).isNotEmpty();
+        assertThat(new File(value)).exists().canRead();
+        TRUSTSTORE_PATH = value;
+
+        value = getPropertyOrEnvironmentVariable(
+            "azure.cosmos.cassandra.truststore-password",
+            null);
+
+        assertThat(value).isNotEmpty();
+        TRUSTSTORE_PASSWORD = value;
+
+        System.setProperty("javax.net.ssl.trustStore",
+            System.getProperty("azure.cosmos.cassandra.truststore-path"));
+
+        System.setProperty("javax.net.ssl.trustStorePassword",
+            System.getProperty("azure.cosmos.cassandra.truststore-password"));
+    }
+
+    private TestCommon() {
+        throw new UnsupportedOperationException();
     }
 
     // endregion
 
     // region Methods
+
+    /**
+     * Logs the name of each test before it is executed.
+     *
+     * @param info Test info.
+     * @param log  The logger for the test.
+     */
+    public static void logTestName(final TestInfo info, final Logger log) {
+        log.info("---------------------------------------------------------------------------------------------------");
+        log.info("{} {}",
+            info.getTestMethod().orElseThrow(null).getName(),
+            info.getDisplayName());
+        log.info("---------------------------------------------------------------------------------------------------");
+    }
+
+    /**
+     * Prints the set of test parameters to {@link System#out} before all tests are run.
+     * <p>
+     * This method should be called in a test method marked with {@link BeforeAll}. It is not automatically called here.
+     */
+    public static void printTestParameters() {
+
+        out.println("--------------------------------------------------------------");
+        out.println("T E S T  P A R A M E T E R S");
+        out.println("--------------------------------------------------------------");
+
+        for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
+            out.println(property.getKey() + " = " + toJson(property.getValue()));
+        }
+
+        out.println("javax.net.ssl.trustStore" + " = "
+            + toJson(System.getProperty("javax.net.ssl.trustStore")));
+        out.println("javax.net.ssl.trustStoreType" + " = "
+            + toJson(System.getProperty("javax.net.ssl.trustStoreType")));
+        out.println("javax.net.ssl.trustStorePassword" + " = "
+            + toJson(System.getProperty("javax.net.ssl.trustStorePassword")));
+
+        out.println();
+    }
 
     /**
      * Creates the schema (keyspace) and table to verify that we can integrate with Cosmos.
@@ -108,25 +219,35 @@ public final class TestCommon {
      * @param keyspaceName name of the keyspace to query.
      * @param tableName    name of the table to query.
      */
-    static void createSchema(final CqlSession session, final String keyspaceName, final String tableName)
-        throws InterruptedException {
+    static void createSchema(
+        final CqlSession session,
+        final String keyspaceName,
+        final String tableName,
+        final int throughput) {
 
-        session.execute(format(
-            "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}",
-            keyspaceName));
+        try {
 
-        session.execute(format(
-            "CREATE TABLE IF NOT EXISTS %s.%s ("
-                + "sensor_id uuid,"
-                + "date date,"
-                + "timestamp timestamp,"  // emulates bucketing by day
-                + "value double,"
-                + "PRIMARY KEY ((sensor_id,date),timestamp)"
-                + ")",
-            keyspaceName,
-            tableName));
+            session.execute(format(
+                "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}",
+                keyspaceName));
 
-        Thread.sleep(5_000L);  // allows time for schema to propagate to all regions
+            session.execute(format(
+                "CREATE TABLE IF NOT EXISTS %s.%s ("
+                    + "sensor_id uuid,"
+                    + "date date,"
+                    + "timestamp timestamp,"  // emulates bucketing by day
+                    + "value double,"
+                    + "PRIMARY KEY ((sensor_id,date),timestamp)"
+                    + ") with cosmosdb_provisioned_throughput=%s",
+                keyspaceName,
+                tableName,
+                throughput));
+
+            Thread.sleep(5_000L);  // allows time for schema propagation
+
+        } catch (final Throwable error) {
+            fail("could not create schema due to: {}", toJson(error));
+        }
     }
 
     /**
@@ -160,24 +281,33 @@ public final class TestCommon {
      * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
      *
      * @param property     a system property name.
-     * @param variable     an environment variable name.
      * @param defaultValue the default value--which may be {@code null}--to be used if neither {@code property} or
      *                     {@code variable} is set.
      *
      * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
      * {@code defaultValue}.
      */
-    static String getPropertyOrEnvironmentVariable(
-        @NonNull final String property, @NonNull final String variable, final String defaultValue) {
+    static String getPropertyOrEnvironmentVariable(@NonNull final String property, final String defaultValue) {
 
+        final String variable = getVariableName(property);
         String value = System.getProperty(property);
 
-        if (value == null) {
+        if (value == null || value.isEmpty()) {
             value = System.getenv(variable);
         }
 
         if (value == null) {
             value = defaultValue;
+        }
+
+        if (value != null) {
+            PROPERTIES.put(property, value);
+            System.setProperty(property, value);
+            System.setProperty(variable, value);
+        } else {
+            PROPERTIES.remove(property);
+            System.getProperties().remove(property);
+            System.getProperties().remove(variable);
         }
 
         return value;
@@ -189,47 +319,48 @@ public final class TestCommon {
      * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
      *
      * @param property a system property name.
-     * @param variable an environment variable name.
-     * @param limit    the default value--which may be {@code null}--to be used if neither {@code property} or {@code
-     *                 variable} is set.
+     * @param elementPrefix a prefix for elements in the list of values.
      *
      * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
      * {@code defaultValue}.
      */
     @SuppressWarnings("SameParameterValue")
     static List<String> getPropertyOrEnvironmentVariableList(
-        @NonNull final String property, @NonNull final String variable, final int limit) {
+        @NonNull final String property,
+        @NonNull final String elementPrefix) {
 
-        final List<String> list = new ArrayList<>(limit);
+        final String[] array = getPropertyOrEnvironmentVariable(property, "").split(("\\s*,\\s*"));
+        int elementNumber = 1;
 
-        for (int i = 1; i <= limit; i++) {
-            final String value = getPropertyOrEnvironmentVariable(property + i, variable + i, null);
-            if (value == null) {
-                break;
-            }
-            list.add(value);
+        for (final String elementValue : array) {
+
+            final String elementName = elementPrefix + elementNumber;
+
+            PROPERTIES.put(elementName, elementValue);
+            System.setProperty(elementName, elementValue);
+            System.setProperty(getVariableName(elementName), elementValue);
+
+            elementNumber++;
         }
 
-        return list;
+        return Arrays.asList(array);
     }
 
     /**
      * Queries data, retrying if necessary with a downgraded consistency level.
      *
      * @param session          the session for executing requests.
-     * @param consistencyLevel the consistency level to apply or {@code null}.
      * @param keyspaceName     name of the keyspace to query.
      * @param tableName        name of the table to query.
      *
+     * @param consistencyLevel the consistency level to apply or {@code null}.
      * @return A {@link ResultSet result set}.
      */
     @SuppressWarnings("SameParameterValue")
     @NonNull
     static ResultSet read(
         @NonNull final CqlSession session,
-        final ConsistencyLevel consistencyLevel,
-        @NonNull final String keyspaceName,
-        @NonNull final String tableName) {
+        @NonNull final String keyspaceName, @NonNull final String tableName, final ConsistencyLevel consistencyLevel) {
 
         out.printf("Reading at %s%n", consistencyLevel);
 
@@ -251,6 +382,156 @@ public final class TestCommon {
     }
 
     /**
+     * Queries data, retrying if necessary with a downgraded consistency level asynchronously.
+     *
+     * @param session          the session for executing requests.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
+     * @param keyspaceName     name of the keyspace to query.
+     * @param tableName        name of the table to query.
+     *
+     * @return {@link CompletableFuture Promise} of an {@link AsyncResultSet asynchronous result set}.
+     */
+    @SuppressWarnings("SameParameterValue")
+    @NonNull
+    static CompletableFuture<AsyncResultSet> readAsync(
+        @NonNull final CqlSession session,
+        final ConsistencyLevel consistencyLevel,
+        @NonNull final String keyspaceName,
+        @NonNull final String tableName) {
+
+        final SimpleStatement statement = SimpleStatement.newInstance(format(
+            "SELECT sensor_id, date, timestamp, value "
+                + "FROM %s.%s "
+                + "WHERE "
+                + "sensor_id = 756716f7-2e54-4715-9f00-91dcbea6cf50 AND "
+                + "date = '2018-02-26' AND "
+                + "timestamp > '2018-02-26+01:00'",
+            keyspaceName,
+            tableName)
+        ).setConsistencyLevel(consistencyLevel);
+
+        return session.executeAsync(statement).toCompletableFuture();
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    static void testAllStatements(@NonNull final CqlSession session) {
+
+        final String tableName = uniqueName("sensor_data_");
+
+        try {
+
+            createSchema(session, KEYSPACE_NAME, tableName, 10_000);
+
+            // SimpleStatements
+
+            session.execute(SimpleStatement.newInstance(format(
+                "SELECT * FROM %s.%s WHERE sensor_id=uuid() and date=toDate(now())",
+                KEYSPACE_NAME,
+                tableName)));
+
+            session.execute(SimpleStatement.newInstance(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (uuid(), toDate(now()), toTimestamp(now()));",
+                KEYSPACE_NAME,
+                tableName)));
+
+            session.execute(SimpleStatement.newInstance(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp=toTimestamp("
+                    + "now())",
+                KEYSPACE_NAME,
+                tableName)));
+
+            session.execute(SimpleStatement.newInstance(format(
+                "DELETE FROM %s.%s WHERE sensor_id=uuid() AND date=toDate(now()) AND timestamp=toTimestamp(now())",
+                KEYSPACE_NAME,
+                tableName)));
+
+            // Built statements
+
+            final LocalDate date = LocalDate.of(2016, 6, 30);
+            final Instant timestamp = Instant.now();
+            final UUID uuid = UUID.randomUUID();
+
+            final Select select = QueryBuilder.selectFrom(KEYSPACE_NAME, tableName)
+                .all()
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
+            session.execute(select.build());
+
+            final Insert insert = QueryBuilder.insertInto(KEYSPACE_NAME, tableName)
+                .value("sensor_id", literal(uuid))
+                .value("date", literal(date))
+                .value("timestamp", literal(timestamp));
+
+            session.execute(insert.build());
+
+            final Update update = QueryBuilder.update(KEYSPACE_NAME, tableName)
+                .setColumn("value", literal(1.0))
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
+            session.execute(update.build());
+
+            final Delete delete = QueryBuilder.deleteFrom(KEYSPACE_NAME, tableName)
+                .whereColumn("sensor_id").isEqualTo(literal(uuid))
+                .whereColumn("date").isEqualTo(literal(date))
+                .whereColumn("timestamp").isEqualTo(literal(timestamp));
+
+            session.execute(delete.build());
+
+            // BoundStatements
+
+            PreparedStatement preparedStatement = session.prepare(format(
+                "SELECT * FROM %s.%s WHERE sensor_id = ? and date = ?",
+                KEYSPACE_NAME,
+                tableName));
+
+            BoundStatement boundStatement = preparedStatement.bind(uuid, date);
+            session.execute(boundStatement);
+
+            preparedStatement = session.prepare(format(
+                "INSERT INTO %s.%s (sensor_id, date, timestamp) VALUES (?, ?, ?)",
+                KEYSPACE_NAME,
+                tableName));
+
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
+
+            preparedStatement = session.prepare(format(
+                "UPDATE %s.%s SET value = 1.0 WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                KEYSPACE_NAME,
+                tableName));
+
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
+
+            preparedStatement = session.prepare(format(
+                "DELETE FROM %s.%s WHERE sensor_id = ? AND date = ? AND timestamp = ?",
+                KEYSPACE_NAME,
+                tableName));
+
+            boundStatement = preparedStatement.bind(uuid, date, timestamp);
+            session.execute(boundStatement);
+
+            // BatchStatement (NOTE: BATCH requests must be single table Update/Delete/Insert statements)
+
+            final BatchStatement batchStatement = BatchStatement.newInstance(BatchType.UNLOGGED)
+                .add(boundStatement)
+                .add(boundStatement);
+
+            session.execute(batchStatement);
+
+        } finally {
+            assertThatCode(() -> session.execute(SchemaBuilder.dropTable(KEYSPACE_NAME, tableName)
+                .ifExists()
+                .build()))
+                .doesNotThrowAnyException();
+        }
+    }
+
+    /**
      * Returns a unique name composed of a {@code prefix} string and a {@linkplain UUID#randomUUID random UUID}.
      * <p>
      * Hyphens are removed from the generated {@link UUID} before it is joined to the {@code prefix} with an underscore.
@@ -262,35 +543,23 @@ public final class TestCommon {
     @NonNull
     static String uniqueName(@NonNull final String prefix) {
 
-        final ByteBuffer buffer = ByteBuffer.allocate(2 * Long.BYTES);
         final UUID uuid = UUID.randomUUID();
+        final long id = uuid.getLeastSignificantBits() ^ uuid.getMostSignificantBits();
 
-        buffer.putLong(uuid.getLeastSignificantBits());
-        buffer.putLong(uuid.getMostSignificantBits());
-
-        return prefix + '_' + Base64.getEncoder().withoutPadding()
-            .encodeToString(buffer.array())
-            .replaceAll("[^_a-zA-Z0-9]", "");
+        return prefix + Long.toUnsignedString(id, Character.MAX_RADIX);
     }
-
-    // endregion
-
-    // region Privates
 
     /**
      * Inserts data, retrying if necessary with a downgraded CL.
-     *
-     * @param session          the session for executing requests.
-     * @param consistencyLevel the consistency level to apply or {@code null}.
+     *  @param session          the session for executing requests.
      * @param keyspaceName     name of the keyspace to query.
      * @param tableName        name of the table to query.
+     * @param consistencyLevel the consistency level to apply or {@code null}.
      */
     @SuppressWarnings("SameParameterValue")
     static void write(
         @NonNull final CqlSession session,
-        final ConsistencyLevel consistencyLevel,
-        @NonNull final String keyspaceName,
-        @NonNull final String tableName) {
+        @NonNull final String keyspaceName, @NonNull final String tableName, final ConsistencyLevel consistencyLevel) {
 
         out.printf("Writing at %s%n", consistencyLevel);
 
@@ -322,6 +591,10 @@ public final class TestCommon {
         out.println("Write succeeded at " + consistencyLevel);
     }
 
+    // endregion
+
+    // region Privates
+
     /**
      * Draws a line to isolate headings from rows.
      *
@@ -335,6 +608,17 @@ public final class TestCommon {
             out.print('+');
         }
         out.println();
+    }
+
+    private static String getVariableName(final String property) {
+
+        final StringBuilder builder = new StringBuilder(property.length());
+
+        property.chars().forEachOrdered(c -> {
+            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
+        });
+
+        return builder.toString();
     }
 
     /**
@@ -359,7 +643,7 @@ public final class TestCommon {
         return matcher;
     }
 
-    private static InetSocketAddress parseSocketAddress(final String value) {
+    private static InetSocketAddress parseInetSocketAddress(final String value) {
 
         final Matcher matcher = matchSocketAddress(value);
 
@@ -367,6 +651,13 @@ public final class TestCommon {
         final int port = Integer.parseUnsignedInt(matcher.group("port"));
 
         return new InetSocketAddress(hostname, port);
+    }
+
+    private static void setProperty(@NonNull final String name, @NonNull final Object value) {
+        final String string = value.toString();
+        PROPERTIES.put(name, string);
+        System.setProperty(name, string);
+        System.setProperty(getVariableName(name), string);
     }
 
     // endregion

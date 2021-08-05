@@ -77,7 +77,7 @@ function verify() {
 
     for app in java-driver-app spring-boot-app; do
         set -o xtrace
-        if mvn --file examples/$app/pom.xml "${options[@]}" -DargLine="-Dazure.cosmos.cassandra.jar=\${project.build.directory}/\${project.build.finalName}.jar" verify; then
+        if mvn --file examples/$app/pom.xml "${options[@]}" verify; then
             successes+=("examples/$app")
         else
             failures+=("examples/$app")
