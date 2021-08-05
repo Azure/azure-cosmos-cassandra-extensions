@@ -288,6 +288,9 @@ Licensed under the MIT License.
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <useModulePath>false</useModulePath>
+          <systemPropertyVariables>
+            <javax.net.ssl.trustStoreType>JKS</javax.net.ssl.trustStoreType>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>
