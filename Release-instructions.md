@@ -11,9 +11,9 @@
 
 - [ ] Update these `package` files:
 
-      * package/CHANGELOG.md
-      * package/KNOWN_ISSUES.md
-      * package/README.md
+      * driver-3/CHANGELOG.md
+      * driver-3/KNOWN_ISSUES.md
+      * driver-3/README.md
 
       as needed.
 
