@@ -115,7 +115,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         this.hostsForWriting = this.multiRegionWritesEnabled
             ? this.hostsForReading
-            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(Collections.emptyList()));
+            : new ConcurrentSkipListSet<>(new PreferredRegionsComparator(preferredRegions));
 
         if (LOG.isTraceEnabled()) {
             LOG.trace("CosmosLoadBalancingPolicy -> {}", toJson(this));
@@ -141,7 +141,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @SuppressWarnings("Java9CollectionFactory")
     public List<Host> getHostsForReading() {
-        return Collections.unmodifiableList(new ArrayList<>(this.hostsForReading));
+        return new ArrayList<>(this.hostsForReading);
     }
 
     /**
@@ -157,7 +157,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @SuppressWarnings("Java9CollectionFactory")
     public List<Host> getHostsForWriting() {
-        return Collections.unmodifiableList(new ArrayList<>(this.hostsForWriting));
+        return new ArrayList<>(this.hostsForWriting);
     }
 
     /**
@@ -180,7 +180,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public List<String> getPreferredReadRegions() {
         final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
         assert comparator != null;
-        return Collections.unmodifiableList(comparator.getPreferredRegions());
+        return new ArrayList<>(comparator.getPreferredRegions());
     }
 
     /**
@@ -192,7 +192,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @return The list of preferred regions for failover on write operations.
      */
     public List<String> getPreferredWriteRegions() {
-        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForReading.comparator();
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.hostsForWriting.comparator();
         assert comparator != null;
         return Collections.unmodifiableList(comparator.getPreferredRegions());
     }
@@ -347,34 +347,16 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
 
         requireNonNull(host, "expected non-null host");
 
-        if (host.getDatacenter() == null) {
+        // We remove based on host, not datacenter name because hosts are based on their endpoint address, not their
+        // datacenter name. We might prefer to remove a host based on datacenter name, but datacenter name is
+        // sometimes unknown (i.e., null) when this method is called.
 
-            if (this.hostsForReading.stream().anyMatch(host::equals)) {
-                throw new IllegalStateException(
-                    "Host without a datacenter should not be in list of hosts for reading: "
-                        + CosmosJson.toString(host));
-            }
+        this.hostsForReading.removeIf(entry -> entry.equals(host));
 
-            if (!this.multiRegionWritesEnabled) {
-
-                assert this.hostsForReading == this.hostsForWriting;
-
-                if (this.hostsForWriting.stream().anyMatch(host::equals)) {
-                    throw new IllegalStateException(
-                        "Host without a datacenter should not be in list of hosts for writing: "
-                            + CosmosJson.toString(host));
-                }
-            }
-
+        if (this.multiRegionWritesEnabled) {
+            assert this.hostsForReading == this.hostsForWriting;
         } else {
-
-            this.hostsForReading.remove(host);
-
-            if (this.multiRegionWritesEnabled) {
-                assert this.hostsForReading == this.hostsForWriting;
-            } else {
-                this.hostsForWriting.remove(host);
-            }
+            this.hostsForReading.removeIf(entry -> entry.equals(host));
         }
 
         if (LOG.isWarnEnabled()) {
@@ -417,19 +399,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         this.hostsForReading.add(host);
 
         if (this.multiRegionWritesEnabled) {
-
             assert this.hostsForReading == this.hostsForWriting;
-
         } else {
-
-            final PreferredRegionsComparator comparator =
-                (PreferredRegionsComparator) this.hostsForWriting.comparator();
-
-            assert comparator != null;
-
-            if (comparator.hasPreferredRegion(host.getDatacenter())) {
-                this.hostsForWriting.add(host);
-            }
+            this.hostsForWriting.add(host);
         }
 
         if (LOG.isTraceEnabled()) {
@@ -649,7 +621,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         List<String> getPreferredRegions() {
-            return this.preferredRegions == null ? this.collectPreferredRegions() : this.preferredRegions;
+            return this.preferredRegions == null ? this.collectAndGetPreferredRegions() : this.preferredRegions;
         }
 
         /**
@@ -667,10 +639,12 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (this.preferredRegions != null) {
                 throw new IllegalStateException("attempt to add preferred regions more than once");
             }
+            // All contact points already in the list of preferred regions are moved to the front of the list.
+            // Their position is changed.
             contactPoints.stream()
                 .map(Host::getDatacenter)
                 .forEachOrdered(region -> this.indexes.put(region, -this.indexes.size()));
-            this.preferredRegions = this.collectPreferredRegions();
+            this.preferredRegions = this.collectAndGetPreferredRegions();
         }
 
         /**
@@ -688,17 +662,19 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             if (this.preferredRegions != null) {
                 throw new IllegalStateException("attempt to add preferred regions more than once");
             }
+            // No contact points already in the list of preferred regions are moved to the back of the list.
+            // Their position is unchanged.
             contactPoints.stream()
                 .map(Host::getDatacenter)
-                .forEachOrdered(region -> this.indexes.put(region, this.indexes.size()));
-            this.preferredRegions = this.collectPreferredRegions();
+                .forEachOrdered(region -> this.indexes.putIfAbsent(region, this.indexes.size()));
+            this.preferredRegions = this.collectAndGetPreferredRegions();
         }
 
         boolean hasPreferredRegion(final String name) {
             return this.indexes.containsKey(name);
         }
 
-        private List<String> collectPreferredRegions() {
+        private List<String> collectAndGetPreferredRegions() {
             return this.indexes.entrySet().stream()
                 .sorted(Comparator.comparingInt(Map.Entry::getValue))
                 .map(Map.Entry::getKey)

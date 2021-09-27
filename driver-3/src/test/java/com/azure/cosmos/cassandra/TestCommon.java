@@ -71,6 +71,7 @@ public final class TestCommon {
     public static final String PASSWORD;
     public static final List<String> PREFERRED_REGIONS;
     public static final List<InetSocketAddress> REGIONAL_ENDPOINTS;
+    public static final List<String> REGIONS;
     public static final String TRUSTSTORE_PASSWORD;
     public static final String TRUSTSTORE_PATH;
     public static final String USERNAME;
@@ -152,11 +153,20 @@ public final class TestCommon {
         assertThat(list).isNotEmpty();
         REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseInetSocketAddress).collect(Collectors.toList());
 
+        // REGIONS
+
+        list = getPropertyOrEnvironmentVariableList(
+            "azure.cosmos.cassandra.regions",
+            "azure.cosmos.cassandra.region-");
+
+        assertThat(list).isNotEmpty();
+        REGIONS = list;
+
+        // TRUSTSTORE
+
         value = getPropertyOrEnvironmentVariable(
             "azure.cosmos.cassandra.truststore-path",
             null);
-
-        // TRUSTSTORE
 
         assertThat(value).isNotEmpty();
         assertThat(new File(value)).exists().canRead();

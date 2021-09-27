@@ -1,5 +1,25 @@
 ## Release History
 
+## 1.0.1
+
+This is a maintenance release that:
+
+* Addresses these CosmosLoadBalancingPolicy issues:
+
+  - Preferred regions are now properly ordered when the primary region is explicitly specified.
+    Prior to this release, if the primary region was specified first in the list of preferred regions, it
+    would be moved to the end of the preferred region list.
+  
+  - CosmosLoadBalancingPolicy::onDown now removes hosts based on endpoint address, not datacenter name.
+    This behavior changes avoids a problem that arises when a host is removed before its datacenter name has been
+    determined.
+  
+  - Writes now fail over to secondary region when the primary region is down.
+    this behavior change
+
+* Adds additional test coverage to ensure that CosmosLoadBalancingPolicy orders hosts correctly based on the
+  specification of preferred regions.
+  
 ## 1.0.0
 
 This is a maintenance release that:
