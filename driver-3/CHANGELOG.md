@@ -14,8 +14,9 @@ This is a maintenance release that addresses these `CosmosLoadBalancingPolicy` i
    removed.
 
 - Writes now fail over to secondary regions when the primary region is down and multi-region-writes are disabled.
-  The primary region is always first in the list of preferred regions for writes, but if the primary region goes down, 
-  writes will pick up on a secondary region in order as specified by `CosmosLoadBalancingPolic::preferedRegions`.
+  The primary region is always first in the list of preferred regions for writes, but if the primary goes down, 
+  writes will fail over to a secondary. Before this change, failover behavior depended entirely on account failover 
+  configuration. 
 
 This release also adds test coverage to more thoroughly ensure that `CosmosLoadBalancingPolicy` orders hosts correctly 
 based on the specification of preferred regions.
