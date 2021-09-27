@@ -5,15 +5,15 @@
 This is a maintenance release that addresses these `CosmosLoadBalancingPolicy` issues:
 
 - Preferred regions are now properly ordered when the primary region is explicitly specified.
-  Prior to this release, if the primary region was specified in the list of preferred regions, it would be moved to
-  the end of the preferred region list.
+  Prior to this release, if the primary region was explicitly specified in the list of preferred regions, it would be 
+  moved to the end of the preferred region list.
 
 - `CosmosLoadBalancingPolicy::onDown` now removes hosts based on endpoint address, not datacenter name.
    This behavior change avoids a problem that arises when a host is removed before its datacenter name has been
    determined. It also ensures that the address of the host removed matches the address of the host to be
    removed.
 
-- Writes now fail over to secondary regions when the primary region is down when multi-region-writes are disabled.
+- Writes now fail over to secondary regions when the primary region is down and multi-region-writes are disabled.
   The primary region is always first in the list of preferred regions for writes, but if the primary region goes down, 
   writes will pick up on a secondary region in order as specified by `CosmosLoadBalancingPolic::preferedRegions`.
 
