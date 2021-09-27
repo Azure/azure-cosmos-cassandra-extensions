@@ -63,7 +63,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
     public static final long PAUSE_MILLIS = 5_000L;
-    private static final int TIMEOUT_IN_SECONDS = 30;
+    private static final int TIMEOUT_IN_SECONDS = 60;
 
     // endregion
 

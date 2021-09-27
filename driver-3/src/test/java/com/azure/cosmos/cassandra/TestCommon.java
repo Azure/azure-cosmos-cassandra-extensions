@@ -187,7 +187,6 @@ public final class TestCommon {
             System.setProperty("javax.net.ssl.trustStorePassword", TRUSTSTORE_PASSWORD);
 
         } catch (final Throwable error) {
-            System.out.println("Class initialization failed due to: " + toJson(error));
             LOG.error("Class initialization failed due to {}", toJson(error));
             printTestParameters();
             throw error;
