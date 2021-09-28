@@ -1,5 +1,21 @@
 # Release History
 
+## 1.1.1
+
+This is a maintenance release that addresses these `CosmosLoadBalancingPolicy` issues:
+
+- Preferred regions are now properly ordered when the primary region is explicitly specified.
+  Prior to this release, if the primary region was explicitly specified in the list of preferred regions, it would be
+  moved to the end of the preferred region list.
+
+- `CosmosLoadBalancingPolicy::onDown` now removes hosts based on endpoint address, not datacenter name.
+  This behavior change avoids a problem that arises when a host is removed before its datacenter name has been
+  determined. It also ensures that the address of the host removed matches the address of the host to be
+  removed.
+
+This release also adds test coverage to more thoroughly ensure that `CosmosLoadBalancingPolicy` orders hosts correctly
+based on the specification of preferred regions.
+
 ## 1.1.0
 
 This is the first maintenance release of the Azure Cosmos Extensions for DataStax Java Driver 4 for Apache Cassandra.
