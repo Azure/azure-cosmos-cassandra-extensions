@@ -10,6 +10,7 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -142,7 +143,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @SuppressWarnings("Java9CollectionFactory")
     public List<Node> getNodesForReading() {
-        return Collections.unmodifiableList(new ArrayList<>(this.nodesForReading));
+        return new ArrayList<>(this.nodesForReading);
     }
 
     /**
@@ -158,7 +159,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @SuppressWarnings("Java9CollectionFactory")
     public List<Node> getNodesForWriting() {
-        return Collections.unmodifiableList(new ArrayList<>(this.nodesForWriting));
+        return new ArrayList<>(this.nodesForWriting);
     }
 
     /**
@@ -172,7 +173,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public List<String> getPreferredReadRegions() {
         final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
         assert comparator != null;
-        return Collections.unmodifiableList(comparator.getPreferredRegions());
+        return new ArrayList<>(comparator.getPreferredRegions());
     }
 
     /**
@@ -186,7 +187,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public List<String> getPreferredWriteRegions() {
         final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
         assert comparator != null;
-        return Collections.unmodifiableList(comparator.getPreferredRegions());
+        return new ArrayList<>(comparator.getPreferredRegions());
     }
 
     // endregion
@@ -338,12 +339,14 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         requireNonNull(node, "expected non-null node");
-        this.nodesForReading.remove(node);
+        final EndPoint endPoint = node.getEndPoint();
+
+        this.nodesForReading.removeIf(item -> endPoint.equals(item.getEndPoint()));
 
         if (this.multiRegionWritesEnabled) {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
-            this.nodesForWriting.remove(node);
+            this.nodesForWriting.removeIf(item -> endPoint.equals(item.getEndPoint()));
         }
 
         if (LOG.isWarnEnabled()) {
@@ -574,7 +577,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
             contactPoints.stream()
                 .map(Node::getDatacenter)
-                .forEachOrdered(region -> this.indexes.put(region, this.indexes.size()));
+                .forEachOrdered(region -> this.indexes.putIfAbsent(region, this.indexes.size()));
             this.preferredRegions = this.collectPreferredRegions();
         }
 

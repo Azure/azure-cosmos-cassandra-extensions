@@ -77,11 +77,11 @@
 - [ ] Tag the release on the release and examples' develop branches.
 
   ```bash
-  git tag release-driver-4-${version}
+  git tag java-driver-4/${version}
   cd examples/java-driver-app
-  git tag release-driver-4-${version}
+  git tag java-driver-4/${version}
   cd ../examples/spring-boot-app
-  git tag release-driver-4-${version}
+  git tag java-driver-4/${version}
   ```
   
   - [ ] Merge the examples` develop branch to main
