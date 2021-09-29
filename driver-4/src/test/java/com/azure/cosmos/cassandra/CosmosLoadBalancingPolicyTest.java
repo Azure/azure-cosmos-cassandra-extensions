@@ -12,6 +12,7 @@ import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.internal.core.connection.ConstantReconnectionPolicy;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -22,6 +23,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +37,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.azure.cosmos.cassandra.CosmosJson.toJson;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_ADDRESS;
@@ -41,6 +47,7 @@ import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_HOSTNAME;
 import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
+import static com.azure.cosmos.cassandra.TestCommon.REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.testAllStatements;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -62,8 +69,9 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
+    public static final long PAUSE_MILLIS = 5_000L;
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-    private static final int TIMEOUT_IN_SECONDS = 300;
+    private static final int TIMEOUT_IN_SECONDS = 60;
 
     // endregion
 
@@ -285,10 +293,10 @@ public final class CosmosLoadBalancingPolicyTest {
             assertThat(expectedPreferredNodes).hasSize(1);
             assertThat(expectedPreferredNodes[0].getDatacenter()).isNotNull();
 
-            final Node globalHost = expectedPreferredNodes[0];
-            final String globalDatacenter = globalHost.getDatacenter();
+            final Node primary = expectedPreferredNodes[0];
+            final String globalDatacenter = primary.getDatacenter();
 
-            final List<String> expectedPreferredRegions = Collections.singletonList(globalHost.getDatacenter());
+            final List<String> expectedPreferredRegions = Collections.singletonList(primary.getDatacenter());
 
             final Node[] initialExpectedFailoverNodes = initialNodes.values().stream()
                 .filter(node -> {
@@ -301,7 +309,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
             validateOperationalState(
                 policy,
-                globalHost,
+                primary,
                 multiRegionWritesEnabled,
                 expectedPreferredRegions,
                 expectedPreferredNodes,
@@ -324,7 +332,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
             validateOperationalState(
                 policy,
-                globalHost,
+                primary,
                 multiRegionWritesEnabled,
                 expectedPreferredRegions,
                 expectedPreferredNodes,
@@ -337,9 +345,150 @@ public final class CosmosLoadBalancingPolicyTest {
         }
     }
 
+    @ParameterizedTest
+    @Tag("checkin")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @MethodSource("provideCosmosLoadBalancingPolicyOptions")
+    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
+    void testPolicyCorrectness(final CosmosLoadBalancingPolicyOptions options) {
+
+        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(
+                CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES,
+                options.getMultiRegionWritesEnabled())
+            .withStringList(
+                CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
+                options.getPreferredRegions())
+            .build();
+
+        try (final CqlSession session = this.connect(configLoader, options.getMultiRegionWritesEnabled())) {
+
+            // Expectation:
+            // - CosmosLoadBalancingPolicy::init is called with the host representing the GLOBAL_ENDPOINT_HOSTNAME
+            // - Cluster::init will have initiated a call to ControlConnection::refreshNodeListAndTokenMap
+            // - On return from our call to Cluster::init the host representing the GLOBAL_ENDPOINT_HOSTNAME--
+            //   the primary--will be up. Other hosts may have been enumerated. Some may be up and others not.
+
+            Map<UUID, Node> nodes = session.getMetadata().getNodes();
+
+            final Node primary = nodes.values().stream()
+                .filter(node -> node.getEndPoint().resolve().equals(GLOBAL_ENDPOINT_ADDRESS))
+                .findFirst()
+                .orElse(null);
+
+            assertThat(primary).isNotNull();
+            assertThat(primary.getState()).isEqualTo(NodeState.UP);
+
+            final LoadBalancingPolicy source = session.getContext()
+                .getLoadBalancingPolicy(DriverExecutionProfile.DEFAULT_NAME);
+
+            assertThat(source).isExactlyInstanceOf(CosmosLoadBalancingPolicy.class);
+            final CosmosLoadBalancingPolicy policy = (CosmosLoadBalancingPolicy) source;
+
+            this.checkCosmosLoadBalancingPolicy(policy, primary, options);
+            assertThat(policy.getNodesForReading()).contains(primary);
+            assertThat(policy.getNodesForWriting()).contains(primary);
+
+            // Expectation:
+            // - CosmosLoadBalancingPolicy::add is called once for each host returned from the query to system.peers.
+            // - On return from our call to Cluster::connect, all hosts known to the Cluster and that the Cluster
+            //   has determined to be up will be represented in order of preferred region by CosmosLoadBalancingPolicy.
+            // - This process can take time. We allow ample time for the driver to enumerate and bring all hosts up.
+
+            nodes = session.getMetadata().getNodes();
+
+            if (nodes.size() < REGIONAL_ENDPOINTS.size()) {
+                LOG.info("Pausing {} ms to allow time for driver to enumerate all nodes", PAUSE_MILLIS);
+                try {
+                    Thread.sleep(PAUSE_MILLIS);
+                } catch (final InterruptedException error) {
+                    // ignore
+                }
+                nodes = session.getMetadata().getNodes();
+            }
+
+            this.checkCosmosLoadBalancingPolicy(policy, primary, options);
+
+            final int up = nodes.values().stream()
+                .map(node -> node.getState() == NodeState.UP ? 1 : 0)
+                .reduce(0, Integer::sum);
+
+            if (up < nodes.size()) {
+                LOG.info("Pausing {} ms to allow time for driver to establish that all nodes are up", PAUSE_MILLIS);
+                try {
+                    Thread.sleep(PAUSE_MILLIS);
+                } catch (final InterruptedException error) {
+                    // ignore
+                }
+                nodes = session.getMetadata().getNodes().values().stream()
+                    .filter(node -> node.getState() == NodeState.UP)
+                    .collect(Collectors.toMap(Node::getHostId, Function.identity()));
+            }
+
+            final List<Node> hostsForReading = policy.getNodesForReading();
+            final List<Node> hostsForWriting = policy.getNodesForWriting();
+
+            assertThat(hostsForReading).hasSameElementsAs(nodes.values());
+
+            if (policy.getMultiRegionWritesEnabled()) {
+                assertThat(hostsForWriting).containsExactlyElementsOf(hostsForReading);
+            } else {
+                assertThat(hostsForWriting).hasSameElementsAs(hostsForReading);
+                assertThat(hostsForWriting).startsWith(primary);
+            }
+
+            assertThat(nodes.size()).isEqualTo(REGIONAL_ENDPOINTS.size());
+
+        } catch (final AssertionError error) {
+            throw error;
+        } catch (final Throwable error) {
+            fail("Failed due to: " + toJson(error), error);
+        }
+    }
+
     // endregion
 
     // region Privates
+
+    private void checkCosmosLoadBalancingPolicy(
+        @NonNull final CosmosLoadBalancingPolicy policy,
+        @NonNull final Node primary,
+        @NonNull final CosmosLoadBalancingPolicyOptions options) {
+
+        assertThat(policy.getMultiRegionWritesEnabled()).isEqualTo(options.getMultiRegionWritesEnabled());
+        final List<String> preferredReadRegions = policy.getPreferredReadRegions();
+        final String primaryRegion = primary.getDatacenter();
+
+        if (options.getPreferredRegions().isEmpty()) {
+            assertThat(preferredReadRegions).containsExactly(primaryRegion);
+        } else {
+            if (options.getPreferredRegions().contains(primaryRegion)) {
+                assertThat(preferredReadRegions).containsExactlyElementsOf(options.getPreferredRegions());
+            } else {
+                assertThat(preferredReadRegions).startsWith(options.getPreferredRegions().toArray(new String[0]));
+                assertThat(preferredReadRegions.size()).isEqualTo(options.getPreferredRegions().size() + 1);
+                assertThat(preferredReadRegions).endsWith(primaryRegion);
+            }
+        }
+        if (policy.getMultiRegionWritesEnabled()) {
+            assertThat(policy.getPreferredWriteRegions()).containsExactlyElementsOf(preferredReadRegions);
+        } else {
+
+            final List<String> preferredWriteRegions = policy.getPreferredWriteRegions();
+
+            if (options.getPreferredRegions().isEmpty()) {
+                assertThat(preferredWriteRegions).containsExactly(primaryRegion);
+            } else {
+
+                final String[] expectedPreferredWriteRegions = options.getPreferredRegions().stream()
+                    .filter(region -> !region.equals(primaryRegion))
+                    .toArray(String[]::new);
+
+                assertThat(preferredWriteRegions).startsWith(primaryRegion).endsWith(expectedPreferredWriteRegions);
+                assertThat(preferredWriteRegions.size()).isEqualTo(expectedPreferredWriteRegions.length + 1);
+            }
+        }
+    }
 
     private static DriverConfigLoader checkState(final DriverConfigLoader configLoader) {
 
@@ -418,10 +567,6 @@ public final class CosmosLoadBalancingPolicyTest {
         return session;
     }
 
-    private static SocketAddress getSocketAddress(List<Node> nodesForWriting, int i) {
-        return nodesForWriting.get(i).getEndPoint().resolve();
-    }
-
     @NonNull
     private CqlSession connect(@NonNull final DriverConfigLoader configLoader, final boolean multiRegionWrites)
         throws InterruptedException {
@@ -478,15 +623,32 @@ public final class CosmosLoadBalancingPolicyTest {
         }
     }
 
+    private static SocketAddress getSocketAddress(final List<Node> nodesForWriting, final int i) {
+        return nodesForWriting.get(i).getEndPoint().resolve();
+    }
+
     private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
         return DriverConfigLoader.programmaticBuilder();
+    }
+
+    private static Stream<Arguments> provideCosmosLoadBalancingPolicyOptions() {
+        return Stream.of(true, false).flatMap(multiRegionWritesEnabled -> Stream.concat(
+            Stream.of(
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(Collections.emptyList(), multiRegionWritesEnabled)),
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(REGIONS, multiRegionWritesEnabled))
+            ),
+            REGIONS.stream().map(region ->
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(
+                    Collections.singletonList(region),
+                    multiRegionWritesEnabled))))
+        );
     }
 
     /**
      * Validates the operational state of a {@link CosmosLoadBalancingPolicy} instance.
      *
      * @param policy                   The {@link CosmosLoadBalancingPolicy} instance under test.
-     * @param globalNode               The {@link Node} representing the global endpoint.
+     * @param primary                  The {@link Node} representing the primary endpoint.
      * @param multiRegionWritesEnabled {@code true} if multi-region writes are enabled.
      * @param expectedPreferredRegions The expected list of preferred regions for read and--if multi-region writes are
      * @param expectedPreferredNodes   The expected list preferred hosts, mapping one-to-one with {@code
@@ -496,7 +658,7 @@ public final class CosmosLoadBalancingPolicyTest {
      */
     private static void validateOperationalState(
         final CosmosLoadBalancingPolicy policy,
-        final Node globalNode,
+        final Node primary,
         final boolean multiRegionWritesEnabled,
         final List<String> expectedPreferredRegions,
         final Node[] expectedPreferredNodes,
@@ -517,7 +679,7 @@ public final class CosmosLoadBalancingPolicyTest {
             final List<Node> nodesForWriting = policy.getNodesForWriting();
             assertThat(nodesForWriting).hasSize(expectedPreferredNodes.length + expectedFailoverNodes.length);
 
-            if (nodesForWriting.get(0).equals(globalNode)) {
+            if (nodesForWriting.get(0).equals(primary)) {
                 for (int i = 1; i < expectedPreferredNodes.length; i++) {
                     assertThat(nodesForWriting.get(i)).isEqualTo(expectedPreferredNodes[i - 1]);
                 }
@@ -526,6 +688,31 @@ public final class CosmosLoadBalancingPolicyTest {
             }
 
             assertThat(nodesForWriting).endsWith(expectedFailoverNodes);
+        }
+    }
+
+    // endregion
+
+    // region Types
+
+    private static class CosmosLoadBalancingPolicyOptions {
+        private final boolean multiRegionWritesEnabled;
+        private final List<String> preferredRegions;
+
+        CosmosLoadBalancingPolicyOptions(
+            @NonNull final List<String> preferredRegions,
+            final boolean multiRegionWritesEnabled) {
+
+            this.preferredRegions = preferredRegions;
+            this.multiRegionWritesEnabled = multiRegionWritesEnabled;
+        }
+
+        public boolean getMultiRegionWritesEnabled() {
+            return this.multiRegionWritesEnabled;
+        }
+
+        public List<String> getPreferredRegions() {
+            return this.preferredRegions;
         }
     }
 
