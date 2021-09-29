@@ -69,8 +69,8 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
-    public static final long PAUSE_MILLIS = 5_000L;
     static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+    public static final long PAUSE_MILLIS = 5_000L;
     private static final int TIMEOUT_IN_SECONDS = 60;
 
     // endregion
@@ -631,19 +631,6 @@ public final class CosmosLoadBalancingPolicyTest {
         return DriverConfigLoader.programmaticBuilder();
     }
 
-    private static Stream<Arguments> provideCosmosLoadBalancingPolicyOptions() {
-        return Stream.of(true, false).flatMap(multiRegionWritesEnabled -> Stream.concat(
-            Stream.of(
-                Arguments.of(new CosmosLoadBalancingPolicyOptions(Collections.emptyList(), multiRegionWritesEnabled)),
-                Arguments.of(new CosmosLoadBalancingPolicyOptions(REGIONS, multiRegionWritesEnabled))
-            ),
-            REGIONS.stream().map(region ->
-                Arguments.of(new CosmosLoadBalancingPolicyOptions(
-                    Collections.singletonList(region),
-                    multiRegionWritesEnabled))))
-        );
-    }
-
     /**
      * Validates the operational state of a {@link CosmosLoadBalancingPolicy} instance.
      *
@@ -689,6 +676,17 @@ public final class CosmosLoadBalancingPolicyTest {
 
             assertThat(nodesForWriting).endsWith(expectedFailoverNodes);
         }
+    }
+
+    public static Stream<Arguments> provideCosmosLoadBalancingPolicy() {
+        return Stream.of(true, false).flatMap(multiRegionWritesEnabled -> Stream.concat(
+            Stream.of(
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(Collections.emptyList(), multiRegionWritesEnabled)),
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(REGIONS, multiRegionWritesEnabled))),
+            REGIONS.stream().map(region ->
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(
+                    Collections.singletonList(region),
+                    multiRegionWritesEnabled)))));
     }
 
     // endregion
