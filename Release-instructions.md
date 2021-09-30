@@ -4,8 +4,8 @@
 - [ ] Create a release branch based on develop/java-driver-4.
   
   ```bash
-  git pull --all
   git checkout develop/java-driver-4
+  git pull --all
   git checkout -b release/java-driver-4/${version}
   ```
 
