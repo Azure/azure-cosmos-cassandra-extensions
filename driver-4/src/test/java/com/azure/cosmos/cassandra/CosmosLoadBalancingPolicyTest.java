@@ -69,8 +69,8 @@ public final class CosmosLoadBalancingPolicyTest {
 
     // region Fields
 
-    static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
-    public static final long PAUSE_MILLIS = 5_000L;
+    private static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+    private static final long PAUSE_MILLIS = 5_000L;
     private static final int TIMEOUT_IN_SECONDS = 60;
 
     // endregion
@@ -100,249 +100,15 @@ public final class CosmosLoadBalancingPolicyTest {
         TestCommon.logTestName(info, LOG);
     }
 
-    /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} with preferred regions routes requests correctly.
-     * <p>
-     * The behavior varies based on whether multi-region writes are enabled. When multi-region writes are enabled all
-     * requests (reads and writes) will be sent to the first region in the list of preferred regions with failover to
-     * other regions in the preferred region list in the order in which they are listed. If all regions in the preferred
-     * region list are down, all requests will fall back to the region in which the global endpoint is deployed, then to
-     * other regions in alphabetic order.
-     * <p>
-     * When multi-region writes are disabled, all write requests are sent to the global-endpoint. There is no fallback.
-     * Read requests are handled the same whether or not multi-region writes are enabled. We do not test failover
-     * scenarios here. We simply check that all requests are sent to the first preferred region when multi-region writes
-     * are enabled. When multi-region writes are disabled we verify that all read requests are sent to the first
-     * preferred region and that all write requests are sent to the global endpoint address.
-     * <p>
-     * This test targets multi-region Cosmos Cassandra API instances. It is guaranteed to fail when run against
-     * multi-node Apache Cassandra datacenters.
-     *
-     * @param multiRegionWritesEnabled {@code true}, if the test should be run with multi-region writes enabled.
-     */
-    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11")
-    @ParameterizedTest
-    @Tag("checkin")
-    @Tag("integration")
-    @Timeout(TIMEOUT_IN_SECONDS)
-    @ValueSource(booleans = { false, true })
-    public void testWithPreferredRegions(final boolean multiRegionWritesEnabled) {
-
-        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-            .withBoolean(
-                CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES,
-                multiRegionWritesEnabled)
-            .withStringList(
-                CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
-                PREFERRED_REGIONS)
-            .build();
-
-        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
-
-        try (CqlSession session = this.connect(configLoader, multiRegionWritesEnabled)) {
-
-            final DriverContext context = session.getContext();
-            final String profileName = context.getConfig().getDefaultProfile().getName();
-            final CosmosLoadBalancingPolicy policy =
-                (CosmosLoadBalancingPolicy) context.getLoadBalancingPolicy(profileName);
-
-            final InetSocketAddress globalEndpointAddress = new InetSocketAddress(
-                GLOBAL_ENDPOINT_HOSTNAME,
-                GLOBAL_ENDPOINT_PORT);
-
-            // This is the expected state of the instance immediately after a cluster is built, before the first session
-            // is created. Starting out we've sometimes got just one host: the global host with a control channel and a
-            // newly-created request pool. Our checks in this phase do not require that all regional (failover) hosts
-            // have been enumerated.
-
-            final Map<UUID, Node> initialNodes = session.getMetadata().getNodes();
-
-            final Node[] expectedPreferredNodes = initialNodes.values().stream()
-                .filter(node -> node.getEndPoint().resolve().equals(globalEndpointAddress))
-                .toArray(Node[]::new);
-
-            assertThat(expectedPreferredNodes).hasSize(1);
-            assertThat(expectedPreferredNodes[0].getDatacenter()).isNotNull();
-
-            final Node globalHost = expectedPreferredNodes[0];
-            final String globalDatacenter = globalHost.getDatacenter();
-
-            final List<String> expectedPreferredRegions = new ArrayList<>(PREFERRED_REGIONS);
-
-            if (!PREFERRED_REGIONS.contains(globalDatacenter)) {
-                expectedPreferredRegions.add(globalDatacenter);
-            }
-
-            final Node[] initialExpectedPreferredNodes = initialNodes.values().stream()
-                .filter(node -> {
-                    final String datacenter = node.getDatacenter();
-                    assertThat(datacenter).isNotNull();
-                    return expectedPreferredRegions.contains(datacenter);
-                })
-                .sorted(Comparator.comparingInt(node -> expectedPreferredRegions.indexOf(node.getDatacenter())))
-                .toArray(Node[]::new);
-
-            final Node[] initialExpectedFailoverNodes = initialNodes.values().stream()
-                .filter(node -> {
-                    final String datacenter = node.getDatacenter();
-                    assertThat(datacenter).isNotNull();
-                    return !expectedPreferredRegions.contains(datacenter);
-                })
-                .sorted(Comparator.comparing(Node::getDatacenter))
-                .toArray(Node[]::new);
-
-            validateOperationalState(
-                policy,
-                globalHost,
-                multiRegionWritesEnabled,
-                expectedPreferredRegions,
-                initialExpectedPreferredNodes,
-                initialExpectedFailoverNodes);
-
-                // Here we check after the cluster is fully operation, usually shortly before or shortly after the
-                // first session is created. Our checks now require that regional (failover) hosts are fully
-                // enumerated. We do a full check on the host failover sequence.
-
-                final Map<UUID, Node> nodes = getAllRegionalNodes(session);
-
-                final Node[] expectedPreferredHosts = nodes.values().stream()
-                    .filter(host -> expectedPreferredRegions.contains(host.getDatacenter()))
-                    .sorted(Comparator.comparingInt(x -> expectedPreferredRegions.indexOf(x.getDatacenter())))
-                    .toArray(Node[]::new);
-
-                assertThat(expectedPreferredHosts).hasSize(expectedPreferredRegions.size());
-
-                final Node[] expectedFailoverHosts = nodes.values().stream()
-                    .filter(node -> {
-                        final String datacenter = node.getDatacenter();
-                        assertThat(datacenter).isNotNull();
-                        return !expectedPreferredRegions.contains(datacenter);
-                    })
-                    .sorted(Comparator.comparing(Node::getDatacenter))
-                    .toArray(Node[]::new);
-
-                validateOperationalState(
-                    policy,
-                    globalHost,
-                    multiRegionWritesEnabled,
-                    expectedPreferredRegions,
-                    expectedPreferredHosts,
-                    expectedFailoverHosts);
-
-        } catch (final AssertionError error) {
-            throw error;
-        } catch (final Throwable error) {
-            fail("Failed due to: " + toJson(error), error);
-        }
-    }
-
-    /**
-     * Verifies that a {@link CosmosLoadBalancingPolicy} without preferred regions routes requests correctly.
-     * <p>
-     * All requests should go to the global endpoint with failover to endpoints in other regions in alphabetic order. We
-     * do not test the failover scenario here. We simply check that all requests are sent to the global endpoint whether
-     * or not multi-region writes are enabled. Cosmos DB guarantees that both read and write requests can be sent to the
-     * global endpoint.
-     * <p>
-     * This test targets multi-region Cosmos Cassandra API instances. It is guaranteed to fail when run against
-     * multi-node Apache Cassandra datacenters.
-     *
-     * @param multiRegionWritesEnabled {@code true}, if the test should be run with multi-region writes enabled.
-     */
-    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11")
-    @ParameterizedTest
-    @Tag("checkin")
-    @Tag("integration")
-    @Timeout(TIMEOUT_IN_SECONDS)
-    @ValueSource(booleans = { false, true })
-    public void testWithoutPreferredRegions(final boolean multiRegionWritesEnabled) {
-
-        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
-            .withBoolean(
-                CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES,
-                multiRegionWritesEnabled)
-            .withStringList(
-                CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
-                Collections.emptyList())
-            .build();
-
-        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
-
-        try (CqlSession session = this.connect(configLoader, multiRegionWritesEnabled)) {
-
-            final DriverContext context = session.getContext();
-            final String name = context.getConfig().getDefaultProfile().getName();
-            final CosmosLoadBalancingPolicy policy = (CosmosLoadBalancingPolicy) context.getLoadBalancingPolicy(name);
-
-            final InetSocketAddress globalEndpointAddress = new InetSocketAddress(
-                GLOBAL_ENDPOINT_HOSTNAME,
-                GLOBAL_ENDPOINT_PORT);
-
-            // This is the expected state of the instance immediately after a cluster is built, before the first session
-            // is created. Starting out we've sometimes got just one host: the global host with a control channel and a
-            // newly-created request pool. Our checks in this phase do not require that all regional (failover)
-            // regionalHosts
-            // have been enumerated.
-
-            final Map<UUID, Node> initialNodes = session.getMetadata().getNodes();
-
-            final Node[] expectedPreferredNodes = initialNodes.values().stream()
-                .filter(node -> node.getEndPoint().resolve().equals(globalEndpointAddress))
-                .toArray(Node[]::new);
-
-            assertThat(expectedPreferredNodes).hasSize(1);
-            assertThat(expectedPreferredNodes[0].getDatacenter()).isNotNull();
-
-            final Node primary = expectedPreferredNodes[0];
-            final String globalDatacenter = primary.getDatacenter();
-
-            final List<String> expectedPreferredRegions = Collections.singletonList(primary.getDatacenter());
-
-            final Node[] initialExpectedFailoverNodes = initialNodes.values().stream()
-                .filter(node -> {
-                    final String datacenter = node.getDatacenter();
-                    assertThat(datacenter).isNotNull();
-                    return !datacenter.equals(globalDatacenter);
-                })
-                .sorted(Comparator.comparing(Node::getDatacenter))
-                .toArray(Node[]::new);
-
-            validateOperationalState(
-                policy,
-                primary,
-                multiRegionWritesEnabled,
-                expectedPreferredRegions,
-                expectedPreferredNodes,
-                initialExpectedFailoverNodes);
-
-            // Here we check after the cluster is fully operation, usually shortly before or shortly after the
-            // first session is created. Our checks now require that regional (failover) nodes are fully
-            // enumerated. We do a full check on the host failover sequence.
-
-            final Map<UUID, Node> regionalNodes = getAllRegionalNodes(session);
-
-            final Node[] expectedFailoverNodes = regionalNodes.values().stream()
-                .filter(node -> {
-                    final String datacenter = node.getDatacenter();
-                    assertThat(datacenter).isNotNull();
-                    return !datacenter.equals(globalDatacenter);
-                })
-                .sorted(Comparator.comparing(Node::getDatacenter))
-                .toArray(Node[]::new);
-
-            validateOperationalState(
-                policy,
-                primary,
-                multiRegionWritesEnabled,
-                expectedPreferredRegions,
-                expectedPreferredNodes,
-                expectedFailoverNodes);
-
-        } catch (final AssertionError error) {
-            throw error;
-        } catch (final Throwable error) {
-            fail("Failed due to: " + toJson(error), error);
-        }
+    public static Stream<Arguments> provideCosmosLoadBalancingPolicyOptions() {
+        return Stream.of(true, false).flatMap(multiRegionWritesEnabled -> Stream.concat(
+            Stream.of(
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(Collections.emptyList(), multiRegionWritesEnabled)),
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(REGIONS, multiRegionWritesEnabled))),
+            REGIONS.stream().map(region ->
+                Arguments.of(new CosmosLoadBalancingPolicyOptions(
+                    Collections.singletonList(region),
+                    multiRegionWritesEnabled)))));
     }
 
     @ParameterizedTest
@@ -350,7 +116,7 @@ public final class CosmosLoadBalancingPolicyTest {
     @Timeout(TIMEOUT_IN_SECONDS)
     @MethodSource("provideCosmosLoadBalancingPolicyOptions")
     @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    void testPolicyCorrectness(final CosmosLoadBalancingPolicyOptions options) {
+    public void testPolicyCorrectness(final CosmosLoadBalancingPolicyOptions options) {
 
         final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
             .withBoolean(
@@ -361,7 +127,10 @@ public final class CosmosLoadBalancingPolicyTest {
                 options.getPreferredRegions())
             .build();
 
-        try (final CqlSession session = this.connect(configLoader, options.getMultiRegionWritesEnabled())) {
+        CosmosLoadBalancingPolicy policy = null;
+        Map<UUID, Node> nodes = null;
+
+        try (final CqlSession session = CqlSession.builder().withConfigLoader(configLoader).build()) {
 
             // Expectation:
             // - CosmosLoadBalancingPolicy::init is called with the host representing the GLOBAL_ENDPOINT_HOSTNAME
@@ -369,7 +138,7 @@ public final class CosmosLoadBalancingPolicyTest {
             // - On return from our call to Cluster::init the host representing the GLOBAL_ENDPOINT_HOSTNAME--
             //   the primary--will be up. Other hosts may have been enumerated. Some may be up and others not.
 
-            Map<UUID, Node> nodes = session.getMetadata().getNodes();
+            nodes = session.getMetadata().getNodes();
 
             final Node primary = nodes.values().stream()
                 .filter(node -> node.getEndPoint().resolve().equals(GLOBAL_ENDPOINT_ADDRESS))
@@ -377,13 +146,15 @@ public final class CosmosLoadBalancingPolicyTest {
                 .orElse(null);
 
             assertThat(primary).isNotNull();
-            assertThat(primary.getState()).isEqualTo(NodeState.UP);
+
+            assertThat(primary.getState()).withFailMessage("Expected primary {} to be UP, not {}")
+                .isEqualTo(NodeState.UP);
 
             final LoadBalancingPolicy source = session.getContext()
                 .getLoadBalancingPolicy(DriverExecutionProfile.DEFAULT_NAME);
 
             assertThat(source).isExactlyInstanceOf(CosmosLoadBalancingPolicy.class);
-            final CosmosLoadBalancingPolicy policy = (CosmosLoadBalancingPolicy) source;
+            policy = (CosmosLoadBalancingPolicy) source;
 
             this.checkCosmosLoadBalancingPolicy(policy, primary, options);
             assertThat(policy.getNodesForReading()).contains(primary);
@@ -439,9 +210,302 @@ public final class CosmosLoadBalancingPolicyTest {
 
             assertThat(nodes.size()).isEqualTo(REGIONAL_ENDPOINTS.size());
 
+            LOG.info(
+                "[testPolicyCorrectness] Passed: {\"loadBalancingPolicy\":{},\"nodes\":{}}",
+                toJson(policy),
+                toJson(nodes));
+
         } catch (final AssertionError error) {
+            LOG.error(
+                "[testPolicyCorrectness] Failed: {\"loadBalancingPolicy\":{},\"nodes\":{},\"error\":{}}",
+                toJson(policy),
+                toJson(nodes),
+                toJson(error));
             throw error;
         } catch (final Throwable error) {
+            LOG.error(
+                "[testPolicyCorrectness] Failed: {\"loadBalancingPolicy\":{},\"nodes\":{},\"error\":{}}",
+                toJson(policy),
+                toJson(nodes),
+                toJson(error));
+            fail("Failed due to: " + toJson(error), error);
+        }
+    }
+
+    /**
+     * Verifies that a {@link CosmosLoadBalancingPolicy} with preferred regions routes requests correctly.
+     * <p>
+     * The behavior varies based on whether multi-region writes are enabled. When multi-region writes are enabled all
+     * requests (reads and writes) will be sent to the first region in the list of preferred regions with failover to
+     * other regions in the preferred region list in the order in which they are listed. If all regions in the preferred
+     * region list are down, all requests will fall back to the region in which the global endpoint is deployed, then to
+     * other regions in alphabetic order.
+     * <p>
+     * When multi-region writes are disabled, all write requests are sent to the global-endpoint. There is no fallback.
+     * Read requests are handled the same whether or not multi-region writes are enabled. We do not test failover
+     * scenarios here. We simply check that all requests are sent to the first preferred region when multi-region writes
+     * are enabled. When multi-region writes are disabled we verify that all read requests are sent to the first
+     * preferred region and that all write requests are sent to the global endpoint address.
+     * <p>
+     * This test targets multi-region Cosmos Cassandra API instances. It is guaranteed to fail when run against
+     * multi-node Apache Cassandra datacenters.
+     *
+     * @param multiRegionWritesEnabled {@code true}, if the test should be run with multi-region writes enabled.
+     */
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11")
+    public void testWithPreferredRegions(final boolean multiRegionWritesEnabled) {
+
+        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(
+                CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES,
+                multiRegionWritesEnabled)
+            .withStringList(
+                CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
+                PREFERRED_REGIONS)
+            .build();
+
+        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
+        CosmosLoadBalancingPolicy policy = null;
+        Map<UUID, Node> nodes = null;
+
+        try (final CqlSession session = this.newCqlSession(configLoader, multiRegionWritesEnabled)) {
+
+            final DriverContext context = session.getContext();
+            final String profileName = context.getConfig().getDefaultProfile().getName();
+
+            final InetSocketAddress globalEndpointAddress = new InetSocketAddress(
+                GLOBAL_ENDPOINT_HOSTNAME,
+                GLOBAL_ENDPOINT_PORT);
+
+            policy = (CosmosLoadBalancingPolicy) context.getLoadBalancingPolicy(profileName);
+
+            // This is the expected state of the instance immediately after a cluster is built, before the first session
+            // is created. Starting out we've sometimes got just one host: the global host with a control channel and a
+            // newly-created request pool. Our checks in this phase do not require that all regional (failover) hosts
+            // have been enumerated.
+
+            final Map<UUID, Node> initialNodes = session.getMetadata().getNodes();
+
+            final Node[] expectedPreferredNodes = initialNodes.values().stream()
+                .filter(node -> node.getEndPoint().resolve().equals(globalEndpointAddress))
+                .toArray(Node[]::new);
+
+            assertThat(expectedPreferredNodes).hasSize(1);
+            assertThat(expectedPreferredNodes[0].getDatacenter()).isNotNull();
+
+            final Node primary = expectedPreferredNodes[0];
+            final String primaryDatacenter = primary.getDatacenter();
+
+            final List<String> expectedPreferredRegions = new ArrayList<>(PREFERRED_REGIONS);
+
+            if (!PREFERRED_REGIONS.contains(primaryDatacenter)) {
+                expectedPreferredRegions.add(primaryDatacenter);
+            }
+
+            final Node[] initialExpectedPreferredNodes = initialNodes.values().stream()
+                .filter(node -> {
+                    final String datacenter = node.getDatacenter();
+                    assertThat(datacenter).isNotNull();
+                    return expectedPreferredRegions.contains(datacenter);
+                })
+                .sorted(Comparator.comparingInt(node -> expectedPreferredRegions.indexOf(node.getDatacenter())))
+                .toArray(Node[]::new);
+
+            final Node[] initialExpectedFailoverNodes = initialNodes.values().stream()
+                .filter(node -> {
+                    final String datacenter = node.getDatacenter();
+                    assertThat(datacenter).isNotNull();
+                    return !expectedPreferredRegions.contains(datacenter);
+                })
+                .sorted(Comparator.comparing(Node::getDatacenter))
+                .toArray(Node[]::new);
+
+            validateOperationalState(
+                policy,
+                primary,
+                multiRegionWritesEnabled,
+                expectedPreferredRegions,
+                initialExpectedPreferredNodes,
+                initialExpectedFailoverNodes);
+
+            // Here we check after the cluster is fully operation, usually shortly before or shortly after the
+            // first session is created. Our checks now require that regional (failover) hosts are fully
+            // enumerated. We do a full check on the host failover sequence.
+
+            nodes = getAllRegionalNodes(session);
+
+            final Node[] expectedPreferredHosts = nodes.values().stream()
+                .filter(host -> expectedPreferredRegions.contains(host.getDatacenter()))
+                .sorted(Comparator.comparingInt(x -> expectedPreferredRegions.indexOf(x.getDatacenter())))
+                .toArray(Node[]::new);
+
+            assertThat(expectedPreferredHosts).hasSize(expectedPreferredRegions.size());
+
+            final Node[] expectedFailoverHosts = nodes.values().stream()
+                .filter(node -> {
+                    final String datacenter = node.getDatacenter();
+                    assertThat(datacenter).isNotNull();
+                    return !expectedPreferredRegions.contains(datacenter);
+                })
+                .sorted(Comparator.comparing(Node::getDatacenter))
+                .toArray(Node[]::new);
+
+            validateOperationalState(
+                policy,
+                primary,
+                multiRegionWritesEnabled,
+                expectedPreferredRegions,
+                expectedPreferredHosts,
+                expectedFailoverHosts);
+
+            LOG.info("[testWithPreferredRegions] Passed: {\"loadBalancingPolicy\":{},\"nodes\":{}}",
+                toJson(policy),
+                toJson(nodes));
+
+        } catch (final AssertionError error) {
+            LOG.error(
+                "[testWithPreferredRegions] Failed: {\"loadBalancingPolicy\":{},\"nodes\":{},\"error\":{}}",
+                toJson(policy),
+                toJson(nodes),
+                toJson(error));
+            throw error;
+        } catch (final Throwable error) {
+            LOG.error(
+                "[testWithPreferredRegions] Failed: {\"loadBalancingPolicy\":{},\"nodes\":{},\"error\":{}}",
+                toJson(policy),
+                toJson(nodes),
+                toJson(error));
+            fail("Failed due to: " + toJson(error), error);
+        }
+    }
+
+    /**
+     * Verifies that a {@link CosmosLoadBalancingPolicy} without preferred regions routes requests correctly.
+     * <p>
+     * All requests should go to the global endpoint with failover to endpoints in other regions in alphabetic order. We
+     * do not test the failover scenario here. We simply check that all requests are sent to the global endpoint whether
+     * or not multi-region writes are enabled. Cosmos DB guarantees that both read and write requests can be sent to the
+     * global endpoint.
+     * <p>
+     * This test targets multi-region Cosmos Cassandra API instances. It is guaranteed to fail when run against
+     * multi-node Apache Cassandra datacenters.
+     *
+     * @param multiRegionWritesEnabled {@code true}, if the test should be run with multi-region writes enabled.
+     */
+    @ParameterizedTest
+    @Tag("checkin")
+    @Tag("integration")
+    @Timeout(TIMEOUT_IN_SECONDS)
+    @ValueSource(booleans = { false, true })
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11")
+    public void testWithoutPreferredRegions(final boolean multiRegionWritesEnabled) {
+
+        final DriverConfigLoader configLoader = newProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(
+                CosmosLoadBalancingPolicyOption.MULTI_REGION_WRITES,
+                multiRegionWritesEnabled)
+            .withStringList(
+                CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS,
+                Collections.emptyList())
+            .build();
+
+        LOG.info("DriverConfiguration({})", toJson(configLoader.getInitialConfig().getDefaultProfile().entrySet()));
+        CosmosLoadBalancingPolicy policy = null;
+        Map<UUID, Node> nodes = null;
+
+        try (final CqlSession session = this.newCqlSession(configLoader, multiRegionWritesEnabled)) {
+
+            final DriverContext context = session.getContext();
+            final String name = context.getConfig().getDefaultProfile().getName();
+
+            final InetSocketAddress globalEndpointAddress = new InetSocketAddress(
+                GLOBAL_ENDPOINT_HOSTNAME,
+                GLOBAL_ENDPOINT_PORT);
+
+            policy = (CosmosLoadBalancingPolicy) context.getLoadBalancingPolicy(name);
+
+            // This is the expected state of the instance immediately after a cluster is built, before the first session
+            // is created. Starting out we've sometimes got just one host: the global host with a control channel and a
+            // newly-created request pool. Our checks in this phase do not require that all regional (failover)
+            // regionalHosts
+            // have been enumerated.
+
+            final Map<UUID, Node> initialNodes = session.getMetadata().getNodes();
+
+            final Node[] expectedPreferredNodes = initialNodes.values().stream()
+                .filter(node -> node.getEndPoint().resolve().equals(globalEndpointAddress))
+                .toArray(Node[]::new);
+
+            assertThat(expectedPreferredNodes).hasSize(1);
+            assertThat(expectedPreferredNodes[0].getDatacenter()).isNotNull();
+
+            final Node primary = expectedPreferredNodes[0];
+            final String globalDatacenter = primary.getDatacenter();
+
+            final List<String> expectedPreferredRegions = Collections.singletonList(primary.getDatacenter());
+
+            final Node[] initialExpectedFailoverNodes = initialNodes.values().stream()
+                .filter(node -> {
+                    final String datacenter = node.getDatacenter();
+                    assertThat(datacenter).isNotNull();
+                    return !datacenter.equals(globalDatacenter);
+                })
+                .sorted(Comparator.comparing(Node::getDatacenter))
+                .toArray(Node[]::new);
+
+            validateOperationalState(
+                policy,
+                primary,
+                multiRegionWritesEnabled,
+                expectedPreferredRegions,
+                expectedPreferredNodes,
+                initialExpectedFailoverNodes);
+
+            // Here we check after the cluster is fully operation, usually shortly before or shortly after the
+            // first session is created. Our checks now require that regional (failover) nodes are fully
+            // enumerated. We do a full check on the host failover sequence.
+
+            nodes = getAllRegionalNodes(session);
+
+            final Node[] expectedFailoverNodes = nodes.values().stream()
+                .filter(node -> {
+                    final String datacenter = node.getDatacenter();
+                    assertThat(datacenter).isNotNull();
+                    return !datacenter.equals(globalDatacenter);
+                })
+                .sorted(Comparator.comparing(Node::getDatacenter))
+                .toArray(Node[]::new);
+
+            validateOperationalState(
+                policy,
+                primary,
+                multiRegionWritesEnabled,
+                expectedPreferredRegions,
+                expectedPreferredNodes,
+                expectedFailoverNodes);
+
+            LOG.info("[testWithPreferredRegions] Passed: {\"loadBalancingPolicy\":{},\"nodes\":{}}",
+                toJson(policy),
+                toJson(nodes));
+
+        } catch (final AssertionError error) {
+            LOG.error(
+                "[testWithPreferredRegions] Failed: {\"loadBalancingPolicy\":{},\"nodes\":{},\"error\":{}}",
+                toJson(policy),
+                toJson(nodes),
+                toJson(error));
+            throw error;
+        } catch (final Throwable error) {
+            LOG.error(
+                "[testWithPreferredRegions] Failed: {\"loadBalancingPolicy\":{},\"nodes\":{},\"error\":{}}",
+                toJson(policy),
+                toJson(nodes),
+                toJson(error));
             fail("Failed due to: " + toJson(error), error);
         }
     }
@@ -490,7 +554,7 @@ public final class CosmosLoadBalancingPolicyTest {
         }
     }
 
-    private static DriverConfigLoader checkState(final DriverConfigLoader configLoader) {
+    private static DriverConfigLoader checkDriverConfiguration(final DriverConfigLoader configLoader) {
 
         final DriverExecutionProfile profile = configLoader.getInitialConfig().getDefaultProfile();
 
@@ -506,7 +570,9 @@ public final class CosmosLoadBalancingPolicyTest {
         return configLoader;
     }
 
-    private static CqlSession checkState(final CqlSession session, final boolean multiRegionWrites) {
+    private static CqlSession checkCosmosLoadBalancingPolicyState(
+        final CqlSession session,
+        final boolean multiRegionWrites) {
 
         final DriverContext driverContext = session.getContext();
         final Map<UUID, Node> nodes = session.getMetadata().getNodes();
@@ -527,7 +593,8 @@ public final class CosmosLoadBalancingPolicyTest {
 
         assertThat(cosmosLoadBalancingPolicy.getMultiRegionWritesEnabled()).isEqualTo(multiRegionWrites);
 
-        final List<String> configuredPreferredRegions = profile.getStringList(CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS);
+        final List<String> configuredPreferredRegions =
+            profile.getStringList(CosmosLoadBalancingPolicyOption.PREFERRED_REGIONS);
 
         final List<String> preferredReadRegions = cosmosLoadBalancingPolicy.getPreferredReadRegions();
         final List<String> preferredWriteRegions = cosmosLoadBalancingPolicy.getPreferredWriteRegions();
@@ -559,23 +626,18 @@ public final class CosmosLoadBalancingPolicyTest {
             }
         }
 
-        LOG.info("[{}] connected to nodes {} with load balancing policy {}",
-            toJson(session.getName()),
-            toJson(nodes),
-            loadBalancingPolicy);
-
         return session;
     }
 
     @NonNull
-    private CqlSession connect(@NonNull final DriverConfigLoader configLoader, final boolean multiRegionWrites)
+    private CqlSession newCqlSession(@NonNull final DriverConfigLoader configLoader, final boolean multiRegionWrites)
         throws InterruptedException {
 
-        final CqlSession session = CqlSession.builder().withConfigLoader(checkState(configLoader)).build();
+        final CqlSession session = CqlSession.builder().withConfigLoader(checkDriverConfiguration(configLoader)).build();
 
         try {
-            Thread.sleep(5_000L); // Gives the session time to enumerate peers and initialize all channel pools
-            return checkState(session, multiRegionWrites);
+            Thread.sleep(PAUSE_MILLIS); // Gives the session time to enumerate peers and initialize all channel pools
+            return checkCosmosLoadBalancingPolicyState(session, multiRegionWrites);
         } catch (final Throwable error) {
             session.close();
             throw error;
@@ -616,7 +678,8 @@ public final class CosmosLoadBalancingPolicyTest {
                 node -> REGIONAL_ENDPOINTS.contains((InetSocketAddress) node.getEndPoint().resolve()),
                 "regional endpoint"));
 
-            LOG.info("[{}] regional endpoints enumerated in iteration {}: {}",
+            LOG.info(
+                "[{}] regional endpoints enumerated in iteration {}: {}",
                 session.getName(),
                 iterations,
                 toJson(nodes));
@@ -676,17 +739,6 @@ public final class CosmosLoadBalancingPolicyTest {
 
             assertThat(nodesForWriting).endsWith(expectedFailoverNodes);
         }
-    }
-
-    public static Stream<Arguments> provideCosmosLoadBalancingPolicy() {
-        return Stream.of(true, false).flatMap(multiRegionWritesEnabled -> Stream.concat(
-            Stream.of(
-                Arguments.of(new CosmosLoadBalancingPolicyOptions(Collections.emptyList(), multiRegionWritesEnabled)),
-                Arguments.of(new CosmosLoadBalancingPolicyOptions(REGIONS, multiRegionWritesEnabled))),
-            REGIONS.stream().map(region ->
-                Arguments.of(new CosmosLoadBalancingPolicyOptions(
-                    Collections.singletonList(region),
-                    multiRegionWritesEnabled)))));
     }
 
     // endregion

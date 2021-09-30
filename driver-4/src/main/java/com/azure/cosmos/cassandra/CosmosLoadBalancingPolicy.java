@@ -184,7 +184,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @return The list of preferred regions for failover on write operations.
      */
     public List<String> getPreferredWriteRegions() {
-        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
         assert comparator != null;
         return new ArrayList<>(comparator.getPreferredRegions());
     }
@@ -222,36 +222,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final MetadataManager metadataManager = this.driverContext.getMetadataManager();
         final Set<Node> contactPoints = this.getContactPointsOrThrow();
         this.distanceReporter = distanceReporter;
+        PreferredRegionsComparator comparator;
 
-        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
         assert comparator != null;
         comparator.addPreferredRegionsLast(contactPoints);
-
-        for (final Node node : nodes.values()) {
-            if (comparator.hasPreferredRegion(node.getDatacenter())) {
-                distanceReporter.setDistance(node, NodeDistance.LOCAL);
-            } else {
-                distanceReporter.setDistance(node, NodeDistance.REMOTE);
-            }
-            this.nodesForReading.add(node);
-        }
+        sortAndReportDistance(nodes, distanceReporter, this.nodesForReading);
 
         if (this.multiRegionWritesEnabled) {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
-
             comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
             assert comparator != null;
             comparator.addPreferredRegionsFirst(contactPoints);
-
-            for (final Node node : nodes.values()) {
-                if (comparator.hasPreferredRegion(node.getDatacenter())) {
-                    distanceReporter.setDistance(node, NodeDistance.LOCAL);
-                } else {
-                    distanceReporter.setDistance(node, NodeDistance.REMOTE);
-                }
-                this.nodesForWriting.add(node);
-            }
+            sortAndReportDistance(nodes, distanceReporter, this.nodesForWriting);
         }
 
         final Semaphore permissionToGetNodes = new Semaphore(Integer.MAX_VALUE);
@@ -285,6 +269,24 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         LOG.debug("init -> {}", this);
     }
 
+    private static void sortAndReportDistance(
+        @NonNull final Map<UUID, Node> nodes,
+        @NonNull final DistanceReporter distanceReporter,
+        @NonNull final NavigableSet<Node> sortedNodes) {
+
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) sortedNodes.comparator();
+        assert comparator != null;
+
+        for (final Node node : nodes.values()) {
+            if (comparator.hasPreferredRegion(node.getDatacenter())) {
+                distanceReporter.setDistance(node, NodeDistance.LOCAL);
+            } else {
+                distanceReporter.setDistance(node, NodeDistance.REMOTE);
+            }
+            sortedNodes.add(node);
+        }
+    }
+
     /**
      * Returns an {@link Queue ordered list} of {@link Node coordinators} to use for a new query.
      * <p>
@@ -310,7 +312,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 toJson(session == null ? null : session.getName()));
         }
 
-        // TODO (DANOBLE) consider caching results so that evaluation is reduced
+        // TODO (DANOBLE) consider caching results or implementing Queue on NavigableSet so that evaluation is reduced
 
         final Function<Request, Queue<Node>> function = this.getNodes;
         final Queue<Node> nodes = function.apply(request);
@@ -349,6 +351,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         if (LOG.isWarnEnabled()) {
+
             if (this.multiRegionWritesEnabled) {
                 if (this.nodesForReading.isEmpty()) {
                     LOG.warn("All nodes have now been removed: {}", toJson(this));
