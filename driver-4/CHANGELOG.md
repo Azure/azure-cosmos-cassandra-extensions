@@ -2,7 +2,9 @@
 
 ## 1.1.1
 
-This is a maintenance release that addresses these `CosmosLoadBalancingPolicy` issues:
+This is a maintenance release that bumps the Apache log4j2 version number to 2.16.0 to address the *Log4j2
+Vulnerability “Log4Shell” (CVE-2021-44228)* reported between late November and early December 2021 and
+resolve these `CosmosLoadBalancingPolicy` issues:
 
 - Preferred regions are now properly ordered when the primary region is explicitly specified.
   Prior to this release, if the primary region was explicitly specified in the list of preferred regions, it would be
@@ -15,6 +17,12 @@ This is a maintenance release that addresses these `CosmosLoadBalancingPolicy` i
 
 This release also adds test coverage to more thoroughly ensure that `CosmosLoadBalancingPolicy` orders hosts correctly
 based on the specification of preferred regions.
+
+### Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)
+
+On 12/14/2021 Apache released version Apache log4j2 2.16.0 to completely remove support for Message Lookups and disable
+JNDI by default. See [CVE-2021-44228 Detail](https://nvd.nist.gov/vuln/detail/CVE-2021-44228) for additional information
+on this issue.
 
 ## 1.1.0
 
