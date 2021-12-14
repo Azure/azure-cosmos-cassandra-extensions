@@ -58,7 +58,7 @@ Licensed under the MIT License.
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.junit-jupiter>5.7.1</version.junit-jupiter>
-    <version.log4j>2.13.3</version.log4j>
+    <version.log4j>2.16.0</version.log4j>
   </properties>
 
   <scm>
