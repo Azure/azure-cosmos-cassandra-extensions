@@ -19,9 +19,10 @@ based on the specification of preferred regions.
 
 ### Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)
 
-On 12/14/2021 Apache released version Apache log4j2 2.16.0 to completely remove support for Message Lookups and disable
-JNDI by default. The test and example code in this repository depend on Apache log4j2 and this release bumps the version
-number for log4j2 from 2.13 to 2.16. The product code takes no dependency on log4j2. It uses [slf4j-api][4] instead.
+The vulnerability that this change addresses is described in the [National Vulnerabilities Database][4]. On 12/14/2021
+Apache released version [Apache log4j2][5] 2.16.0 to completely remove support for Message Lookups and disable JNDI by
+default. The test and example code in this repository depend on Apache log4j2 and this release bumps the version
+number for log4j2 from 2.13 to 2.16. The product code takes no dependency on log4j2. It uses [slf4j-api][6] instead.
 
 ## 1.1.0
 
@@ -69,4 +70,6 @@ started using this package by reviewing `README.md`.
 [1]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4/
 [2]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4/
 [3]: https://nvd.nist.gov/vuln/detail/CVE-2021-44228
-[4]:  http://www.slf4j.org
+[4]: https://nvd.nist.gov/
+[5]: https://github.com/apache/logging-log4j2
+[6]: http://www.slf4j.org
