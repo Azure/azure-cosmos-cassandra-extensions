@@ -1,5 +1,13 @@
 ## Release History
 
+## 1.0.2
+
+This is a maintenance release that bumps the Apache log4j2 version number to 2.16.0. This version addresses the [*Log4j2 
+Vulnerability “Log4Shell” (CVE-2021-44228)*](https://nvd.nist.gov/vuln/detail/CVE-2021-44228) reported between late
+November and early December 2021. On 12/14/2021 Apache released version 2.16.0 to completely remove support for Message
+Lookups and disable JNDI by default. The test and the example code in this repository takes a dependency on log4j2. The 
+product code uses [slf4j-api](http://www.slf4j.org).
+
 ## 1.0.1
 
 This is a maintenance release that addresses these `CosmosLoadBalancingPolicy` issues:
