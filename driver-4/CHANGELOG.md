@@ -2,9 +2,8 @@
 
 ## 1.1.1
 
-This is a maintenance release that bumps the Apache log4j2 version number to 2.16.0 to address the *Log4j2
-Vulnerability “Log4Shell” (CVE-2021-44228)* reported between late November and early December 2021 and
-resolve these `CosmosLoadBalancingPolicy` issues:
+This is a maintenance release to address the [*Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)*][3] reported between 
+late November and early December 2021 and resolve these `CosmosLoadBalancingPolicy` issues:
 
 - Preferred regions are now properly ordered when the primary region is explicitly specified.
   Prior to this release, if the primary region was explicitly specified in the list of preferred regions, it would be
@@ -21,8 +20,8 @@ based on the specification of preferred regions.
 ### Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)
 
 On 12/14/2021 Apache released version Apache log4j2 2.16.0 to completely remove support for Message Lookups and disable
-JNDI by default. See [CVE-2021-44228 Detail](https://nvd.nist.gov/vuln/detail/CVE-2021-44228) for additional information
-on this issue.
+JNDI by default. The test and example code in this repository depend on Apache log4j2 and this release bumps the version
+number for log4j2 from 2.13 to 2.16. The product code takes no dependency on log4j2. It uses [slf4j-api][4] instead.
 
 ## 1.1.0
 
@@ -69,3 +68,5 @@ started using this package by reviewing `README.md`.
 [0]: https://github.com/Azure/azure-cosmos-cassandra-extensions/tree/develop/java-driver-4
 [1]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4/
 [2]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4/
+[3]: https://nvd.nist.gov/vuln/detail/CVE-2021-44228
+[4]:  http://www.slf4j.org
