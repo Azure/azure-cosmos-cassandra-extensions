@@ -16,7 +16,7 @@ Licensed under the MIT License.
   <artifactId>azure-cosmos-cassandra-driver-3</artifactId>
   <groupId>com.azure</groupId>
   <packaging>pom</packaging>
-  <version>1.0.2-SNAPSHOT</version>
+  <version>1.0.2</version>
 
   <organization>
     <name>Microsoft Azure Cosmos DB</name>

@@ -11,6 +11,7 @@
 
 - [ ] Update these `package` files:
 
+      * Release-instructions.md
       * driver-3/CHANGELOG.md
       * driver-3/KNOWN_ISSUES.md
       * driver-3/README.md
@@ -20,20 +21,22 @@
 - [ ] Bump the version numbers in:
 
       * pom.xml
-      * examples/pom.xml
-      * package/pom.xml
+      * driver-3/pom.xml
+      * examples/*/pom.xml
 
       if required.
       
 - [ ] Push your changes and submit a release PR against the code on master.
 
       Use this title text:
-
-      `[CHORE] Release Azure Cosmos Cassandra Extensions for DataStax Java Driver 3`
-
+      ```
+      [CHORE] Release Azure Cosmos Cassandra Extensions for DataStax Java Driver 3
+      ```
+      
       Start the description with this text:
-
+      ```
       This is release <version>.
+      ```
 
 - [ ] When your PR is complete, publish the release artifacts from the CI build to the Maven Repository.
 
