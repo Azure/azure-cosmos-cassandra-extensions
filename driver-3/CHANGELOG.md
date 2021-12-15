@@ -12,10 +12,14 @@ Apache released version [Apache log4j2][3] 2.16.0 to completely remove support f
 default. The test and example code in this repository depend on Apache log4j2 and this release bumps the version
 number for log4j2 from 2.13 to 2.16. The product code takes no dependency on log4j2. It uses [slf4j-api][4] instead.
 
+[Microsoft’s Response to CVE-2021-44228 Apache Log4j 2][5] includes a summary, analysis, and mitigation guidance for
+addressing this vulnerability.
+
 [1]: https://nvd.nist.gov/vuln/detail/CVE-2021-44228
 [2]: https://nvd.nist.gov/
 [3]: https://github.com/apache/logging-log4j2
 [4]: http://www.slf4j.org
+[5]: https://msrc-blog.microsoft.com/2021/12/11/microsofts-response-to-cve-2021-44228-apache-log4j2/
 
 ## 1.0.1
 
