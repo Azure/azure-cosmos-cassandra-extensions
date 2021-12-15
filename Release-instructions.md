@@ -44,7 +44,7 @@
       
 - [ ] Push your changes and submit a release PR against the code on develop/java-driver-4.
 
-  Use this title text:
+  Use this title text:d
   
   ```text
   [CHORE] Release Azure Cosmos Cassandra Extensions for DataStax Java Driver 4
