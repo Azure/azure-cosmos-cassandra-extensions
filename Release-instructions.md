@@ -4,8 +4,8 @@
 - [ ] Create a release branch based on develop/java-driver-4.
   
   ```bash
-  git pull --all
   git checkout develop/java-driver-4
+  git pull --all
   git checkout -b release/java-driver-4/${version}
   ```
 
@@ -77,11 +77,11 @@
 - [ ] Tag the release on the release and examples' develop branches.
 
   ```bash
-  git tag release-driver-4-${version}
+  git tag java-driver-4/${version}
   cd examples/java-driver-app
-  git tag release-driver-4-${version}
+  git tag java-driver-4/${version}
   cd ../examples/spring-boot-app
-  git tag release-driver-4-${version}
+  git tag java-driver-4/${version}
   ```
   
   - [ ] Merge the examples` develop branch to main

@@ -10,6 +10,7 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -22,7 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -142,7 +142,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @SuppressWarnings("Java9CollectionFactory")
     public List<Node> getNodesForReading() {
-        return Collections.unmodifiableList(new ArrayList<>(this.nodesForReading));
+        return new ArrayList<>(this.nodesForReading);
     }
 
     /**
@@ -158,7 +158,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      */
     @SuppressWarnings("Java9CollectionFactory")
     public List<Node> getNodesForWriting() {
-        return Collections.unmodifiableList(new ArrayList<>(this.nodesForWriting));
+        return new ArrayList<>(this.nodesForWriting);
     }
 
     /**
@@ -172,7 +172,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
     public List<String> getPreferredReadRegions() {
         final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
         assert comparator != null;
-        return Collections.unmodifiableList(comparator.getPreferredRegions());
+        return new ArrayList<>(comparator.getPreferredRegions());
     }
 
     /**
@@ -184,9 +184,9 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @return The list of preferred regions for failover on write operations.
      */
     public List<String> getPreferredWriteRegions() {
-        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
         assert comparator != null;
-        return Collections.unmodifiableList(comparator.getPreferredRegions());
+        return new ArrayList<>(comparator.getPreferredRegions());
     }
 
     // endregion
@@ -222,36 +222,20 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         final MetadataManager metadataManager = this.driverContext.getMetadataManager();
         final Set<Node> contactPoints = this.getContactPointsOrThrow();
         this.distanceReporter = distanceReporter;
+        PreferredRegionsComparator comparator;
 
-        PreferredRegionsComparator comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
+        comparator = (PreferredRegionsComparator) this.nodesForReading.comparator();
         assert comparator != null;
         comparator.addPreferredRegionsLast(contactPoints);
-
-        for (final Node node : nodes.values()) {
-            if (comparator.hasPreferredRegion(node.getDatacenter())) {
-                distanceReporter.setDistance(node, NodeDistance.LOCAL);
-            } else {
-                distanceReporter.setDistance(node, NodeDistance.REMOTE);
-            }
-            this.nodesForReading.add(node);
-        }
+        sortAndReportDistance(nodes, distanceReporter, this.nodesForReading);
 
         if (this.multiRegionWritesEnabled) {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
-
             comparator = (PreferredRegionsComparator) this.nodesForWriting.comparator();
             assert comparator != null;
             comparator.addPreferredRegionsFirst(contactPoints);
-
-            for (final Node node : nodes.values()) {
-                if (comparator.hasPreferredRegion(node.getDatacenter())) {
-                    distanceReporter.setDistance(node, NodeDistance.LOCAL);
-                } else {
-                    distanceReporter.setDistance(node, NodeDistance.REMOTE);
-                }
-                this.nodesForWriting.add(node);
-            }
+            sortAndReportDistance(nodes, distanceReporter, this.nodesForWriting);
         }
 
         final Semaphore permissionToGetNodes = new Semaphore(Integer.MAX_VALUE);
@@ -285,6 +269,24 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         LOG.debug("init -> {}", this);
     }
 
+    private static void sortAndReportDistance(
+        @NonNull final Map<UUID, Node> nodes,
+        @NonNull final DistanceReporter distanceReporter,
+        @NonNull final NavigableSet<Node> sortedNodes) {
+
+        final PreferredRegionsComparator comparator = (PreferredRegionsComparator) sortedNodes.comparator();
+        assert comparator != null;
+
+        for (final Node node : nodes.values()) {
+            if (comparator.hasPreferredRegion(node.getDatacenter())) {
+                distanceReporter.setDistance(node, NodeDistance.LOCAL);
+            } else {
+                distanceReporter.setDistance(node, NodeDistance.REMOTE);
+            }
+            sortedNodes.add(node);
+        }
+    }
+
     /**
      * Returns an {@link Queue ordered list} of {@link Node coordinators} to use for a new query.
      * <p>
@@ -310,7 +312,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
                 toJson(session == null ? null : session.getName()));
         }
 
-        // TODO (DANOBLE) consider caching results so that evaluation is reduced
+        // TODO (DANOBLE) consider caching results or implementing Queue on NavigableSet so that evaluation is reduced
 
         final Function<Request, Queue<Node>> function = this.getNodes;
         final Queue<Node> nodes = function.apply(request);
@@ -338,15 +340,18 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
         }
 
         requireNonNull(node, "expected non-null node");
-        this.nodesForReading.remove(node);
+        final EndPoint endPoint = node.getEndPoint();
+
+        this.nodesForReading.removeIf(item -> endPoint.equals(item.getEndPoint()));
 
         if (this.multiRegionWritesEnabled) {
             assert this.nodesForReading == this.nodesForWriting;
         } else {
-            this.nodesForWriting.remove(node);
+            this.nodesForWriting.removeIf(item -> endPoint.equals(item.getEndPoint()));
         }
 
         if (LOG.isWarnEnabled()) {
+
             if (this.multiRegionWritesEnabled) {
                 if (this.nodesForReading.isEmpty()) {
                     LOG.warn("All nodes have now been removed: {}", toJson(this));
@@ -574,7 +579,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
             }
             contactPoints.stream()
                 .map(Node::getDatacenter)
-                .forEachOrdered(region -> this.indexes.put(region, this.indexes.size()));
+                .forEachOrdered(region -> this.indexes.putIfAbsent(region, this.indexes.size()));
             this.preferredRegions = this.collectPreferredRegions();
         }
 

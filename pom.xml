@@ -17,7 +17,7 @@ Licensed under the MIT License.
   <artifactId>azure-cosmos-cassandra-driver-4</artifactId>
   <groupId>com.azure</groupId>
   <packaging>pom</packaging>
-  <version>1.1.0</version>
+  <version>1.1.1-SNAPSHOT</version>
 
   <developers>
     <developer>
@@ -57,7 +57,7 @@ Licensed under the MIT License.
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.junit-jupiter>5.7.1</version.junit-jupiter>
-    <version.log4j>2.13.3</version.log4j>
+    <version.log4j>2.15.0</version.log4j>
     <version.testng>7.3.0</version.testng>
   </properties>
 

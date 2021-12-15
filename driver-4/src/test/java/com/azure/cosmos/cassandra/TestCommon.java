@@ -23,6 +23,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -53,6 +54,8 @@ public final class TestCommon {
 
     // region Fields
 
+    static final Logger LOG = LoggerFactory.getLogger(CosmosLoadBalancingPolicyTest.class);
+
     public static final String GLOBAL_ENDPOINT;
     public static final InetSocketAddress GLOBAL_ENDPOINT_ADDRESS;
     public static final String GLOBAL_ENDPOINT_HOSTNAME;
@@ -62,6 +65,7 @@ public final class TestCommon {
     public static final String PASSWORD;
     public static final List<String> PREFERRED_REGIONS;
     public static final List<InetSocketAddress> REGIONAL_ENDPOINTS;
+    public static final List<String> REGIONS;
     public static final String TRUSTSTORE_PASSWORD;
     public static final String TRUSTSTORE_PATH;
     public static final String USERNAME;
@@ -71,98 +75,120 @@ public final class TestCommon {
 
     static {
 
-        // GLOBAL_ENDPOINT
+        try {
+            // GLOBAL_ENDPOINT
 
-        String value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.global-endpoint",
-            "localhost");
+            String value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.global-endpoint",
+                "localhost");
 
-        assertThat(value).isNotBlank();
-        final int index = value.lastIndexOf(':');
+            assertThat(value).isNotBlank();
+            final int index = value.lastIndexOf(':');
 
-        if (index == -1) {
-            GLOBAL_ENDPOINT = value + ":10350";
-            GLOBAL_ENDPOINT_HOSTNAME = value;
-            GLOBAL_ENDPOINT_PORT = 10350;
-        } else {
-            assertThat(index).isGreaterThan(0);
-            assertThat(index).isLessThan(value.length() - 1);
-            GLOBAL_ENDPOINT = value;
-            GLOBAL_ENDPOINT_HOSTNAME = GLOBAL_ENDPOINT.substring(0, index);
-            GLOBAL_ENDPOINT_PORT = Integer.parseUnsignedInt(GLOBAL_ENDPOINT.substring(index + 1));
+            if (index == -1) {
+                GLOBAL_ENDPOINT = value + ":10350";
+                GLOBAL_ENDPOINT_HOSTNAME = value;
+                GLOBAL_ENDPOINT_PORT = 10350;
+            } else {
+                assertThat(index).isGreaterThan(0);
+                assertThat(index).isLessThan(value.length() - 1);
+                GLOBAL_ENDPOINT = value;
+                GLOBAL_ENDPOINT_HOSTNAME = GLOBAL_ENDPOINT.substring(0, index);
+                GLOBAL_ENDPOINT_PORT = Integer.parseUnsignedInt(GLOBAL_ENDPOINT.substring(index + 1));
+            }
+
+            GLOBAL_ENDPOINT_ADDRESS = new InetSocketAddress(GLOBAL_ENDPOINT_HOSTNAME, GLOBAL_ENDPOINT_PORT);
+
+            setProperty("azure.cosmos.cassandra.global-endpoint-address", GLOBAL_ENDPOINT_ADDRESS);
+            setProperty("azure.cosmos.cassandra.global-endpoint-hostname", GLOBAL_ENDPOINT_HOSTNAME);
+            setProperty("azure.cosmos.cassandra.global-endpoint-port", GLOBAL_ENDPOINT_PORT);
+
+            // USERNAME
+
+            value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.username",
+                null);
+
+            assertThat(value).isNotBlank();
+            USERNAME = value;
+
+            // PASSWORD
+
+            value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.password",
+                null);
+
+            assertThat(value).isNotBlank();
+            PASSWORD = value;
+
+            // MULTI_REGION_WRITES
+
+            value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.multi-region-writes",
+                "true");
+
+            assertThat(value).isNotBlank();
+            MULTI_REGION_WRITES = Boolean.parseBoolean(value);
+
+            // PREFERRED_REGIONS
+
+            List<String> list = getPropertyOrEnvironmentVariableList(
+                "azure.cosmos.cassandra.preferred-regions",
+                "azure.cosmos.cassandra.preferred-region-");
+
+            assertThat(list).isNotEmpty();
+            PREFERRED_REGIONS = list;
+
+            // REGIONAL_ENDPOINTS
+
+            list = getPropertyOrEnvironmentVariableList(
+                "azure.cosmos.cassandra.regional-endpoints",
+                "azure.cosmos.cassandra.regional-endpoint-");
+
+            assertThat(list).isNotEmpty();
+            REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseInetSocketAddress).collect(Collectors.toList());
+
+            // REGIONS
+
+            list = getPropertyOrEnvironmentVariableList(
+                "azure.cosmos.cassandra.regions",
+                "azure.cosmos.cassandra.region-");
+
+            assertThat(list).isNotEmpty();
+            REGIONS = list;
+
+            // TRUSTSTORE_PATH
+
+            value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.truststore-path",
+                null);
+
+            assertThat(value).isNotEmpty();
+            assertThat(new File(value)).exists().canRead();
+            TRUSTSTORE_PATH = value;
+
+            // TRUSTSTORE_PASSWORD
+
+            value = getPropertyOrEnvironmentVariable(
+                "azure.cosmos.cassandra.truststore-password",
+                null);
+
+            assertThat(value).isNotEmpty();
+            TRUSTSTORE_PASSWORD = value;
+
+            System.setProperty(
+                "javax.net.ssl.trustStore",
+                System.getProperty("azure.cosmos.cassandra.truststore-path"));
+
+            System.setProperty(
+                "javax.net.ssl.trustStorePassword",
+                System.getProperty("azure.cosmos.cassandra.truststore-password"));
+
+        } catch (final Throwable error) {
+            LOG.error("Class initialization failed due to {}", toJson(error));
+            printTestParameters();
+            throw error;
         }
-
-        GLOBAL_ENDPOINT_ADDRESS = new InetSocketAddress(GLOBAL_ENDPOINT_HOSTNAME, GLOBAL_ENDPOINT_PORT);
-
-        setProperty("azure.cosmos.cassandra.global-endpoint-address", GLOBAL_ENDPOINT_ADDRESS);
-        setProperty("azure.cosmos.cassandra.global-endpoint-hostname", GLOBAL_ENDPOINT_HOSTNAME);
-        setProperty("azure.cosmos.cassandra.global-endpoint-port", GLOBAL_ENDPOINT_PORT);
-
-        // USERNAME
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.username",
-            null);
-
-        assertThat(value).isNotBlank();
-        USERNAME = value;
-
-        // PASSWORD
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.password",
-            null);
-
-        assertThat(value).isNotBlank();
-        PASSWORD = value;
-
-        // MULTI_REGION_WRITES
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.multi-region-writes",
-            "true");
-
-        assertThat(value).isNotBlank();
-        MULTI_REGION_WRITES = Boolean.parseBoolean(value);
-
-        // PREFERRED_REGIONS
-
-        List<String> list = getPropertyOrEnvironmentVariableList(
-            "azure.cosmos.cassandra.preferred-regions",
-            "azure.cosmos.cassandra.preferred-region-");
-
-        assertThat(list).isNotEmpty();
-        PREFERRED_REGIONS = list;
-
-        // REGIONAL_ENDPOINTS
-
-        list = getPropertyOrEnvironmentVariableList(
-            "azure.cosmos.cassandra.regional-endpoints",
-            "azure.cosmos.cassandra.regional-endpoint-");
-
-        assertThat(list).isNotEmpty();
-        REGIONAL_ENDPOINTS = list.stream().map(TestCommon::parseInetSocketAddress).collect(Collectors.toList());
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.truststore-path",
-            null);
-
-        assertThat(value).isNotEmpty();
-        assertThat(new File(value)).exists().canRead();
-        TRUSTSTORE_PATH = value;
-
-        value = getPropertyOrEnvironmentVariable(
-            "azure.cosmos.cassandra.truststore-password",
-            null);
-
-        assertThat(value).isNotEmpty();
-        TRUSTSTORE_PASSWORD = value;
-
-        System.setProperty("javax.net.ssl.trustStore",
-            System.getProperty("azure.cosmos.cassandra.truststore-path"));
-
-        System.setProperty("javax.net.ssl.trustStorePassword",
-            System.getProperty("azure.cosmos.cassandra.truststore-password"));
     }
 
     private TestCommon() {
