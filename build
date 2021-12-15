@@ -2,7 +2,7 @@
 
 set -o errexit -o nounset
 
-declare -ra arg_line=()
+declare -ra arg_line=('')
 declare -r log_directory=~/.local/var/log
 declare -r reporting_directory="$log_directory"
 
