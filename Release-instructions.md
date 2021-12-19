@@ -33,6 +33,7 @@
 
 - [ ] Bump the version numbers in:
 
+  * Release-instructions.md
   * pom.xml
   * driver-4/pom.xml
   * spring-data/pom.xml
