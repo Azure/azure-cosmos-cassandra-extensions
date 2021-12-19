@@ -1,5 +1,18 @@
 ## Release History
 
+## 1.0.3
+
+This is a maintenance release to address the [*Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)*][1] reported between
+late November and early December 2021. 
+
+### Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)
+
+The vulnerability that this change addresses is described in the [National Vulnerabilities Database][2]. On 12/17/2021
+Apache released version [Apache log4j2][3] 2.17.0 after discovering issues with their previous release, 2.16.0, 
+published on 12/14/2021. The test and example code in this repository depend on Apache log4j2 and this release bumps 
+the version number for log4j2 from 2.16 to 2.17. The product code takes no dependency on log4j2. It uses [slf4j-api][4] 
+instead.
+
 ## 1.0.2
 
 This is a maintenance release to address the [*Log4j2 Vulnerability “Log4Shell” (CVE-2021-44228)*][1] reported between
