@@ -4,8 +4,8 @@
 - [ ] Create a release branch based on master.
   
       ```bash
-      git pull --all
       git checkout master
+      git pull --all
       git checkout -b release/java-driver-3/$version
       ```
 
@@ -32,7 +32,7 @@
       ```
       [CHORE] Release Azure Cosmos Cassandra Extensions for DataStax Java Driver 3
       ```
-      
+
       Start the description with this text:
       ```
       This is release <version>.
