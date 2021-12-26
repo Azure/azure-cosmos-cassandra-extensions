@@ -1,6 +1,6 @@
 # Release History
 
-## 1.1.2
+## 1.1.2-1
 
 This release bumps the version of the dependency on `azure-cosmos-cassandra-driver-4-extensions` from 1.1.1 to 1.1.2.
 See the [`CHANGELOG.md`][4] for a summary of the changes to this dependency.
