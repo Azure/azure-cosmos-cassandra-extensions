@@ -19,7 +19,7 @@ choose to override.
 
 See `KNOWN_ISSUES.md` for a description of known issues in this release.
 
-[0]: https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/release/java-driver-4/1.1.2/driver-4/
+[0]: https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/release/java-driver-4/1.1.3/driver-4/
 [1]: https://docs.datastax.com/en/developer/java-driver/4.13/
 [2]: https://docs.datastax.com/en/developer/java-driver/4.13/manual/core/configuration/
-[3]: https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/release/java-driver-4/1.1.2/driver-4/src/main/resources/reference.conf
+[3]: https://github.com/Azure/azure-cosmos-cassandra-extensions/blob/release/java-driver-4/1.1.3/driver-4/src/main/resources/reference.conf

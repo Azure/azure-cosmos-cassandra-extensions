@@ -1,5 +1,10 @@
 # Release History
 
+## 1.1.3
+
+This release bumps the version of the dependency on `azure-cosmos-cassandra-driver-4-extensions` from 1.1.2 to 1.1.3.
+See the [`CHANGELOG.md`][5] for a summary of the changes to this dependency.
+
 ## 1.1.2-1
 
 This release bumps the version of the dependency on `azure-cosmos-cassandra-driver-4-extensions` from 1.1.1 to 1.1.2.
@@ -40,3 +45,5 @@ with Spring Boot or a plain ordinary Java Application by taking a look at these 
 [2]: https://github.com/Azure-Samples/azure-cosmos-cassandra-extensions-java-sample-v4/
 [3]: https://github.com/Azure/azure-cosmos-cassandra-extensions/tree/release/java-driver-4/1.1.1/driver-4/CHANGELOG.md
 [4]: https://github.com/Azure/azure-cosmos-cassandra-extensions/tree/release/java-driver-4/1.1.2/driver-4/CHANGELOG.md
+[5]: https://github.com/Azure/azure-cosmos-cassandra-extensions/tree/release/java-driver-4/1.1.3/driver-4/CHANGELOG.md
+
