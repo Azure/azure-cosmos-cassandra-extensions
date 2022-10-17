@@ -5,7 +5,7 @@ instance using [DataStax Java Driver 4][1]. When you take a dependency on this p
 file overrides some default values set by [DataStax Java Driver 4][1]. This ensures a good out-of-box experience for 
 communicating with Cosmos DB. It guarantees, for example, that each of these extensions are used by default:
 
-- `CosmosLoadBalancingPolicy` offering options for specifying read and write datacenters to route requests.
+- `CosmosLoadBalancingPolicy` offering options for specifying preferred regions for failover in multi-region environments.
 - `CosmosRetryPolicy` throttling-aware, providing options for back-offs when failures occur.
 - `ConstantReconnectionPolicy` waits a constant time between each reconnection attempt.
 - `PlainTextAuthProvider` supports SASL authentication using the PLAIN mechanism as required by Cosmos DB.
