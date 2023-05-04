@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +55,8 @@ public final class CosmosJson {
      *
      * @return The {@link ObjectMapper object mapper} used by this class.
      */
+    @NonNull
+    @SuppressFBWarnings("MS_EXPOSE_REP")
     public static ObjectMapper objectMapper() {
         return INSTANCE.objectMapper;
     }
@@ -67,6 +70,7 @@ public final class CosmosJson {
      * @return The object writer instantiated by this class.
      */
     @NonNull
+    @SuppressFBWarnings("MS_EXPOSE_REP")
     public static ObjectWriter objectWriter() {
         return INSTANCE.objectWriter;
     }

@@ -48,6 +48,7 @@ import static com.azure.cosmos.cassandra.TestCommon.GLOBAL_ENDPOINT_PORT;
 import static com.azure.cosmos.cassandra.TestCommon.PREFERRED_REGIONS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONAL_ENDPOINTS;
 import static com.azure.cosmos.cassandra.TestCommon.REGIONS;
+import static com.azure.cosmos.cassandra.TestCommon.getSocketAddress;
 import static com.azure.cosmos.cassandra.TestCommon.testAllStatements;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -141,7 +142,7 @@ public final class CosmosLoadBalancingPolicyTest {
             nodes = session.getMetadata().getNodes();
 
             final Node primary = nodes.values().stream()
-                .filter(node -> node.getEndPoint().resolve().equals(GLOBAL_ENDPOINT_ADDRESS))
+                .filter(node -> getSocketAddress(node).equals(GLOBAL_ENDPOINT_ADDRESS))
                 .findFirst()
                 .orElse(null);
 
@@ -292,7 +293,7 @@ public final class CosmosLoadBalancingPolicyTest {
             final Map<UUID, Node> initialNodes = session.getMetadata().getNodes();
 
             final Node[] expectedPreferredNodes = initialNodes.values().stream()
-                .filter(node -> node.getEndPoint().resolve().equals(globalEndpointAddress))
+                .filter(node -> getSocketAddress(node).equals(globalEndpointAddress))
                 .toArray(Node[]::new);
 
             assertThat(expectedPreferredNodes).hasSize(1);
@@ -438,7 +439,7 @@ public final class CosmosLoadBalancingPolicyTest {
             final Map<UUID, Node> initialNodes = session.getMetadata().getNodes();
 
             final Node[] expectedPreferredNodes = initialNodes.values().stream()
-                .filter(node -> node.getEndPoint().resolve().equals(globalEndpointAddress))
+                .filter(node -> getSocketAddress(node).equals(globalEndpointAddress))
                 .toArray(Node[]::new);
 
             assertThat(expectedPreferredNodes).hasSize(1);
@@ -580,7 +581,10 @@ public final class CosmosLoadBalancingPolicyTest {
 
         // Check that the driver has got the nodes we expect: one per region because we're connected to Cosmos DB
 
-        assertThat(nodes.values().stream().map(node -> node.getEndPoint().resolve())).containsAll(REGIONAL_ENDPOINTS);
+        assertThat(nodes.values().stream()
+            .map(TestCommon::getSocketAddress))
+            .containsAll(REGIONAL_ENDPOINTS);
+
         assertThat(nodes.size()).isEqualTo(REGIONAL_ENDPOINTS.size());
 
         // Check that we've got the load balancing policy we think we have
@@ -612,7 +616,7 @@ public final class CosmosLoadBalancingPolicyTest {
         final List<Node> nodesForReading = cosmosLoadBalancingPolicy.getNodesForReading();
 
         if (preferredReadRegions.size() == configuredPreferredRegions.size()) {
-            final SocketAddress address = getSocketAddress(nodesForReading, preferredReadRegions.size() - 1);
+            final SocketAddress address = TestCommon.getSocketAddress(nodesForReading.get(0));
             assertThat(address).isEqualTo(GLOBAL_ENDPOINT_ADDRESS);
         }
 
@@ -621,7 +625,7 @@ public final class CosmosLoadBalancingPolicyTest {
         } else {
             final List<Node> nodesForWriting = cosmosLoadBalancingPolicy.getNodesForWriting();
             if (preferredReadRegions.size() == configuredPreferredRegions.size()) {
-                final SocketAddress address = getSocketAddress(nodesForWriting, 0);
+                final SocketAddress address = TestCommon.getSocketAddress(nodesForWriting.get(0));
                 assertThat(address).isEqualTo(GLOBAL_ENDPOINT_ADDRESS);
             }
         }
@@ -675,7 +679,7 @@ public final class CosmosLoadBalancingPolicyTest {
             assertThat(nodes).hasSize(REGIONAL_ENDPOINTS.size());
 
             assertThat(nodes.values()).are(new Condition<>(
-                node -> REGIONAL_ENDPOINTS.contains((InetSocketAddress) node.getEndPoint().resolve()),
+                node -> REGIONAL_ENDPOINTS.contains((InetSocketAddress) getSocketAddress(node)),
                 "regional endpoint"));
 
             LOG.info(
@@ -684,10 +688,6 @@ public final class CosmosLoadBalancingPolicyTest {
                 iterations,
                 toJson(nodes));
         }
-    }
-
-    private static SocketAddress getSocketAddress(final List<Node> nodesForWriting, final int i) {
-        return nodesForWriting.get(i).getEndPoint().resolve();
     }
 
     private static ProgrammaticDriverConfigLoaderBuilder newProgrammaticDriverConfigLoaderBuilder() {
@@ -731,7 +731,7 @@ public final class CosmosLoadBalancingPolicyTest {
 
             if (nodesForWriting.get(0).equals(primary)) {
                 for (int i = 1; i < expectedPreferredNodes.length; i++) {
-                    assertThat(nodesForWriting.get(i)).isEqualTo(expectedPreferredNodes[i - 1]);
+                    assertThat(nodesForWriting.get(i)).isEqualTo(expectedPreferredNodes[i]);
                 }
             } else {
                 assertThat(nodesForWriting).startsWith(expectedPreferredNodes);

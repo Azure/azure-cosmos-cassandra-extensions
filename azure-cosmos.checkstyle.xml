@@ -13,7 +13,7 @@ page at http://checkstyle.sourceforge.net/config.html -->
   </module>
 
   <module name="SuppressionFilter">
-    <property name="file" value="${samedir}/checkstyle-suppressions.xml"/>
+    <property name="file" value="azure-cosmos.checkstyle-suppressions.xml"/>
     <property name="optional" value="true"/>
   </module>
 

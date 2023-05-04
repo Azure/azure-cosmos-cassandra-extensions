@@ -13,6 +13,7 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import com.datastax.oss.driver.api.querybuilder.delete.Delete;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -634,6 +636,11 @@ public final class TestCommon {
             out.print('+');
         }
         out.println();
+    }
+
+    static SocketAddress getSocketAddress(final Node node) {
+        final InetSocketAddress address = (InetSocketAddress) node.getEndPoint().resolve();
+        return address.getAddress() == null ? new InetSocketAddress(address.getHostName(), address.getPort()) : address;
     }
 
     private static String getVariableName(final String property) {

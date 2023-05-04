@@ -19,6 +19,11 @@ import java.util.function.Function;
  */
 public enum CosmosLoadBalancingPolicyOption implements CosmosDriverOption {
 
+    LOCAL_DATACENTER("local-datacenter",
+        (option, profile) -> profile.getString(option, option.getDefaultValue(String.class)),
+        Function.identity(),
+        null),
+
     MULTI_REGION_WRITES("multi-region-writes",
         (option, profile) -> profile.getBoolean(option, option.getDefaultValue(Boolean.class)),
         Boolean::parseBoolean,

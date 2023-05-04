@@ -210,6 +210,7 @@ public final class CosmosLoadBalancingPolicy implements LoadBalancingPolicy {
      * @param distanceReporter an object that the policy uses to signal decisions it makes about node distances.
      */
     @Override
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public void init(@NonNull final Map<UUID, Node> nodes, @NonNull final DistanceReporter distanceReporter) {
 
         requireNonNull(nodes, "expected non-null cluster");

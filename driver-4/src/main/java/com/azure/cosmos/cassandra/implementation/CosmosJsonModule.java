@@ -321,7 +321,7 @@ public final class CosmosJsonModule extends SimpleModule {
      * A mix-in for serializing {@link RetryPolicy} instances to JSON.
      */
     @JsonAppend(props = @Prop(value = TypePropertyWriter.class, name = "type", type = String.class), prepend = true)
-    public abstract static class RetryPolicyMixin {
+    public abstract static class RetryPolicyMixIn {
         public static final Class<RetryPolicy> HANDLED_TYPE = RetryPolicy.class;
     }
 

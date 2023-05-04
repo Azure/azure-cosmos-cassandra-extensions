@@ -48,17 +48,16 @@ Licensed under the MIT License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javadoc.options/>
     <!-- Package dependency version numbers -->
-    <version.cassandra-driver>[4.7,4.14)</version.cassandra-driver>
-    <version.jackson>[2.12,2.13)</version.jackson>
+    <version.cassandra-driver>[4.7,4.16)</version.cassandra-driver>
+    <version.jackson>[2.13,2.14)</version.jackson>
     <version.slf4j-api>[1.7,1.8.0-alpha0)</version.slf4j-api>
-    <version.spring-data-cassandra>[3.2,3.3)</version.spring-data-cassandra>
+    <version.spring-data-cassandra>[3.2,3.4.5)</version.spring-data-cassandra>
     <!-- Examples dependency version numbers -->
     <version.spring-boot-starter-data-cassandra>[2.4.4]</version.spring-boot-starter-data-cassandra>
     <!-- Test dependency version numbers -->
     <version.assertj-core>3.18.0</version.assertj-core>
     <version.junit-jupiter>5.7.1</version.junit-jupiter>
-    <version.log4j>[2.17.1,)</version.log4j>
-    <version.testng>7.3.0</version.testng>
+    <version.log4j>[2.19.0,)</version.log4j>
   </properties>
 
   <scm>
@@ -157,18 +156,18 @@ Licensed under the MIT License.
         </plugin>
         <plugin>
           <artifactId>maven-checkstyle-plugin</artifactId>
-          <version>3.1.2</version>
+          <version>3.2.0</version>
           <dependencies>
             <dependency>
               <groupId>com.puppycrawl.tools</groupId>
               <artifactId>checkstyle</artifactId>
-              <version>8.42</version>
+              <version>10.3.4</version>
             </dependency>
           </dependencies>
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>3.10.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-dependency-plugin</artifactId>
@@ -212,12 +211,12 @@ Licensed under the MIT License.
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>3.0.0-M7</version>
         </plugin>
         <plugin>
           <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
-          <version>4.2.3</version>
+          <version>4.7.2.1</version>
         </plugin>
         <plugin>
           <groupId>org.springframework.boot</groupId>
@@ -230,8 +229,8 @@ Licensed under the MIT License.
       <plugin>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <configuration>
-          <configLocation>azure-cosmos-style.xml</configLocation>
-          <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
+          <configLocation>azure-cosmos.checkstyle.xml</configLocation>
+          <propertyExpansion>samedir=${project.parent.basedir}</propertyExpansion>
           <consoleOutput>true</consoleOutput>
           <failsOnError>true</failsOnError>
           <linkXRef>false</linkXRef>
@@ -376,15 +375,15 @@ Licensed under the MIT License.
     <profile>
       <id>java-lts</id>
       <activation>
-        <jdk>[11,)</jdk>
+        <jdk>[17,)</jdk>
       </activation>
       <build>
         <plugins>
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
-              <source>11</source>
-              <target>11</target>
+              <source>17</source>
+              <target>17</target>
             </configuration>
             <executions>
               <!-- Compile first with module-info for Java LTS+ -->

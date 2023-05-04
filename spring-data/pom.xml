@@ -28,7 +28,7 @@ Licensed under the MIT License.
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-cosmos-cassandra-driver-4-extensions</artifactId>
-      <version>${parent.version}</version>
+      <version>${project.parent.version}</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
