@@ -122,4 +122,4 @@ function Test-Build {
     }
 }
 
-Measure-Command { Test-Build $ArgLine } | Out-Default
+Test-Build $ArgLine
