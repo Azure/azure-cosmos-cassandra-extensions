@@ -1,3 +1,8 @@
+--------------------------------
+This repository has been archived due to sustained lack of activity as noted in issue: [[https://github.com/microsoft/pxt-data-streamer/issues/11](https://github.com/Azure/azure-cosmos-cassandra-extensions/issues/57)
+--------------------------------
+
+
 # Azure Cosmos Cassandra Extensions for Java
 
 ## Contribution and Feedback
